@@ -539,6 +539,10 @@ export type Database = {
     }
     Functions: {
       is_admin: { Args: never; Returns: boolean }
+      user_can_access_template: {
+        Args: { p_template_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "client"
