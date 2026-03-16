@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { getAdminAccessError } from "@/lib/admin-access";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,8 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const created = searchParams.get("cadastro") === "sucesso";
   const callbackUrl = searchParams.get("callbackUrl") ?? "/minha-conta";
+  const adminAccessError =
+    searchParams.get("erro") === "admin_email" ? getAdminAccessError(searchParams.get("email")) : null;
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
 
@@ -57,6 +60,12 @@ export default function LoginPage() {
             {created && (
               <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
                 Conta criada com sucesso. Agora e so entrar.
+              </div>
+            )}
+
+            {adminAccessError && (
+              <div className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                {adminAccessError}
               </div>
             )}
 

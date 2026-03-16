@@ -5,6 +5,7 @@ import { Plus } from "lucide-react";
 import { DiagnosticFlowBuilder } from "@/components/admin/diagnostic-flow-builder";
 import { LinkManager } from "@/components/admin/link-manager";
 import { supabase } from "@/integrations/supabase/client";
+import { getAdminAccessError, isAllowedAdminEmail } from "@/lib/admin-access";
 import {
   archiveTemplate,
   createTemplate,
@@ -48,6 +49,12 @@ export default function AdminPage() {
 
         if (!session?.user) {
           navigate("/entrar?callbackUrl=/admin");
+          return;
+        }
+
+        if (!isAllowedAdminEmail(session.user.email)) {
+          await supabase.auth.signOut();
+          navigate(`/entrar?erro=admin_email&email=${encodeURIComponent(session.user.email ?? "")}`);
           return;
         }
 
