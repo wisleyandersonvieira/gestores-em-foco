@@ -16,7 +16,6 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@auth/core": "^0.34.2",
     "@hookform/resolvers": "^3.10.0",
     "@prisma/client": "^5.22.0",
     "@radix-ui/react-accordion": "^1.2.11",
