@@ -1,0 +1,130 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  CLIENT
+}
+
+enum ModelStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum NodeType {
+  START
+  END
+  QUESTION_YESNO
+  QUESTION_MULTIPLE
+  QUESTION_SCALE
+  QUESTION_TEXT
+  GROUP
+}
+
+enum LinkStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+model User {
+  id             String               @id @default(cuid())
+  name           String
+  email          String               @unique
+  passwordHash   String
+  companyName    String?
+  segment        String?
+  employeesCount Int?
+  role           Role                 @default(CLIENT)
+  createdAt      DateTime             @default(now())
+  responses      DiagnosticResponse[]
+  links          DiagnosticLink[]     @relation("AssignedLinks")
+}
+
+model DiagnosticModel {
+  id          String           @id @default(cuid())
+  name        String
+  description String?
+  category    String?
+  status      ModelStatus      @default(ACTIVE)
+  createdAt   DateTime         @default(now())
+  nodes       DiagnosticNode[]
+  edges       DiagnosticEdge[]
+  links       DiagnosticLink[]
+}
+
+model DiagnosticNode {
+  id           String               @id @default(cuid())
+  modelId      String
+  model        DiagnosticModel      @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  nodeType     NodeType
+  label        String?
+  questionText String?
+  category     String?
+  weight       Float                @default(1.0)
+  positionX    Float
+  positionY    Float
+  config       Json?
+  createdAt    DateTime             @default(now())
+  sourceEdges  DiagnosticEdge[]     @relation("SourceEdges")
+  targetEdges  DiagnosticEdge[]     @relation("TargetEdges")
+  responses    DiagnosticResponse[]
+
+  @@index([modelId])
+}
+
+model DiagnosticEdge {
+  id             String          @id @default(cuid())
+  modelId        String
+  sourceNodeId   String
+  targetNodeId   String
+  conditionLabel String?
+  conditionValue String?
+  createdAt      DateTime        @default(now())
+  model          DiagnosticModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  sourceNode     DiagnosticNode  @relation("SourceEdges", fields: [sourceNodeId], references: [id], onDelete: Cascade)
+  targetNode     DiagnosticNode  @relation("TargetEdges", fields: [targetNodeId], references: [id], onDelete: Cascade)
+
+  @@index([modelId])
+  @@index([sourceNodeId])
+  @@index([targetNodeId])
+}
+
+model DiagnosticLink {
+  id             String                @id @default(cuid())
+  modelId        String
+  token          String                @unique @default(uuid())
+  label          String?
+  assignedUserId String?
+  status         LinkStatus            @default(PENDING)
+  expiresAt      DateTime?
+  createdAt      DateTime              @default(now())
+  model          DiagnosticModel       @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  assignedUser   User?                 @relation("AssignedLinks", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  responses      DiagnosticResponse[]
+
+  @@index([modelId])
+  @@index([assignedUserId])
+}
+
+model DiagnosticResponse {
+  id          String         @id @default(cuid())
+  linkId      String
+  userId      String
+  nodeId      String
+  answerValue String
+  answeredAt  DateTime       @default(now())
+  link        DiagnosticLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  node        DiagnosticNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@unique([linkId, userId, nodeId])
+  @@index([linkId, userId])
+  @@index([nodeId])
+}

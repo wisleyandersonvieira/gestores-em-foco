@@ -1,0 +1,11 @@
+{
+  "/_not-found/page": "app/_not-found/page.js",
+  "/(auth)/cadastro/page": "app/(auth)/cadastro/page.js",
+  "/(auth)/entrar/page": "app/(auth)/entrar/page.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/diagnostico/[token]/page": "app/diagnostico/[token]/page.js",
+  "/page": "app/page.js",
+  "/(platform)/minha-conta/diagnostico/[linkId]/resultado/page": "app/(platform)/minha-conta/diagnostico/[linkId]/resultado/page.js",
+  "/(platform)/minha-conta/page": "app/(platform)/minha-conta/page.js",
+  "/admin/page": "app/admin/page.js"
+}

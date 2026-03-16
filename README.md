@@ -1,73 +1,67 @@
-# Welcome to your Lovable project
+# Gestores em Foco
 
-## Project info
+Base SaaS em `Next.js 14` para diagnosticos empresariais usados por mentores, coaches e organizadores de summits.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Stack
 
-## How can I edit this code?
+- Next.js 14 + App Router + TypeScript
+- Tailwind CSS + shadcn/ui
+- Prisma + PostgreSQL / Supabase
+- NextAuth com login por email e senha
 
-There are several ways of editing your application.
+## Primeira entrega
 
-**Use Lovable**
+Esta fase implementa a base do produto:
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+- landing page institucional
+- cadastro e login
+- protecao de rotas para `/minha-conta` e `/admin`
+- schema Prisma completo
+- seed com usuario admin, usuario cliente e modelo demo
+- rota publica `/diagnostico/[token]` com validacao inicial
 
-Changes made via Lovable will be committed automatically to this repo.
+## Ambiente
 
-**Use your preferred IDE**
+1. Instale dependencias:
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+```bash
+npm install
+```
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+2. Configure o ambiente:
 
-Follow these steps:
+```bash
+cp .env.example .env
+```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+3. Gere o client Prisma e rode a migration:
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+```bash
+npm run prisma:generate
+npm run prisma:migrate
+```
 
-# Step 3: Install the necessary dependencies.
-npm i
+4. Popule dados de teste:
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
+npm run prisma:seed
+```
+
+5. Inicie a aplicacao:
+
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## Credenciais seed
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+- Admin: `admin@gestoresemfoco.com` / `Admin@123`
+- Cliente: `cliente@exemplo.com` / `Cliente@123`
 
-**Use GitHub Codespaces**
+## Proximas fases
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- CRUD de modelos de diagnostico
+- construtor com React Flow
+- gerador de links
+- persistencia de respostas
+- relatorio final com score e radar chart

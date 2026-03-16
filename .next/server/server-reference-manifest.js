@@ -1,0 +1,1 @@
+self.__RSC_SERVER_MANIFEST="{\"node\":{\"62389eec5b31de52c4aa217640dcf6022b267cd8\":{\"workers\":{\"app/(auth)/cadastro/page\":\"42448\"},\"layer\":{\"app/(auth)/cadastro/page\":\"action-browser\"}}},\"edge\":{},\"encryptionKey\":\"process.env.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY\"}"
