@@ -101,6 +101,13 @@ export type Database = {
             foreignKeyName: "diagnostic_categories_template_id_fkey"
             columns: ["template_id"]
             isOneToOne: false
+            referencedRelation: "admin_stats_sessions"
+            referencedColumns: ["template_id"]
+          },
+          {
+            foreignKeyName: "diagnostic_categories_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
             referencedRelation: "diagnostic_templates"
             referencedColumns: ["id"]
           },
@@ -166,6 +173,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "diagnostic_links_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "admin_stats_sessions"
+            referencedColumns: ["template_id"]
           },
           {
             foreignKeyName: "diagnostic_links_template_id_fkey"
@@ -264,6 +278,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "diagnostic_categories"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "diagnostic_questions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "admin_stats_sessions"
+            referencedColumns: ["template_id"]
           },
           {
             foreignKeyName: "diagnostic_questions_template_id_fkey"
@@ -373,6 +394,13 @@ export type Database = {
             foreignKeyName: "diagnostic_sessions_template_id_fkey"
             columns: ["template_id"]
             isOneToOne: false
+            referencedRelation: "admin_stats_sessions"
+            referencedColumns: ["template_id"]
+          },
+          {
+            foreignKeyName: "diagnostic_sessions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
             referencedRelation: "diagnostic_templates"
             referencedColumns: ["id"]
           },
@@ -473,7 +501,41 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      admin_stats_links: {
+        Row: {
+          active_links: number | null
+          recent_links: number | null
+          total_links: number | null
+        }
+        Relationships: []
+      }
+      admin_stats_sessions: {
+        Row: {
+          completed_sessions: number | null
+          completion_rate: number | null
+          template_id: string | null
+          template_name: string | null
+          total_sessions: number | null
+        }
+        Relationships: []
+      }
+      admin_stats_templates: {
+        Row: {
+          archived: number | null
+          drafts: number | null
+          published_active: number | null
+          total_templates: number | null
+        }
+        Relationships: []
+      }
+      admin_stats_users: {
+        Row: {
+          active_users: number | null
+          total_admins: number | null
+          total_users: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       is_admin: { Args: never; Returns: boolean }
