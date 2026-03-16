@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 
 import { DiagnosticFlowBuilder } from "@/components/admin/diagnostic-flow-builder";
+import { LinkManager } from "@/components/admin/link-manager";
 import { supabase } from "@/integrations/supabase/client";
 import {
   archiveTemplate,
@@ -24,6 +25,7 @@ export default function AdminPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [editorState, setEditorState] = useState<TemplateEditorState | null>(null);
@@ -48,6 +50,8 @@ export default function AdminPage() {
           navigate("/entrar?callbackUrl=/admin");
           return;
         }
+
+        setUserId(session.user.id);
 
         const profile = await getAdminProfile(session.user.id);
         if (profile.role !== "admin") {
@@ -304,6 +308,10 @@ export default function AdminPage() {
           </div>
 
           <DiagnosticFlowBuilder template={editorState} saving={busy} onSave={handleSaveTemplate} />
+        </section>
+
+        <section className="mt-10">
+          <LinkManager templateId={selectedTemplateId} userId={userId} />
         </section>
       </main>
     </div>
