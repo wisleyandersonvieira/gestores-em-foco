@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import {
   ArrowRight,
   BarChart3,
@@ -79,22 +79,22 @@ export function LandingPage() {
               <CheckCircle2 className="h-4 w-4" />
               Diagnosticos empresariais para educacao e mentoria
             </div>
-            <h1 className="font-display max-w-3xl text-4xl font-semibold leading-tight text-slate-950 md:text-6xl">
+            <h1 className="font-display max-w-3xl text-4xl font-semibold leading-tight text-foreground md:text-6xl">
               Descubra o que esta travando o crescimento do seu negocio.
             </h1>
-            <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600">
+            <p className="mt-6 max-w-2xl text-lg leading-8 text-muted-foreground">
               Transforme respostas em insights acionaveis. Mentores, coaches e organizadores enviam links personalizados,
               acompanham o progresso e entregam um diagnostico com profundidade real.
             </p>
             <div className="mt-8 flex flex-col gap-4 sm:flex-row">
               <Button asChild size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90">
-                <Link href="/cadastro">
+                <Link to="/cadastro">
                   Fazer meu Diagnostico
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
               <Button asChild size="lg" variant="outline" className="border-primary/20 bg-white/70">
-                <Link href="/entrar">Acessar minha conta</Link>
+                <Link to="/entrar">Acessar minha conta</Link>
               </Button>
             </div>
           </div>
@@ -105,22 +105,22 @@ export function LandingPage() {
               <div className="rounded-3xl border border-primary/10 bg-white p-5">
                 <p className="text-sm font-medium text-muted-foreground">Status da turma</p>
                 <p className="font-display mt-3 text-4xl font-semibold text-primary">82%</p>
-                <p className="mt-2 text-sm text-slate-600">dos participantes finalizaram o diagnostico desta rodada.</p>
+                <p className="mt-2 text-sm text-muted-foreground">dos participantes finalizaram o diagnostico desta rodada.</p>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Card className="border-primary/10 bg-slate-950 text-white">
+                <Card className="border-primary/10 bg-foreground text-background">
                   <CardHeader>
-                    <CardDescription className="text-slate-300">Categoria critica</CardDescription>
+                    <CardDescription className="text-background/70">Categoria critica</CardDescription>
                     <CardTitle className="text-xl">Marketing e Vendas</CardTitle>
                   </CardHeader>
-                  <CardContent className="pt-0 text-sm text-slate-300">48% de maturidade media entre os participantes.</CardContent>
+                  <CardContent className="pt-0 text-sm text-background/70">48% de maturidade media entre os participantes.</CardContent>
                 </Card>
                 <Card className="border-accent/20 bg-accent/10">
                   <CardHeader>
                     <CardDescription>Melhor indicador</CardDescription>
                     <CardTitle className="text-xl text-accent-foreground">Processos Internos</CardTitle>
                   </CardHeader>
-                  <CardContent className="pt-0 text-sm text-slate-700">71% de consistencia operacional nas respostas.</CardContent>
+                  <CardContent className="pt-0 text-sm text-muted-foreground">71% de consistencia operacional nas respostas.</CardContent>
                 </Card>
               </div>
             </div>
@@ -159,7 +159,7 @@ export function LandingPage() {
                     <pillar.icon className="h-10 w-10 text-accent" />
                     <CardTitle className="text-xl">{pillar.title}</CardTitle>
                   </CardHeader>
-                  <CardContent className="pt-0 text-sm leading-6 text-slate-600">{pillar.text}</CardContent>
+                  <CardContent className="pt-0 text-sm leading-6 text-muted-foreground">{pillar.text}</CardContent>
                 </Card>
               ))}
             </div>
@@ -171,9 +171,9 @@ export function LandingPage() {
             {testimonials.map((item) => (
               <Card key={item.author} className="surface-panel border-none">
                 <CardContent className="p-8">
-                  <p className="text-lg leading-8 text-slate-700">"{item.quote}"</p>
+                  <p className="text-lg leading-8 text-muted-foreground">"{item.quote}"</p>
                   <div className="mt-8">
-                    <p className="font-semibold text-slate-950">{item.author}</p>
+                    <p className="font-semibold text-foreground">{item.author}</p>
                     <p className="text-sm text-muted-foreground">{item.role}</p>
                   </div>
                 </CardContent>
@@ -189,7 +189,7 @@ export function LandingPage() {
               Pensada para programas de transformacao empresarial.
             </h2>
           </div>
-          <div className="space-y-4 text-lg leading-8 text-slate-600">
+          <div className="space-y-4 text-lg leading-8 text-muted-foreground">
             <p>
               Gestores em Foco centraliza diagnostico, distribuicao de links, respostas e relatorios em um unico ambiente.
             </p>
@@ -211,7 +211,7 @@ export function LandingPage() {
             {faqs.map((faq, index) => (
               <AccordionItem key={faq.question} value={`item-${index}`}>
                 <AccordionTrigger className="text-left text-base font-medium">{faq.question}</AccordionTrigger>
-                <AccordionContent className="text-base leading-7 text-slate-600">{faq.answer}</AccordionContent>
+                <AccordionContent className="text-base leading-7 text-muted-foreground">{faq.answer}</AccordionContent>
               </AccordionItem>
             ))}
           </Accordion>
@@ -225,7 +225,7 @@ export function LandingPage() {
                 <h2 className="font-display mt-3 text-3xl font-semibold">Comece com a base pronta para escalar seus diagnosticos.</h2>
               </div>
               <Button asChild size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90">
-                <Link href="/cadastro">Criar minha conta</Link>
+                <Link to="/cadastro">Criar minha conta</Link>
               </Button>
             </CardContent>
           </Card>

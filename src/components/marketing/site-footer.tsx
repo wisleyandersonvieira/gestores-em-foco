@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "react-router-dom";
 
 export function SiteFooter() {
   return (
@@ -11,13 +11,13 @@ export function SiteFooter() {
           </p>
         </div>
         <div className="flex flex-wrap gap-4 text-sm text-primary-foreground/80">
-          <Link href="/entrar" className="transition hover:text-white">
+          <Link to="/entrar" className="transition hover:text-white">
             Acessar conta
           </Link>
-          <Link href="/cadastro" className="transition hover:text-white">
+          <Link to="/cadastro" className="transition hover:text-white">
             Criar conta
           </Link>
-          <Link href="/admin" className="transition hover:text-white">
+          <Link to="/admin" className="transition hover:text-white">
             Painel admin
           </Link>
         </div>
