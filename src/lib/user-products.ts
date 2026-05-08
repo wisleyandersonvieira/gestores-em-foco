@@ -12,6 +12,7 @@ export const productTypeLabels: Record<ProductType, string> = {
   workshop: "Workshop",
   imersao: "Imersao",
   diagnostico: "Diagnostico",
+  dre_facil: "Gestor de DRE",
   mentoria: "Mentoria",
   consultoria: "Consultoria",
 };

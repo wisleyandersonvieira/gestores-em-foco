@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { BarChart3, Home, LogOut, Menu, Package, Settings, UserCircle } from "lucide-react";
+import { BarChart3, Home, LogOut, Menu, Package, ReceiptText, Settings, UserCircle } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -11,6 +11,7 @@ const navigation = [
   { to: "/dashboard", label: "Inicio / Dashboard", icon: Home },
   { to: "/meus-produtos", label: "Meus Produtos", icon: Package },
   { to: "/diagnosticos", label: "Diagnosticos", icon: BarChart3 },
+  { to: "/dre-facil", label: "Gestor de DRE", icon: ReceiptText },
   { to: "/meu-perfil", label: "Meu Perfil", icon: UserCircle },
   { to: "/configuracoes", label: "Configuracoes", icon: Settings },
 ];

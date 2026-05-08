@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ComponentType } from "react";
-import { ArrowRight, BookOpen, BriefcaseBusiness, ClipboardCheck, Filter, GraduationCap, MessagesSquare, Presentation, Rocket } from "lucide-react";
+import { ArrowRight, BookOpen, BriefcaseBusiness, ClipboardCheck, Filter, GraduationCap, MessagesSquare, Presentation, ReceiptText, Rocket } from "lucide-react";
 
 import { ClientLayout } from "@/components/platform/client-layout";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,7 @@ const productIcons: Record<ProductType, ComponentType<{ className?: string }>> =
   workshop: Filter,
   imersao: Rocket,
   diagnostico: ClipboardCheck,
+  dre_facil: ReceiptText,
   mentoria: MessagesSquare,
   consultoria: BriefcaseBusiness,
 };
