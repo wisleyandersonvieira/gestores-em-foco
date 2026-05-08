@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { getAvailableProducts, getUserProducts, productBenefits, type Product, type UserProductAccess } from "@/lib/products";
+import { activateProductSubscriptionForTest, getAvailableProducts, getUserProducts, productBenefits, type Product, type UserProductAccess } from "@/lib/products";
 
 const productIcons: Record<string, ComponentType<{ className?: string }>> = {
   diagnosticos: BarChart3,
@@ -28,14 +28,19 @@ function AvailableProductsContent({ userId }: { userId: string }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [userProducts, setUserProducts] = useState<UserProductAccess[]>([]);
   const [contractProduct, setContractProduct] = useState<Product | null>(null);
+  const [activatingSlug, setActivatingSlug] = useState<string | null>(null);
 
-  useEffect(() => {
-    Promise.all([getAvailableProducts(), getUserProducts(userId)])
+  async function reload() {
+    await Promise.all([getAvailableProducts(), getUserProducts(userId)])
       .then(([available, owned]) => {
         setProducts(available);
         setUserProducts(owned);
       })
       .catch((error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel carregar produtos."));
+  }
+
+  useEffect(() => {
+    void reload();
   }, [userId]);
 
   const accessMap = useMemo(() => new Map(userProducts.map((item) => [item.product_slug, item])), [userProducts]);
@@ -90,15 +95,35 @@ function AvailableProductsContent({ userId }: { userId: string }) {
       <Dialog open={Boolean(contractProduct)} onOpenChange={(open) => !open && setContractProduct(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Contratacao em breve</DialogTitle>
+            <DialogTitle>Liberar acesso de teste</DialogTitle>
             <DialogDescription>
-              Este produto estara disponivel para contratacao online em breve. A integracao com pagamento sera feita pelo Stripe.
+              Nesta etapa, o acesso sera liberado sem pagamento para testes. Depois este fluxo sera substituido pela contratacao via Stripe.
             </DialogDescription>
           </DialogHeader>
           <div className="rounded-lg bg-muted p-4 text-sm">
             Produto selecionado: <strong>{contractProduct?.name}</strong>
           </div>
-          <Button onClick={() => setContractProduct(null)}>Entendi</Button>
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setContractProduct(null)}>Cancelar</Button>
+            <Button
+              disabled={!contractProduct || activatingSlug === contractProduct.slug}
+              onClick={() => {
+                if (!contractProduct) return;
+                setActivatingSlug(contractProduct.slug);
+                void activateProductSubscriptionForTest(contractProduct.slug)
+                  .then(async () => {
+                    toast.success("Acesso liberado. O produto foi adicionado em Meus Produtos.");
+                    setContractProduct(null);
+                    await reload();
+                    window.dispatchEvent(new Event("product-access-updated"));
+                  })
+                  .catch((error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel liberar acesso."))
+                  .finally(() => setActivatingSlug(null));
+              }}
+            >
+              {contractProduct && activatingSlug === contractProduct.slug ? "Liberando..." : "Liberar acesso"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

@@ -77,9 +77,19 @@ export function ClientLayout({ children }: ClientLayoutProps) {
 
   useEffect(() => {
     if (!user) return;
-    void getUserProductAccessMap(user.id)
-      .then((map) => setProductAccess(new Set(map.keys())))
-      .catch(() => setProductAccess(new Set()));
+    async function loadProductAccess() {
+      if (!user) return;
+      try {
+        const map = await getUserProductAccessMap(user.id);
+        setProductAccess(new Set(map.keys()));
+      } catch {
+        setProductAccess(new Set());
+      }
+    }
+
+    void loadProductAccess();
+    window.addEventListener("product-access-updated", loadProductAccess);
+    return () => window.removeEventListener("product-access-updated", loadProductAccess);
   }, [user]);
 
   async function handleSignOut() {

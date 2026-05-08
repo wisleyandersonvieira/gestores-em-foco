@@ -90,6 +90,17 @@ export async function getUserProductAccessMap(userId: string) {
   return new Map(products.map((item) => [item.product_slug, item]));
 }
 
+export async function activateProductSubscriptionForTest(productSlug: string) {
+  const { error } = await supabase.rpc("activate_product_subscription_for_test", {
+    p_product_slug: productSlug,
+  });
+
+  if (error) {
+    console.error("Erro ao ativar assinatura de teste:", error);
+    throw new Error("Nao foi possivel liberar o acesso de teste.");
+  }
+}
+
 export async function createStripeCheckoutSession(_productSlug: string) {
   throw new Error("Checkout Stripe ainda nao implementado.");
 }

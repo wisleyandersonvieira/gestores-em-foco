@@ -165,6 +165,68 @@ as $$
   );
 $$;
 
+-- Temporary test helper. Replace this flow with Stripe Checkout/webhooks before production.
+create or replace function public.activate_product_subscription_for_test(p_product_slug text)
+returns public.user_product_subscriptions
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_product public.products;
+  v_subscription public.user_product_subscriptions;
+begin
+  if v_user_id is null then
+    raise exception 'authenticated user required';
+  end if;
+
+  select *
+    into v_product
+  from public.products
+  where slug = p_product_slug
+    and status = 'active';
+
+  if v_product.id is null then
+    raise exception 'active product not found';
+  end if;
+
+  insert into public.user_product_subscriptions (
+    user_id,
+    product_id,
+    product_slug,
+    status,
+    plan_name,
+    access_type,
+    current_period_start,
+    current_period_end
+  )
+  values (
+    v_user_id,
+    v_product.id,
+    v_product.slug,
+    'active',
+    'Acesso de teste',
+    'test',
+    now(),
+    null
+  )
+  on conflict (user_id, product_id) do update set
+    status = 'active',
+    plan_name = 'Acesso de teste',
+    access_type = 'test',
+    current_period_start = coalesce(public.user_product_subscriptions.current_period_start, now()),
+    current_period_end = null,
+    canceled_at = null,
+    updated_at = now()
+  returning * into v_subscription;
+
+  return v_subscription;
+end;
+$$;
+
+grant execute on function public.activate_product_subscription_for_test(text) to authenticated;
+
 insert into public.user_product_subscriptions (
   user_id,
   product_id,

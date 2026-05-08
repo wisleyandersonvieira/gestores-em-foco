@@ -1015,6 +1015,10 @@ export type Database = {
         Args: { p_product_slug: string; p_user_id: string }
         Returns: boolean
       }
+      activate_product_subscription_for_test: {
+        Args: { p_product_slug: string }
+        Returns: Database["public"]["Tables"]["user_product_subscriptions"]["Row"]
+      }
       create_default_dre_categories: {
         Args: { p_user_id: string }
         Returns: undefined
