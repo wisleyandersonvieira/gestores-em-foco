@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
-import { calculateCategoryTotal, formatCompetence, formatPercentage } from "@/lib/dre-calculations";
+import { calculateCategoryTotal, calculateSumLineValue, formatCompetence, formatPercentage } from "@/lib/dre-calculations";
 import { getDreEntry } from "@/lib/dre-service";
 import type { DreDraftLine, DreEntryWithItems } from "@/types/dre";
 
@@ -69,10 +69,10 @@ function DreEntryViewContent({ userId }: { userId: string }) {
           <Table>
             <TableBody>
               {lines.map((line, index) => {
-                const value = line.lineType === "category" ? calculateCategoryTotal(line.categoryId, lines) : line.value;
+                const value = line.lineType === "category" ? calculateCategoryTotal(line.categoryId, lines) : line.lineType === "sum" ? calculateSumLineValue(index, lines) : line.value;
                 return (
-                  <TableRow key={`${line.lineType}-${line.categoryId}-${line.subcategoryId}-${index}`} className={line.lineType === "category" ? "bg-muted/70" : ""}>
-                    <TableCell className={line.lineType === "category" ? "font-semibold uppercase" : "pl-10 text-sm"}>{line.lineType === "category" ? line.categoryName : line.subcategoryName}</TableCell>
+                  <TableRow key={`${line.lineType}-${line.categoryId}-${line.subcategoryId}-${index}`} className={line.lineType === "category" ? "bg-muted/70" : line.lineType === "sum" ? "bg-primary/5" : ""}>
+                    <TableCell className={line.lineType === "category" ? "font-semibold uppercase" : line.lineType === "sum" ? "font-semibold text-primary" : "pl-10 text-sm"}>{line.lineType === "category" || line.lineType === "sum" ? line.categoryName : line.subcategoryName}</TableCell>
                     <TableCell className="text-right font-medium tabular-nums">{formatCurrency(value)}</TableCell>
                   </TableRow>
                 );

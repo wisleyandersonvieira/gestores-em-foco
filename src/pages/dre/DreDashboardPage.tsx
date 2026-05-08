@@ -4,7 +4,7 @@ import { Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis } from "rec
 import { toast } from "sonner";
 
 import { DreLayout } from "@/components/dre/dre-layout";
-import { CompetenceMultiFilter, IndicatorCard, formatCurrency } from "@/components/dre/dre-ui";
+import { CompetenceSelect, IndicatorCard, formatCurrency } from "@/components/dre/dre-ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -112,8 +112,9 @@ function DreDashboardContent({ userId }: { userId: string }) {
       </div>
 
       <Card className="border-primary/10 bg-white/90">
-        <CardContent className="p-5">
-          <CompetenceMultiFilter selected={selectedCompetences} onChange={(items) => setSelectedCompetences(items.length ? items : [currentCompetence()])} />
+        <CardContent className="grid gap-2 p-5 sm:max-w-xs">
+          <span className="text-sm font-medium">Competencia</span>
+          <CompetenceSelect value={selectedCompetences[0] ?? currentCompetence()} onChange={(competence) => setSelectedCompetences([competence])} />
         </CardContent>
       </Card>
 

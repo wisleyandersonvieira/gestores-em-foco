@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { buildDraftLinesFromModel, getDreEntry, getDreModelWithLines, listDreModels, saveDreEntry } from "@/lib/dre-service";
-import { calculateCategoryTotal, calculateDreTotals, currentCompetence, formatCompetence } from "@/lib/dre-calculations";
+import { calculateCategoryTotal, calculateDreTotals, calculateSumLineValue, currentCompetence, formatCompetence } from "@/lib/dre-calculations";
 import type { DreDraftLine, DreEntryStatus, DreModel } from "@/types/dre";
 
 export default function DreEntryFormPage() {
@@ -121,18 +121,18 @@ function DreEntryFormContent({ userId }: { userId: string }) {
                 </TableHeader>
                 <TableBody>
                   {lines.map((line, index) => {
-                    const categoryValue = line.lineType === "category" ? calculateCategoryTotal(line.categoryId, lines) : line.value;
+                    const readonlyValue = line.lineType === "category" ? calculateCategoryTotal(line.categoryId, lines) : line.lineType === "sum" ? calculateSumLineValue(index, lines) : line.value;
                     return (
-                      <TableRow key={`${line.lineType}-${line.categoryId}-${line.subcategoryId}-${index}`} className={line.lineType === "category" ? "bg-muted/70" : ""}>
+                      <TableRow key={`${line.lineType}-${line.categoryId}-${line.subcategoryId}-${index}`} className={line.lineType === "category" ? "bg-muted/70" : line.lineType === "sum" ? "bg-primary/5" : ""}>
                         <TableCell>
-                          <div className={line.lineType === "category" ? "font-semibold uppercase" : "pl-6 text-sm"}>
-                            {line.lineType === "category" ? line.categoryName : line.subcategoryName}
+                          <div className={line.lineType === "category" ? "font-semibold uppercase" : line.lineType === "sum" ? "font-semibold text-primary" : "pl-6 text-sm"}>
+                            {line.lineType === "category" || line.lineType === "sum" ? line.categoryName : line.subcategoryName}
                             {line.lineType === "category" ? <Badge className="ml-2" variant={line.categoryType === "credit" ? "default" : "secondary"}>{line.categoryType === "credit" ? "Credito" : "Debito"}</Badge> : null}
                           </div>
                         </TableCell>
                         <TableCell>
-                          {line.lineType === "category" ? (
-                            <div className="text-right font-semibold tabular-nums">{formatCurrency(categoryValue)}</div>
+                          {line.lineType !== "subcategory" ? (
+                            <div className="text-right font-semibold tabular-nums">{formatCurrency(readonlyValue)}</div>
                           ) : (
                             <CurrencyInput
                               value={line.value}

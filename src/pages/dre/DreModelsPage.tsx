@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Edit2, Plus, Save, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Edit2, Plus, PlusCircle, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { DreLayout } from "@/components/dre/dre-layout";
@@ -14,9 +14,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { deleteOrDeactivateDreModel, getDreModelWithLines, listDreCategories, listDreModels, listDreSubcategories, saveDreModel } from "@/lib/dre-service";
-import type { DreCategory, DreModel, DreModelBuilderCategory, DreRecordStatus, DreSubcategoryWithCategory } from "@/types/dre";
+import type { DreCategory, DreModel, DreModelBuilderLine, DreRecordStatus, DreSubcategoryWithCategory } from "@/types/dre";
 
-type ModelForm = { id?: string; name: string; description: string; status: DreRecordStatus; structure: DreModelBuilderCategory[] };
+type ModelForm = { id?: string; name: string; description: string; status: DreRecordStatus; structure: DreModelBuilderLine[] };
 
 export default function DreModelsPage() {
   return <DreLayout>{(user) => <DreModelsContent userId={user.id} />}</DreLayout>;
@@ -42,19 +42,27 @@ function DreModelsContent({ userId }: { userId: string }) {
 
   async function editModel(model: DreModel) {
     const fullModel = await getDreModelWithLines(userId, model.id);
-    const categoryLines = fullModel.lines.filter((line) => line.line_type === "category");
     setForm({
       id: model.id,
       name: model.name,
       description: model.description ?? "",
       status: model.status,
-      structure: categoryLines.map((line) => ({
-        categoryId: line.category_id,
-        subcategoryIds: fullModel.lines
-          .filter((child) => child.line_type === "subcategory" && child.parent_category_id === line.category_id)
-          .map((child) => child.subcategory_id)
-          .filter(Boolean) as string[],
-      })),
+      structure: fullModel.lines
+        .filter((line) => line.line_type === "category" || line.line_type === "sum")
+        .map((line) => {
+          if (line.line_type === "sum") {
+            return { kind: "sum" as const, id: line.id, label: line.sum_label ?? "Subtotal" };
+          }
+
+          return {
+            kind: "category" as const,
+            categoryId: line.category_id ?? "",
+            subcategoryIds: fullModel.lines
+              .filter((child) => child.line_type === "subcategory" && child.parent_category_id === line.category_id)
+              .map((child) => child.subcategory_id)
+              .filter(Boolean) as string[],
+          };
+        }),
     });
   }
 
@@ -67,6 +75,7 @@ function DreModelsContent({ userId }: { userId: string }) {
   }
 
   const categoryMap = useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories]);
+  const subcategoryMap = useMemo(() => new Map(subcategories.map((subcategory) => [subcategory.id, subcategory])), [subcategories]);
 
   return (
     <div className="space-y-6">
@@ -123,7 +132,7 @@ function DreModelsContent({ userId }: { userId: string }) {
 
               <div className="grid gap-3">
                 {categories.map((category) => {
-                  const selectedCategory = form.structure.find((item) => item.categoryId === category.id);
+                  const selectedCategory = form.structure.find((item): item is Extract<DreModelBuilderLine, { kind: "category" }> => item.kind === "category" && item.categoryId === category.id);
                   const categorySubcategories = subcategories.filter((subcategory) => subcategory.category_id === category.id);
                   return (
                     <div key={category.id} className="rounded-lg border bg-white p-4">
@@ -131,8 +140,8 @@ function DreModelsContent({ userId }: { userId: string }) {
                         <Checkbox
                           checked={Boolean(selectedCategory)}
                           onCheckedChange={(checked) => {
-                            if (checked) setForm({ ...form, structure: [...form.structure, { categoryId: category.id, subcategoryIds: [] }] });
-                            else setForm({ ...form, structure: form.structure.filter((item) => item.categoryId !== category.id) });
+                            if (checked) setForm({ ...form, structure: [...form.structure, { kind: "category", categoryId: category.id, subcategoryIds: [] }] });
+                            else setForm({ ...form, structure: form.structure.filter((item) => item.kind !== "category" || item.categoryId !== category.id) });
                           }}
                         />
                         <div>
@@ -150,7 +159,7 @@ function DreModelsContent({ userId }: { userId: string }) {
                                 checked={selectedCategory.subcategoryIds.includes(subcategory.id)}
                                 onCheckedChange={(checked) => {
                                   const nextStructure = form.structure.map((item) => {
-                                    if (item.categoryId !== category.id) return item;
+                                    if (item.kind !== "category" || item.categoryId !== category.id) return item;
                                     const subcategoryIds = checked
                                       ? [...item.subcategoryIds, subcategory.id]
                                       : item.subcategoryIds.filter((id) => id !== subcategory.id);
@@ -170,13 +179,72 @@ function DreModelsContent({ userId }: { userId: string }) {
               </div>
 
               <Card className="bg-muted/50">
-                <CardHeader><CardTitle className="text-base">Previa da estrutura</CardTitle></CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                  <CardTitle className="text-base">Previa da estrutura</CardTitle>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setForm({ ...form, structure: [...form.structure, { kind: "sum", id: crypto.randomUUID(), label: "Subtotal" }] })}
+                  >
+                    <PlusCircle className="h-4 w-4" />
+                    Inserir soma
+                  </Button>
+                </CardHeader>
                 <CardContent className="space-y-3">
-                  {form.structure.length === 0 ? <p className="text-sm text-muted-foreground">Nenhuma categoria selecionada.</p> : form.structure.map((item) => (
-                    <div key={item.categoryId}>
-                      <p className="font-semibold uppercase">{categoryMap.get(item.categoryId)?.name}</p>
-                      <div className="mt-1 grid gap-1 pl-5 text-sm text-muted-foreground">
-                        {item.subcategoryIds.map((subcategoryId) => <span key={subcategoryId}>{subcategories.find((subcategory) => subcategory.id === subcategoryId)?.name}</span>)}
+                  {form.structure.length === 0 ? <p className="text-sm text-muted-foreground">Nenhuma categoria selecionada.</p> : form.structure.map((item, index) => (
+                    <div key={item.kind === "sum" ? item.id : item.categoryId} className={`rounded-lg border p-3 ${item.kind === "sum" ? "bg-primary/5" : "bg-white"}`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          {item.kind === "sum" ? (
+                            <Label>
+                              Linha de somatorio
+                              <Input
+                                className="mt-2"
+                                value={item.label}
+                                onChange={(event) => setForm({
+                                  ...form,
+                                  structure: form.structure.map((line, lineIndex) => lineIndex === index && line.kind === "sum" ? { ...line, label: event.target.value } : line),
+                                })}
+                              />
+                            </Label>
+                          ) : (
+                            <>
+                              <p className="font-semibold uppercase">{categoryMap.get(item.categoryId)?.name}</p>
+                              <div className="mt-1 grid gap-1 pl-5 text-sm text-muted-foreground">
+                                {item.subcategoryIds.length === 0 ? <span>Nenhuma subcategoria selecionada.</span> : item.subcategoryIds.map((subcategoryId) => <span key={subcategoryId}>{subcategoryMap.get(subcategoryId)?.name}</span>)}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                        <div className="flex shrink-0 gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            disabled={index === 0}
+                            onClick={() => setForm({ ...form, structure: moveStructureLine(form.structure, index, -1) })}
+                          >
+                            <ArrowUp className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            disabled={index === form.structure.length - 1}
+                            onClick={() => setForm({ ...form, structure: moveStructureLine(form.structure, index, 1) })}
+                          >
+                            <ArrowDown className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setForm({ ...form, structure: form.structure.filter((_, lineIndex) => lineIndex !== index) })}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -210,4 +278,13 @@ function DreModelsContent({ userId }: { userId: string }) {
       />
     </div>
   );
+}
+
+function moveStructureLine(structure: DreModelBuilderLine[], index: number, direction: -1 | 1) {
+  const nextIndex = index + direction;
+  if (nextIndex < 0 || nextIndex >= structure.length) return structure;
+  const next = [...structure];
+  const [line] = next.splice(index, 1);
+  next.splice(nextIndex, 0, line);
+  return next;
 }

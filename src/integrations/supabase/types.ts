@@ -566,7 +566,7 @@ export type Database = {
       }
       dre_model_lines: {
         Row: {
-          category_id: string
+          category_id: string | null
           created_at: string
           display_order: number
           id: string
@@ -574,10 +574,11 @@ export type Database = {
           model_id: string
           parent_category_id: string | null
           subcategory_id: string | null
+          sum_label: string | null
           user_id: string
         }
         Insert: {
-          category_id: string
+          category_id?: string | null
           created_at?: string
           display_order?: number
           id?: string
@@ -585,10 +586,11 @@ export type Database = {
           model_id: string
           parent_category_id?: string | null
           subcategory_id?: string | null
+          sum_label?: string | null
           user_id: string
         }
         Update: {
-          category_id?: string
+          category_id?: string | null
           created_at?: string
           display_order?: number
           id?: string
@@ -596,6 +598,7 @@ export type Database = {
           model_id?: string
           parent_category_id?: string | null
           subcategory_id?: string | null
+          sum_label?: string | null
           user_id?: string
         }
         Relationships: [
@@ -905,7 +908,7 @@ export type Database = {
         app_role: "admin" | "client"
         dre_category_type: "credit" | "debit"
         dre_entry_status: "draft" | "finalized"
-        dre_model_line_type: "category" | "subcategory"
+        dre_model_line_type: "category" | "subcategory" | "sum"
         dre_record_status: "active" | "inactive"
         link_status: "active" | "expired" | "cancelled"
         product_type:
@@ -1057,7 +1060,7 @@ export const Constants = {
       app_role: ["admin", "client"],
       dre_category_type: ["credit", "debit"],
       dre_entry_status: ["draft", "finalized"],
-      dre_model_line_type: ["category", "subcategory"],
+      dre_model_line_type: ["category", "subcategory", "sum"],
       dre_record_status: ["active", "inactive"],
       link_status: ["active", "expired", "cancelled"],
       product_type: [

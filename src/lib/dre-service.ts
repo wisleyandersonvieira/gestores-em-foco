@@ -1,13 +1,13 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
-import { calculateCategoryTotal, calculateDreTotals } from "@/lib/dre-calculations";
+import { calculateCategoryTotal, calculateDreTotals, calculateSumLineValue } from "@/lib/dre-calculations";
 import type {
   DreCategory,
   DreDraftLine,
   DreEntryStatus,
   DreEntryWithItems,
   DreEntryWithModel,
-  DreModelBuilderCategory,
+  DreModelBuilderLine,
   DreModelWithLines,
   DreRecordStatus,
   DreSubcategory,
@@ -139,7 +139,7 @@ export async function saveDreModel(params: {
   name: string;
   description?: string | null;
   status: DreRecordStatus;
-  structure: DreModelBuilderCategory[];
+  structure: DreModelBuilderLine[];
 }) {
   const name = params.name.trim();
   if (!name) throw new Error("Informe o nome do modelo.");
@@ -157,26 +157,41 @@ export async function saveDreModel(params: {
 
   if (error || !model) throw new Error("Nao foi possivel salvar o modelo.");
 
-  const linePayloads = params.structure.flatMap((category, categoryIndex) => {
-    const categoryOrder = categoryIndex * 1000;
+  const linePayloads = params.structure.flatMap((line, lineIndex) => {
+    const lineOrder = lineIndex * 1000;
+    if (line.kind === "sum") {
+      return [{
+        user_id: params.userId,
+        model_id: model.id,
+        category_id: null,
+        line_type: "sum" as const,
+        subcategory_id: null,
+        parent_category_id: null,
+        sum_label: line.label.trim() || "Subtotal",
+        display_order: lineOrder,
+      }];
+    }
+
     return [
       {
         user_id: params.userId,
         model_id: model.id,
-        category_id: category.categoryId,
+        category_id: line.categoryId,
         line_type: "category" as const,
         subcategory_id: null,
         parent_category_id: null,
-        display_order: categoryOrder,
+        sum_label: null,
+        display_order: lineOrder,
       },
-      ...category.subcategoryIds.map((subcategoryId, subcategoryIndex) => ({
+      ...line.subcategoryIds.map((subcategoryId, subcategoryIndex) => ({
         user_id: params.userId,
         model_id: model.id,
-        category_id: category.categoryId,
+        category_id: line.categoryId,
         line_type: "subcategory" as const,
         subcategory_id: subcategoryId,
-        parent_category_id: category.categoryId,
-        display_order: categoryOrder + subcategoryIndex + 1,
+        parent_category_id: line.categoryId,
+        sum_label: null,
+        display_order: lineOrder + subcategoryIndex + 1,
       })),
     ];
   });
@@ -209,7 +224,7 @@ export function buildDraftLinesFromModel(model: DreModelWithLines): DreDraftLine
   return model.lines.map((line) => ({
     categoryId: line.category_id,
     subcategoryId: line.subcategory_id,
-    categoryName: line.category?.name ?? "Categoria",
+    categoryName: line.line_type === "sum" ? line.sum_label ?? "Subtotal" : line.category?.name ?? "Categoria",
     subcategoryName: line.subcategory?.name ?? null,
     categoryType: line.category?.type ?? "debit",
     lineType: line.line_type,
@@ -247,9 +262,13 @@ export async function saveDreEntry(params: {
     if (duplicate) throw new Error("Ja existe um DRE finalizado para este modelo e competencia.");
   }
 
-  const normalizedLines = params.lines.map((line) => ({
+  const normalizedLines = params.lines.map((line, lineIndex) => ({
     ...line,
-    value: line.lineType === "category" ? calculateCategoryTotal(line.categoryId, params.lines) : line.value,
+    value: line.lineType === "category"
+      ? calculateCategoryTotal(line.categoryId, params.lines)
+      : line.lineType === "sum"
+        ? calculateSumLineValue(lineIndex, params.lines)
+        : line.value,
   }));
   const totals = calculateDreTotals(normalizedLines);
 

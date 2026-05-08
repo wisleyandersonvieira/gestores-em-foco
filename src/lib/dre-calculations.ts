@@ -67,6 +67,14 @@ export function calculateCategoryTotal(categoryId: string | null, lines: DreDraf
   );
 }
 
+export function calculateSumLineValue(lineIndex: number, lines: DreDraftLine[]) {
+  const previousSubcategoryLines = lines.slice(0, lineIndex).filter((line) => line.lineType === "subcategory");
+  const credit = previousSubcategoryLines.filter((line) => line.categoryType === "credit").reduce((sum, line) => sum + Number(line.value || 0), 0);
+  const debit = previousSubcategoryLines.filter((line) => line.categoryType === "debit").reduce((sum, line) => sum + Number(line.value || 0), 0);
+
+  return roundCurrency(credit - debit);
+}
+
 export function calculateEntryTotals(entry: DreEntry, items: DreEntryItem[]) {
   const totals = calculateDreTotals(
     items.map((item) => ({

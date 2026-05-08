@@ -1,11 +1,36 @@
 alter type public.product_type add value if not exists 'dre_facil';
 
-create type public.dre_category_type as enum ('credit', 'debit');
-create type public.dre_record_status as enum ('active', 'inactive');
-create type public.dre_model_line_type as enum ('category', 'subcategory');
-create type public.dre_entry_status as enum ('draft', 'finalized');
+do $$
+begin
+  create type public.dre_category_type as enum ('credit', 'debit');
+exception
+  when duplicate_object then null;
+end $$;
 
-create table public.dre_categories (
+do $$
+begin
+  create type public.dre_record_status as enum ('active', 'inactive');
+exception
+  when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  create type public.dre_model_line_type as enum ('category', 'subcategory', 'sum');
+exception
+  when duplicate_object then null;
+end $$;
+
+alter type public.dre_model_line_type add value if not exists 'sum';
+
+do $$
+begin
+  create type public.dre_entry_status as enum ('draft', 'finalized');
+exception
+  when duplicate_object then null;
+end $$;
+
+create table if not exists public.dre_categories (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   name text not null,
@@ -17,7 +42,7 @@ create table public.dre_categories (
   constraint dre_categories_name_not_blank check (length(trim(name)) > 0)
 );
 
-create table public.dre_subcategories (
+create table if not exists public.dre_subcategories (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   category_id uuid not null references public.dre_categories(id) on delete restrict,
@@ -29,7 +54,7 @@ create table public.dre_subcategories (
   constraint dre_subcategories_name_not_blank check (length(trim(name)) > 0)
 );
 
-create table public.dre_models (
+create table if not exists public.dre_models (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   name text not null,
@@ -40,24 +65,27 @@ create table public.dre_models (
   constraint dre_models_name_not_blank check (length(trim(name)) > 0)
 );
 
-create table public.dre_model_lines (
+create table if not exists public.dre_model_lines (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   model_id uuid not null references public.dre_models(id) on delete cascade,
-  category_id uuid not null references public.dre_categories(id) on delete restrict,
+  category_id uuid references public.dre_categories(id) on delete restrict,
   subcategory_id uuid references public.dre_subcategories(id) on delete restrict,
   line_type public.dre_model_line_type not null,
   parent_category_id uuid references public.dre_categories(id) on delete restrict,
+  sum_label text,
   display_order integer not null default 0,
   created_at timestamptz not null default now(),
   constraint dre_model_category_line_shape check (
-    (line_type = 'category' and subcategory_id is null and parent_category_id is null)
+    (line_type::text = 'category' and category_id is not null and subcategory_id is null and parent_category_id is null)
     or
-    (line_type = 'subcategory' and subcategory_id is not null and parent_category_id is not null)
+    (line_type::text = 'subcategory' and category_id is not null and subcategory_id is not null and parent_category_id is not null)
+    or
+    (line_type::text = 'sum' and category_id is null and subcategory_id is null and parent_category_id is null and length(trim(coalesce(sum_label, ''))) > 0)
   )
 );
 
-create table public.dre_entries (
+create table if not exists public.dre_entries (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   model_id uuid not null references public.dre_models(id) on delete restrict,
@@ -72,7 +100,7 @@ create table public.dre_entries (
   constraint dre_entries_competence_format check (competence ~ '^[0-9]{4}-(0[1-9]|1[0-2])$')
 );
 
-create table public.dre_entry_items (
+create table if not exists public.dre_entry_items (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   dre_entry_id uuid not null references public.dre_entries(id) on delete cascade,
@@ -87,13 +115,15 @@ create table public.dre_entry_items (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint dre_entry_item_line_shape check (
-    (line_type = 'category' and subcategory_name_snapshot is null)
+    (line_type::text = 'category' and subcategory_name_snapshot is null)
     or
-    (line_type = 'subcategory' and subcategory_name_snapshot is not null)
+    (line_type::text = 'subcategory' and subcategory_name_snapshot is not null)
+    or
+    (line_type::text = 'sum' and subcategory_name_snapshot is null)
   )
 );
 
-create table public.product_subscriptions (
+create table if not exists public.product_subscriptions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   product_id text not null,
@@ -108,22 +138,50 @@ create table public.product_subscriptions (
   updated_at timestamptz not null default now()
 );
 
-create index dre_categories_user_id_idx on public.dre_categories(user_id);
-create index dre_categories_type_status_idx on public.dre_categories(user_id, type, status);
-create index dre_subcategories_user_id_idx on public.dre_subcategories(user_id);
-create index dre_subcategories_category_id_idx on public.dre_subcategories(category_id);
-create index dre_models_user_id_idx on public.dre_models(user_id);
-create index dre_model_lines_user_model_idx on public.dre_model_lines(user_id, model_id);
-create index dre_entries_user_competence_idx on public.dre_entries(user_id, competence);
-create index dre_entries_user_model_idx on public.dre_entries(user_id, model_id);
-create index dre_entry_items_entry_idx on public.dre_entry_items(dre_entry_id);
-create index product_subscriptions_user_product_idx on public.product_subscriptions(user_id, product_id);
+alter table public.dre_model_lines
+  alter column category_id drop not null,
+  add column if not exists sum_label text;
 
-create unique index dre_entries_finalized_unique_idx
+alter table public.dre_model_lines
+  drop constraint if exists dre_model_category_line_shape;
+
+alter table public.dre_model_lines
+  add constraint dre_model_category_line_shape check (
+    (line_type::text = 'category' and category_id is not null and subcategory_id is null and parent_category_id is null)
+    or
+    (line_type::text = 'subcategory' and category_id is not null and subcategory_id is not null and parent_category_id is not null)
+    or
+    (line_type::text = 'sum' and category_id is null and subcategory_id is null and parent_category_id is null and length(trim(coalesce(sum_label, ''))) > 0)
+  );
+
+alter table public.dre_entry_items
+  drop constraint if exists dre_entry_item_line_shape;
+
+alter table public.dre_entry_items
+  add constraint dre_entry_item_line_shape check (
+    (line_type::text = 'category' and category_name_snapshot is not null and subcategory_name_snapshot is null)
+    or
+    (line_type::text = 'subcategory' and category_name_snapshot is not null and subcategory_name_snapshot is not null)
+    or
+    (line_type::text = 'sum' and category_name_snapshot is not null and subcategory_name_snapshot is null)
+  );
+
+create index if not exists dre_categories_user_id_idx on public.dre_categories(user_id);
+create index if not exists dre_categories_type_status_idx on public.dre_categories(user_id, type, status);
+create index if not exists dre_subcategories_user_id_idx on public.dre_subcategories(user_id);
+create index if not exists dre_subcategories_category_id_idx on public.dre_subcategories(category_id);
+create index if not exists dre_models_user_id_idx on public.dre_models(user_id);
+create index if not exists dre_model_lines_user_model_idx on public.dre_model_lines(user_id, model_id);
+create index if not exists dre_entries_user_competence_idx on public.dre_entries(user_id, competence);
+create index if not exists dre_entries_user_model_idx on public.dre_entries(user_id, model_id);
+create index if not exists dre_entry_items_entry_idx on public.dre_entry_items(dre_entry_id);
+create index if not exists product_subscriptions_user_product_idx on public.product_subscriptions(user_id, product_id);
+
+create unique index if not exists dre_entries_finalized_unique_idx
   on public.dre_entries(user_id, model_id, competence)
   where status = 'finalized';
 
-create unique index product_subscriptions_active_unique_idx
+create unique index if not exists product_subscriptions_active_unique_idx
   on public.product_subscriptions(user_id, product_id)
   where status in ('active', 'trialing');
 
@@ -136,6 +194,13 @@ begin
   return new;
 end;
 $$;
+
+drop trigger if exists set_dre_categories_updated_at on public.dre_categories;
+drop trigger if exists set_dre_subcategories_updated_at on public.dre_subcategories;
+drop trigger if exists set_dre_models_updated_at on public.dre_models;
+drop trigger if exists set_dre_entries_updated_at on public.dre_entries;
+drop trigger if exists set_dre_entry_items_updated_at on public.dre_entry_items;
+drop trigger if exists set_product_subscriptions_updated_at on public.product_subscriptions;
 
 create trigger set_dre_categories_updated_at before update on public.dre_categories
   for each row execute function public.set_updated_at();
@@ -203,6 +268,48 @@ alter table public.dre_model_lines enable row level security;
 alter table public.dre_entries enable row level security;
 alter table public.dre_entry_items enable row level security;
 alter table public.product_subscriptions enable row level security;
+
+drop policy if exists "Users can view their own DRE categories" on public.dre_categories;
+drop policy if exists "Users can create their own DRE categories" on public.dre_categories;
+drop policy if exists "Users can update their own DRE categories" on public.dre_categories;
+drop policy if exists "Users can delete their own DRE categories" on public.dre_categories;
+drop policy if exists "Admins can manage DRE categories" on public.dre_categories;
+
+drop policy if exists "Users can view their own DRE subcategories" on public.dre_subcategories;
+drop policy if exists "Users can create their own DRE subcategories" on public.dre_subcategories;
+drop policy if exists "Users can update their own DRE subcategories" on public.dre_subcategories;
+drop policy if exists "Users can delete their own DRE subcategories" on public.dre_subcategories;
+drop policy if exists "Admins can manage DRE subcategories" on public.dre_subcategories;
+
+drop policy if exists "Users can view their own DRE models" on public.dre_models;
+drop policy if exists "Users can create their own DRE models" on public.dre_models;
+drop policy if exists "Users can update their own DRE models" on public.dre_models;
+drop policy if exists "Users can delete their own DRE models" on public.dre_models;
+drop policy if exists "Admins can manage DRE models" on public.dre_models;
+
+drop policy if exists "Users can view their own DRE model lines" on public.dre_model_lines;
+drop policy if exists "Users can create their own DRE model lines" on public.dre_model_lines;
+drop policy if exists "Users can update their own DRE model lines" on public.dre_model_lines;
+drop policy if exists "Users can delete their own DRE model lines" on public.dre_model_lines;
+drop policy if exists "Admins can manage DRE model lines" on public.dre_model_lines;
+
+drop policy if exists "Users can view their own DRE entries" on public.dre_entries;
+drop policy if exists "Users can create their own DRE entries" on public.dre_entries;
+drop policy if exists "Users can update their own DRE entries" on public.dre_entries;
+drop policy if exists "Users can delete their own DRE entries" on public.dre_entries;
+drop policy if exists "Admins can manage DRE entries" on public.dre_entries;
+
+drop policy if exists "Users can view their own DRE entry items" on public.dre_entry_items;
+drop policy if exists "Users can create their own DRE entry items" on public.dre_entry_items;
+drop policy if exists "Users can update their own DRE entry items" on public.dre_entry_items;
+drop policy if exists "Users can delete their own DRE entry items" on public.dre_entry_items;
+drop policy if exists "Admins can manage DRE entry items" on public.dre_entry_items;
+
+drop policy if exists "Users can view their own product subscriptions" on public.product_subscriptions;
+drop policy if exists "Users can create their own product subscriptions" on public.product_subscriptions;
+drop policy if exists "Users can update their own product subscriptions" on public.product_subscriptions;
+drop policy if exists "Users can delete their own product subscriptions" on public.product_subscriptions;
+drop policy if exists "Admins can manage product subscriptions" on public.product_subscriptions;
 
 create policy "Users can view their own DRE categories" on public.dre_categories
   for select using (auth.uid() = user_id);

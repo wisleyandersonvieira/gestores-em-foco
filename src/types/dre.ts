@@ -34,9 +34,18 @@ export type DreEntryWithItems = DreEntryWithModel & {
 };
 
 export type DreModelBuilderCategory = {
+  kind: "category";
   categoryId: string;
   subcategoryIds: string[];
 };
+
+export type DreModelBuilderSum = {
+  kind: "sum";
+  id: string;
+  label: string;
+};
+
+export type DreModelBuilderLine = DreModelBuilderCategory | DreModelBuilderSum;
 
 export type DreDraftLine = {
   categoryId: string | null;
@@ -44,7 +53,7 @@ export type DreDraftLine = {
   categoryName: string;
   subcategoryName: string | null;
   categoryType: DreCategoryType;
-  lineType: "category" | "subcategory";
+  lineType: "category" | "subcategory" | "sum";
   displayOrder: number;
   value: number;
 };
