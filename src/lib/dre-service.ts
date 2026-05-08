@@ -124,12 +124,15 @@ export async function getDreModelWithLines(userId: string, modelId: string): Pro
 
   const { data: lines, error: linesError } = await supabase
     .from("dre_model_lines")
-    .select("*, category:dre_categories(*), subcategory:dre_subcategories(*)")
+    .select("*, category:dre_categories!dre_model_lines_category_id_fkey(*), subcategory:dre_subcategories!dre_model_lines_subcategory_id_fkey(*)")
     .eq("user_id", userId)
     .eq("model_id", modelId)
     .order("display_order", { ascending: true });
 
-  if (linesError) throw new Error("Nao foi possivel carregar a estrutura do modelo.");
+  if (linesError) {
+    console.error("Erro ao carregar estrutura do modelo DRE:", linesError);
+    throw new Error("Nao foi possivel carregar a estrutura do modelo.");
+  }
   return { ...model, lines: (lines ?? []) as DreModelWithLines["lines"] };
 }
 
