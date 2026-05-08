@@ -154,7 +154,7 @@ function DreDashboardContent({ userId }: { userId: string }) {
 
       <div className="grid gap-5 xl:grid-cols-2">
         <ChartCard title="Evolução de faturamento, despesas e lucro">
-          <ChartContainer className="h-80 w-full" config={{ credit: { label: "Crédito", color: "#16a34a" }, debit: { label: "Débito", color: "#dc2626" }, result: { label: "Lucro", color: "#2563eb" } }}>
+          <ChartContainer className="aspect-auto h-80 w-full" config={{ credit: { label: "Crédito", color: "#16a34a" }, debit: { label: "Débito", color: "#dc2626" }, result: { label: "Lucro", color: "#2563eb" } }}>
             <LineChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
               <CartesianGrid vertical={false} />
               <XAxis dataKey="competence" tickLine={false} axisLine={false} />
@@ -168,7 +168,7 @@ function DreDashboardContent({ userId }: { userId: string }) {
         </ChartCard>
 
         <ChartCard title="Comparativo crédito, débito e lucro">
-          <ChartContainer className="h-80 w-full" config={{ credit: { label: "Crédito", color: "#16a34a" }, debit: { label: "Débito", color: "#dc2626" }, result: { label: "Lucro", color: "#2563eb" } }}>
+          <ChartContainer className="aspect-auto h-80 w-full" config={{ credit: { label: "Crédito", color: "#16a34a" }, debit: { label: "Débito", color: "#dc2626" }, result: { label: "Lucro", color: "#2563eb" } }}>
             <BarChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
               <CartesianGrid vertical={false} />
               <XAxis dataKey="competence" tickLine={false} axisLine={false} />
@@ -183,7 +183,7 @@ function DreDashboardContent({ userId }: { userId: string }) {
       </div>
 
       <ChartCard title="Top categorias de despesa com maior impacto">
-        <ChartContainer className="h-80 w-full" config={{ value: { label: "Impacto", color: "#0f172a" } }}>
+        <ChartContainer className="aspect-auto h-80 w-full" config={{ value: { label: "Impacto", color: "#0f172a" } }}>
           <BarChart data={categoryImpact} margin={{ top: 16, right: 12, left: 0, bottom: 0 }}>
             <CartesianGrid vertical={false} />
             <XAxis dataKey="category" tickLine={false} axisLine={false} interval={0} height={50} tick={{ fontSize: 11 }} />
