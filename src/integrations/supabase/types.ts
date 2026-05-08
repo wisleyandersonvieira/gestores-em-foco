@@ -952,6 +952,150 @@ export type Database = {
           },
         ]
       }
+      user_profiles: {
+        Row: {
+          avatar_url: string | null
+          company_name: string | null
+          created_at: string
+          full_name: string | null
+          id: string
+          phone: string | null
+          role: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          company_name?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          role?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          company_name?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          role?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_notification_preferences: {
+        Row: {
+          billing_emails: boolean
+          created_at: string
+          id: string
+          in_app_notifications: boolean
+          platform_emails: boolean
+          product_news: boolean
+          security_alerts: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          billing_emails?: boolean
+          created_at?: string
+          id?: string
+          in_app_notifications?: boolean
+          platform_emails?: boolean
+          product_news?: boolean
+          security_alerts?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          billing_emails?: boolean
+          created_at?: string
+          id?: string
+          in_app_notifications?: boolean
+          platform_emails?: boolean
+          product_news?: boolean
+          security_alerts?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_preferences: {
+        Row: {
+          created_at: string
+          currency: string
+          date_format: string
+          density: string
+          id: string
+          language: string
+          theme: string
+          timezone: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          currency?: string
+          date_format?: string
+          density?: string
+          id?: string
+          language?: string
+          theme?: string
+          timezone?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          date_format?: string
+          density?: string
+          id?: string
+          language?: string
+          theme?: string
+          timezone?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      support_requests: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          status: string
+          subject: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          status?: string
+          subject: string
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          status?: string
+          subject?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_products: {
         Row: {
           access_url: string | null
