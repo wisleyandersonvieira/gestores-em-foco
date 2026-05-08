@@ -493,138 +493,6 @@ export type Database = {
         }
         Relationships: []
       }
-      dre_subcategories: {
-        Row: {
-          category_id: string
-          created_at: string
-          display_order: number
-          id: string
-          name: string
-          status: Database["public"]["Enums"]["dre_record_status"]
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          category_id: string
-          created_at?: string
-          display_order?: number
-          id?: string
-          name: string
-          status?: Database["public"]["Enums"]["dre_record_status"]
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          category_id?: string
-          created_at?: string
-          display_order?: number
-          id?: string
-          name?: string
-          status?: Database["public"]["Enums"]["dre_record_status"]
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "dre_subcategories_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "dre_categories"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      dre_models: {
-        Row: {
-          created_at: string
-          description: string | null
-          id: string
-          name: string
-          status: Database["public"]["Enums"]["dre_record_status"]
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          name: string
-          status?: Database["public"]["Enums"]["dre_record_status"]
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          name?: string
-          status?: Database["public"]["Enums"]["dre_record_status"]
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      dre_model_lines: {
-        Row: {
-          category_id: string | null
-          created_at: string
-          display_order: number
-          id: string
-          line_type: Database["public"]["Enums"]["dre_model_line_type"]
-          model_id: string
-          parent_category_id: string | null
-          subcategory_id: string | null
-          sum_label: string | null
-          user_id: string
-        }
-        Insert: {
-          category_id?: string | null
-          created_at?: string
-          display_order?: number
-          id?: string
-          line_type: Database["public"]["Enums"]["dre_model_line_type"]
-          model_id: string
-          parent_category_id?: string | null
-          subcategory_id?: string | null
-          sum_label?: string | null
-          user_id: string
-        }
-        Update: {
-          category_id?: string | null
-          created_at?: string
-          display_order?: number
-          id?: string
-          line_type?: Database["public"]["Enums"]["dre_model_line_type"]
-          model_id?: string
-          parent_category_id?: string | null
-          subcategory_id?: string | null
-          sum_label?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "dre_model_lines_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "dre_categories"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "dre_model_lines_model_id_fkey"
-            columns: ["model_id"]
-            isOneToOne: false
-            referencedRelation: "dre_models"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "dre_model_lines_subcategory_id_fkey"
-            columns: ["subcategory_id"]
-            isOneToOne: false
-            referencedRelation: "dre_subcategories"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       dre_entries: {
         Row: {
           competence: string
@@ -723,13 +591,211 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "dre_entry_items_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "dre_categories"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "dre_entry_items_dre_entry_id_fkey"
             columns: ["dre_entry_id"]
             isOneToOne: false
             referencedRelation: "dre_entries"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "dre_entry_items_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "dre_subcategories"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      dre_model_lines: {
+        Row: {
+          category_id: string | null
+          created_at: string
+          display_order: number
+          id: string
+          line_type: Database["public"]["Enums"]["dre_model_line_type"]
+          model_id: string
+          parent_category_id: string | null
+          subcategory_id: string | null
+          sum_label: string | null
+          user_id: string
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string
+          display_order?: number
+          id?: string
+          line_type: Database["public"]["Enums"]["dre_model_line_type"]
+          model_id: string
+          parent_category_id?: string | null
+          subcategory_id?: string | null
+          sum_label?: string | null
+          user_id: string
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string
+          display_order?: number
+          id?: string
+          line_type?: Database["public"]["Enums"]["dre_model_line_type"]
+          model_id?: string
+          parent_category_id?: string | null
+          subcategory_id?: string | null
+          sum_label?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dre_model_lines_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "dre_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dre_model_lines_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "dre_models"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dre_model_lines_parent_category_id_fkey"
+            columns: ["parent_category_id"]
+            isOneToOne: false
+            referencedRelation: "dre_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dre_model_lines_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "dre_subcategories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dre_models: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          status: Database["public"]["Enums"]["dre_record_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          status?: Database["public"]["Enums"]["dre_record_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          status?: Database["public"]["Enums"]["dre_record_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      dre_subcategories: {
+        Row: {
+          category_id: string
+          created_at: string
+          display_order: number
+          id: string
+          name: string
+          status: Database["public"]["Enums"]["dre_record_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          name: string
+          status?: Database["public"]["Enums"]["dre_record_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          name?: string
+          status?: Database["public"]["Enums"]["dre_record_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dre_subcategories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "dre_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_subscriptions: {
+        Row: {
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          plan_name: string | null
+          product_id: string
+          product_name: string
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          plan_name?: string | null
+          product_id: string
+          product_name: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          plan_name?: string | null
+          product_id?: string
+          product_name?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       products: {
         Row: {
@@ -778,6 +844,45 @@ export type Database = {
           slug?: string
           status?: string
           stripe_product_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          company_name: string | null
+          created_at: string
+          email: string | null
+          employees_count: number | null
+          full_name: string | null
+          id: string
+          is_active: boolean
+          role: Database["public"]["Enums"]["app_role"]
+          segment: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_name?: string | null
+          created_at?: string
+          email?: string | null
+          employees_count?: number | null
+          full_name?: string | null
+          id: string
+          is_active?: boolean
+          role?: Database["public"]["Enums"]["app_role"]
+          segment?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_name?: string | null
+          created_at?: string
+          email?: string | null
+          employees_count?: number | null
+          full_name?: string | null
+          id?: string
+          is_active?: boolean
+          role?: Database["public"]["Enums"]["app_role"]
+          segment?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -847,51 +952,6 @@ export type Database = {
           },
         ]
       }
-      product_subscriptions: {
-        Row: {
-          created_at: string
-          current_period_end: string | null
-          current_period_start: string | null
-          id: string
-          plan_name: string | null
-          product_id: string
-          product_name: string
-          status: string
-          stripe_customer_id: string | null
-          stripe_subscription_id: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          current_period_end?: string | null
-          current_period_start?: string | null
-          id?: string
-          plan_name?: string | null
-          product_id: string
-          product_name: string
-          status?: string
-          stripe_customer_id?: string | null
-          stripe_subscription_id?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          current_period_end?: string | null
-          current_period_start?: string | null
-          id?: string
-          plan_name?: string | null
-          product_id?: string
-          product_name?: string
-          status?: string
-          stripe_customer_id?: string | null
-          stripe_subscription_id?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       user_products: {
         Row: {
           access_url: string | null
@@ -925,45 +985,6 @@ export type Database = {
           purchased_at?: string
           status?: Database["public"]["Enums"]["user_product_status"]
           user_id?: string
-        }
-        Relationships: []
-      }
-      profiles: {
-        Row: {
-          company_name: string | null
-          created_at: string
-          email: string | null
-          employees_count: number | null
-          full_name: string | null
-          id: string
-          is_active: boolean
-          role: Database["public"]["Enums"]["app_role"]
-          segment: string | null
-          updated_at: string
-        }
-        Insert: {
-          company_name?: string | null
-          created_at?: string
-          email?: string | null
-          employees_count?: number | null
-          full_name?: string | null
-          id: string
-          is_active?: boolean
-          role?: Database["public"]["Enums"]["app_role"]
-          segment?: string | null
-          updated_at?: string
-        }
-        Update: {
-          company_name?: string | null
-          created_at?: string
-          email?: string | null
-          employees_count?: number | null
-          full_name?: string | null
-          id?: string
-          is_active?: boolean
-          role?: Database["public"]["Enums"]["app_role"]
-          segment?: string | null
-          updated_at?: string
         }
         Relationships: []
       }
@@ -1006,7 +1027,33 @@ export type Database = {
       }
     }
     Functions: {
-      is_admin: { Args: never; Returns: boolean }
+      activate_product_subscription_for_test: {
+        Args: { p_product_slug: string }
+        Returns: {
+          access_type: string
+          canceled_at: string | null
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          plan_name: string | null
+          product_id: string
+          product_slug: string
+          status: string
+          stripe_customer_id: string | null
+          stripe_price_id: string | null
+          stripe_subscription_id: string | null
+          trial_ends_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "user_product_subscriptions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       check_product_access: {
         Args: { p_product_key: string; p_user_id: string }
         Returns: boolean
@@ -1015,46 +1062,43 @@ export type Database = {
         Args: { p_product_slug: string; p_user_id: string }
         Returns: boolean
       }
-      activate_product_subscription_for_test: {
-        Args: { p_product_slug: string }
-        Returns: Database["public"]["Tables"]["user_product_subscriptions"]["Row"]
-      }
       create_default_dre_categories: {
         Args: { p_user_id: string }
         Returns: undefined
       }
+      is_admin: { Args: never; Returns: boolean }
       user_can_access_template: {
         Args: { p_template_id: string }
         Returns: boolean
       }
     }
-      Enums: {
-        app_role: "admin" | "client"
-        dre_category_type: "credit" | "debit"
-        dre_entry_status: "draft" | "finalized"
-        dre_model_line_type: "category" | "subcategory" | "sum"
-        dre_record_status: "active" | "inactive"
-        link_status: "active" | "expired" | "cancelled"
-        product_type:
-          | "curso_presencial"
-          | "curso_online"
-          | "palestra"
-          | "workshop"
-          | "imersao"
-          | "diagnostico"
-          | "dre_facil"
-          | "mentoria"
-          | "consultoria"
-        question_type:
-          | "scale"
-          | "single_choice"
-          | "multiple_choice"
-          | "text"
-          | "yes_no"
-        session_status: "not_started" | "in_progress" | "completed"
-        template_status: "draft" | "published" | "archived"
-        user_product_status: "ativo" | "concluido" | "expirado" | "pendente"
-      }
+    Enums: {
+      app_role: "admin" | "client"
+      dre_category_type: "credit" | "debit"
+      dre_entry_status: "draft" | "finalized"
+      dre_model_line_type: "category" | "subcategory" | "sum"
+      dre_record_status: "active" | "inactive"
+      link_status: "active" | "expired" | "cancelled"
+      product_type:
+        | "curso_presencial"
+        | "curso_online"
+        | "palestra"
+        | "workshop"
+        | "imersao"
+        | "diagnostico"
+        | "mentoria"
+        | "consultoria"
+        | "dre_facil"
+      question_type:
+        | "scale"
+        | "single_choice"
+        | "multiple_choice"
+        | "text"
+        | "yes_no"
+      session_status: "not_started" | "in_progress" | "completed"
+      template_status: "draft" | "published" | "archived"
+      user_product_status: "ativo" | "concluido" | "expirado" | "pendente"
+    }
     CompositeTypes: {
       [_ in never]: never
     }
@@ -1194,9 +1238,9 @@ export const Constants = {
         "workshop",
         "imersao",
         "diagnostico",
-        "dre_facil",
         "mentoria",
         "consultoria",
+        "dre_facil",
       ],
       question_type: [
         "scale",
