@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 
 import {
@@ -32,13 +33,34 @@ export function IndicatorCard({ title, value, description, tone = "neutral" }: {
 }
 
 export function CurrencyInput({ value, onChange, disabled }: { value: number; onChange: (value: number) => void; disabled?: boolean }) {
+  const [draftValue, setDraftValue] = useState(toCurrencyInput(value));
+  const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    if (!editing) {
+      setDraftValue(toCurrencyInput(value));
+    }
+  }, [editing, value]);
+
   return (
     <Input
       inputMode="decimal"
       disabled={disabled}
-      value={toCurrencyInput(value)}
-      onChange={(event) => onChange(parseCurrencyInput(event.target.value))}
-      onFocus={(event) => event.currentTarget.select()}
+      value={draftValue}
+      onChange={(event) => {
+        const nextValue = event.target.value;
+        setDraftValue(nextValue);
+        onChange(parseCurrencyInput(nextValue));
+      }}
+      onFocus={(event) => {
+        setEditing(true);
+        setDraftValue(value ? String(value).replace(".", ",") : "");
+        window.requestAnimationFrame(() => event.currentTarget.select());
+      }}
+      onBlur={() => {
+        setEditing(false);
+        setDraftValue(toCurrencyInput(parseCurrencyInput(draftValue)));
+      }}
       className="text-right font-medium tabular-nums"
     />
   );
