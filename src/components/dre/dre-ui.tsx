@@ -16,6 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { competenceOptionsAroundCurrent, formatCompetence, formatCurrency, parseCurrencyInput, toCurrencyInput } from "@/lib/dre-calculations";
 
 export function IndicatorCard({ title, value, description, tone = "neutral" }: { title: string; value: string; description?: string; tone?: "neutral" | "positive" | "negative" }) {
@@ -68,24 +69,35 @@ export function CurrencyInput({ value, onChange, disabled }: { value: number; on
 
 export function CompetenceMultiFilter({ selected, onChange }: { selected: string[]; onChange: (competences: string[]) => void }) {
   const options = competenceOptionsAroundCurrent();
+  const label = selected.length === 1 ? formatCompetence(selected[0]) : `${selected.length} competencias selecionadas`;
 
   return (
     <div className="grid gap-2">
       <Label>Competencias</Label>
-      <div className="grid max-h-44 gap-2 overflow-y-auto rounded-lg border bg-white p-3 sm:grid-cols-2 lg:grid-cols-3">
-        {options.map((competence) => (
-          <label key={competence} className="flex items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-muted">
-            <Checkbox
-              checked={selected.includes(competence)}
-              onCheckedChange={(checked) => {
-                if (checked) onChange([...selected, competence].sort());
-                else onChange(selected.filter((item) => item !== competence));
-              }}
-            />
-            {formatCompetence(competence)}
-          </label>
-        ))}
-      </div>
+      <Popover>
+        <PopoverTrigger asChild>
+          <button className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-left text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
+            <span>{label}</span>
+            <span className="text-muted-foreground">Selecionar</span>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-80 p-3" align="start">
+          <div className="grid max-h-72 gap-2 overflow-y-auto">
+            {options.map((competence) => (
+              <label key={competence} className="flex items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-muted">
+                <Checkbox
+                  checked={selected.includes(competence)}
+                  onCheckedChange={(checked) => {
+                    if (checked) onChange([...selected, competence].sort());
+                    else onChange(selected.filter((item) => item !== competence));
+                  }}
+                />
+                {formatCompetence(competence)}
+              </label>
+            ))}
+          </div>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
