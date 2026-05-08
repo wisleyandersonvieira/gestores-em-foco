@@ -324,6 +324,31 @@ export async function listDreEntries(userId: string) {
   return (data ?? []) as DreEntryWithModel[];
 }
 
+export async function listDreEntriesByModelAndYears(params: {
+  userId: string;
+  modelId: string;
+  years: string[];
+  includeDrafts: boolean;
+}) {
+  if (!params.modelId || params.years.length === 0) return [];
+
+  let query = supabase
+    .from("dre_entries")
+    .select("*, model:dre_models(id,name)")
+    .eq("user_id", params.userId)
+    .eq("model_id", params.modelId)
+    .in("competence", params.years.flatMap((year) => Array.from({ length: 12 }, (_, index) => `${year}-${String(index + 1).padStart(2, "0")}`)))
+    .order("competence", { ascending: true });
+
+  if (!params.includeDrafts) {
+    query = query.eq("status", "finalized");
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error("Nao foi possivel carregar DREs para analise.");
+  return (data ?? []) as DreEntryWithModel[];
+}
+
 export async function getDreEntry(userId: string, entryId: string): Promise<DreEntryWithItems> {
   const { data: entry, error } = await supabase
     .from("dre_entries")

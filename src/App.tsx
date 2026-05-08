@@ -12,6 +12,7 @@ import AdminPage from "@/pages/AdminPage";
 import DiagnosticPage from "@/pages/DiagnosticPage";
 import DiagnosticReportPage from "@/pages/DiagnosticReportPage";
 import DreAccountPage from "@/pages/dre/DreAccountPage";
+import DreAnalysisPage from "@/pages/dre/DreAnalysisPage";
 import DreCategoriesPage from "@/pages/dre/DreCategoriesPage";
 import DreDashboardPage from "@/pages/dre/DreDashboardPage";
 import DreEntriesPage from "@/pages/dre/DreEntriesPage";
@@ -35,6 +36,7 @@ export default function App() {
       <Route path="/dre-facil/dres" element={<DreEntriesPage />} />
       <Route path="/dre-facil/dres/:entryId" element={<DreEntryViewPage />} />
       <Route path="/dre-facil/dres/:entryId/editar" element={<DreEntryFormPage />} />
+      <Route path="/dre-facil/analise" element={<DreAnalysisPage />} />
       <Route path="/dre-facil/modelos" element={<DreModelsPage />} />
       <Route path="/dre-facil/categorias" element={<DreCategoriesPage />} />
       <Route path="/dre-facil/minha-conta" element={<DreAccountPage />} />
