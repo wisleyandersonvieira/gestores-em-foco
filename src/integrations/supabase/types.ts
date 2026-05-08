@@ -731,6 +731,122 @@ export type Database = {
           },
         ]
       }
+      products: {
+        Row: {
+          created_at: string
+          display_order: number
+          full_description: string | null
+          highlight_color: string | null
+          icon: string | null
+          id: string
+          name: string
+          product_type: string
+          route_path: string | null
+          short_description: string | null
+          slug: string
+          status: string
+          stripe_product_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          full_description?: string | null
+          highlight_color?: string | null
+          icon?: string | null
+          id?: string
+          name: string
+          product_type?: string
+          route_path?: string | null
+          short_description?: string | null
+          slug: string
+          status?: string
+          stripe_product_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          full_description?: string | null
+          highlight_color?: string | null
+          icon?: string | null
+          id?: string
+          name?: string
+          product_type?: string
+          route_path?: string | null
+          short_description?: string | null
+          slug?: string
+          status?: string
+          stripe_product_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_product_subscriptions: {
+        Row: {
+          access_type: string
+          canceled_at: string | null
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          plan_name: string | null
+          product_id: string
+          product_slug: string
+          status: string
+          stripe_customer_id: string | null
+          stripe_price_id: string | null
+          stripe_subscription_id: string | null
+          trial_ends_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_type?: string
+          canceled_at?: string | null
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          plan_name?: string | null
+          product_id: string
+          product_slug: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_price_id?: string | null
+          stripe_subscription_id?: string | null
+          trial_ends_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_type?: string
+          canceled_at?: string | null
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          plan_name?: string | null
+          product_id?: string
+          product_slug?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_price_id?: string | null
+          stripe_subscription_id?: string | null
+          trial_ends_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_product_subscriptions_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_subscriptions: {
         Row: {
           created_at: string
@@ -893,6 +1009,10 @@ export type Database = {
       is_admin: { Args: never; Returns: boolean }
       check_product_access: {
         Args: { p_product_key: string; p_user_id: string }
+        Returns: boolean
+      }
+      check_product_access_v2: {
+        Args: { p_product_slug: string; p_user_id: string }
         Returns: boolean
       }
       create_default_dre_categories: {

@@ -1,8 +1,9 @@
-import { Routes, Route } from "react-router-dom";
+import { Navigate, Routes, Route } from "react-router-dom";
 import HomePage from "@/pages/HomePage";
 import LoginPage from "@/pages/LoginPage";
 import SignupPage from "@/pages/SignupPage";
 import AccountPage from "@/pages/AccountPage";
+import AvailableProductsPage from "@/pages/AvailableProductsPage";
 import DashboardPage from "@/pages/DashboardPage";
 import DiagnosticsWorkspacePage from "@/pages/DiagnosticsWorkspacePage";
 import MyProductsPage from "@/pages/MyProductsPage";
@@ -30,7 +31,9 @@ export default function App() {
       <Route path="/cadastro" element={<SignupPage />} />
       <Route path="/dashboard" element={<DashboardPage />} />
       <Route path="/meus-produtos" element={<MyProductsPage />} />
+      <Route path="/produtos" element={<AvailableProductsPage />} />
       <Route path="/diagnosticos" element={<DiagnosticsWorkspacePage />} />
+      <Route path="/gestor-dre" element={<Navigate to="/dre-facil" replace />} />
       <Route path="/dre-facil" element={<DreDashboardPage />} />
       <Route path="/dre-facil/cadastrar" element={<DreEntryFormPage />} />
       <Route path="/dre-facil/dres" element={<DreEntriesPage />} />

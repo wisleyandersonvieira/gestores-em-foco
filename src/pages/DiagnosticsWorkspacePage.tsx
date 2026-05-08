@@ -5,6 +5,7 @@ import { AlertCircle, CheckCircle2, Clock3, PlayCircle, Search } from "lucide-re
 import type { User } from "@supabase/supabase-js";
 
 import { ClientLayout } from "@/components/platform/client-layout";
+import { ProductAccessGate } from "@/components/platform/product-access";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,10 +13,19 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { extractDiagnosticToken, getAccountWorkspace, validateDiagnosticTokenForUser } from "@/lib/diagnostic-runtime";
+import { PRODUCT_SLUGS } from "@/lib/products";
 import type { AccountWorkspace, AssignedDiagnosticItem, SessionHistoryItem } from "@/types/diagnostic-runtime";
 
 export default function DiagnosticsWorkspacePage() {
-  return <ClientLayout>{(user) => <DiagnosticsContent user={user} />}</ClientLayout>;
+  return (
+    <ClientLayout>
+      {(user) => (
+        <ProductAccessGate user={user} productSlug={PRODUCT_SLUGS.diagnostics} productName="Diagnosticos">
+          <DiagnosticsContent user={user} />
+        </ProductAccessGate>
+      )}
+    </ClientLayout>
+  );
 }
 
 function statusLabel(status: AssignedDiagnosticItem["status"] | SessionHistoryItem["status"]) {

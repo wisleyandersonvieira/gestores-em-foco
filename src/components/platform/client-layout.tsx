@@ -6,21 +6,27 @@ import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { getUserProductAccessMap, PRODUCT_SLUGS } from "@/lib/products";
 
-const navigation = [
+const generalNavigation = [
   { to: "/dashboard", label: "Inicio / Dashboard", icon: Home },
   { to: "/meus-produtos", label: "Meus Produtos", icon: Package },
-  { to: "/diagnosticos", label: "Diagnosticos", icon: BarChart3 },
-  { to: "/dre-facil", label: "Gestor de DRE", icon: ReceiptText },
   { to: "/meu-perfil", label: "Meu Perfil", icon: UserCircle },
   { to: "/configuracoes", label: "Configuracoes", icon: Settings },
+];
+
+const productNavigation = [
+  { to: "/diagnosticos", label: "Diagnosticos", icon: BarChart3, slug: PRODUCT_SLUGS.diagnostics },
+  { to: "/dre-facil", label: "Gestor de DRE", icon: ReceiptText, slug: PRODUCT_SLUGS.dre },
 ];
 
 type ClientLayoutProps = {
   children: (user: User) => React.ReactNode;
 };
 
-function NavItems({ onNavigate }: { onNavigate?: () => void }) {
+function NavItems({ productAccess, onNavigate }: { productAccess: Set<string>; onNavigate?: () => void }) {
+  const navigation = [...generalNavigation, ...productNavigation.filter((item) => productAccess.has(item.slug))];
+
   return (
     <nav className="grid gap-1">
       {navigation.map((item) => (
@@ -47,6 +53,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [productAccess, setProductAccess] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -67,6 +74,13 @@ export function ClientLayout({ children }: ClientLayoutProps) {
 
     return () => subscription.unsubscribe();
   }, [navigate]);
+
+  useEffect(() => {
+    if (!user) return;
+    void getUserProductAccessMap(user.id)
+      .then((map) => setProductAccess(new Set(map.keys())))
+      .catch(() => setProductAccess(new Set()));
+  }, [user]);
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -92,7 +106,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
               <p className="text-xs text-primary-foreground/65">Area do cliente</p>
             </div>
           </Link>
-          <NavItems />
+          <NavItems productAccess={productAccess} />
           <Button variant="ghost" className="mt-auto justify-start gap-3 text-primary-foreground/78 hover:bg-white/10 hover:text-white" onClick={handleSignOut}>
             <LogOut className="h-4 w-4" />
             Sair
@@ -117,7 +131,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
                     <p className="font-display text-lg font-semibold uppercase tracking-wide">Gestores em Foco</p>
                     <p className="text-sm text-primary-foreground/65">{user.email}</p>
                   </div>
-                  <NavItems onNavigate={() => setOpen(false)} />
+                  <NavItems productAccess={productAccess} onNavigate={() => setOpen(false)} />
                   <Button variant="ghost" className="justify-start gap-3 text-primary-foreground/78 hover:bg-white/10 hover:text-white" onClick={handleSignOut}>
                     <LogOut className="h-4 w-4" />
                     Sair

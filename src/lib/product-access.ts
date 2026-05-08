@@ -1,50 +1,42 @@
-import { supabase } from "@/integrations/supabase/client";
 import { DRE_PRODUCT_KEY, DRE_PRODUCT_NAME } from "@/lib/dre-calculations";
-
-export async function checkProductAccess(userId: string, productKey: string) {
-  const { data, error } = await supabase.rpc("check_product_access", {
-    p_user_id: userId,
-    p_product_key: productKey,
-  });
-
-  if (error) {
-    return { hasAccess: true, error: "Nao foi possivel verificar a assinatura. Acesso temporario liberado para testes." };
-  }
-
-  return { hasAccess: Boolean(data) || productKey === DRE_PRODUCT_KEY, error: null };
-}
+import { checkProductAccess as checkProductAccessBoolean, getProductSubscriptionStatus } from "@/lib/products";
 
 export async function getDreSubscription(userId: string) {
-  const { data: subscription } = await supabase
-    .from("product_subscriptions")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("product_id", DRE_PRODUCT_KEY)
-    .maybeSingle();
+  const subscription = await getProductSubscriptionStatus(userId, DRE_PRODUCT_KEY);
 
   if (subscription) {
-    return subscription;
+    return {
+      id: subscription.id,
+      user_id: subscription.user_id,
+      product_id: subscription.product_slug,
+      product_name: subscription.product?.name ?? DRE_PRODUCT_NAME,
+      status: subscription.status,
+      plan_name: subscription.plan_name,
+      stripe_customer_id: subscription.stripe_customer_id,
+      stripe_subscription_id: subscription.stripe_subscription_id,
+      current_period_start: subscription.current_period_start,
+      current_period_end: subscription.current_period_end,
+      created_at: subscription.created_at,
+      updated_at: subscription.updated_at,
+    };
   }
 
-  const { data: product } = await supabase
-    .from("user_products")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("product_type", DRE_PRODUCT_KEY)
-    .maybeSingle();
-
   return {
-    id: product?.id ?? "temporary-access",
+    id: "no-subscription",
     user_id: userId,
     product_id: DRE_PRODUCT_KEY,
-    product_name: product?.product_name ?? DRE_PRODUCT_NAME,
-    status: product?.status ?? "active",
-    plan_name: "Acesso de teste",
+    product_name: DRE_PRODUCT_NAME,
+    status: "inactive",
+    plan_name: null,
     stripe_customer_id: null,
     stripe_subscription_id: null,
-    current_period_start: product?.purchased_at ?? new Date().toISOString(),
-    current_period_end: product?.expires_at ?? null,
-    created_at: product?.purchased_at ?? new Date().toISOString(),
-    updated_at: product?.purchased_at ?? new Date().toISOString(),
+    current_period_start: null,
+    current_period_end: null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
   };
+}
+
+export async function checkProductAccess(userId: string, productKey: string) {
+  return { hasAccess: await checkProductAccessBoolean(userId, productKey), error: null };
 }

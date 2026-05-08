@@ -5,7 +5,7 @@ import { ClientLayout } from "@/components/platform/client-layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { listUserProducts, productStatusLabels, productTypeLabels, type UserProduct } from "@/lib/user-products";
+import { getUserProducts, PRODUCT_SLUGS, type UserProductAccess } from "@/lib/products";
 
 export default function DashboardPage() {
   return (
@@ -16,15 +16,15 @@ export default function DashboardPage() {
 }
 
 function DashboardContent({ userId, name }: { userId: string; name: string }) {
-  const [products, setProducts] = useState<UserProduct[]>([]);
+  const [products, setProducts] = useState<UserProductAccess[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    listUserProducts(userId).then(setProducts).catch((err) => setError(err instanceof Error ? err.message : "Nao foi possivel carregar o dashboard."));
+    getUserProducts(userId).then(setProducts).catch((err) => setError(err instanceof Error ? err.message : "Nao foi possivel carregar o dashboard."));
   }, [userId]);
 
-  const activeProducts = useMemo(() => products.filter((product) => product.status === "ativo").length, [products]);
-  const completedDiagnostics = useMemo(() => products.filter((product) => product.product_type === "diagnostico" && product.status === "concluido").length, [products]);
+  const activeProducts = useMemo(() => products.length, [products]);
+  const hasDiagnostics = useMemo(() => products.some((product) => product.product_slug === PRODUCT_SLUGS.diagnostics), [products]);
   const quickAccess = products.slice(0, 3);
 
   return (
@@ -49,8 +49,8 @@ function DashboardContent({ userId, name }: { userId: string; name: string }) {
         <Card className="border-primary/10 bg-white/90">
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <div>
-              <CardDescription>Diagnosticos realizados</CardDescription>
-              <CardTitle className="mt-2 text-4xl">{completedDiagnostics}</CardTitle>
+              <CardDescription>Acesso a Diagnosticos</CardDescription>
+              <CardTitle className="mt-2 text-4xl">{hasDiagnostics ? "Ativo" : "-"}</CardTitle>
             </div>
             <BarChart3 className="h-9 w-9 text-accent" />
           </CardHeader>
@@ -70,19 +70,19 @@ function DashboardContent({ userId, name }: { userId: string; name: string }) {
             <Card className="border-dashed bg-white/80 lg:col-span-3">
               <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm text-muted-foreground">Voce ainda nao possui produtos ativos.</p>
-                <Button asChild className="bg-accent text-accent-foreground hover:bg-accent/90"><a href="/#produtos">Conhecer produtos</a></Button>
+                <Button asChild className="bg-accent text-accent-foreground hover:bg-accent/90"><a href="/produtos">Conhecer produtos</a></Button>
               </CardContent>
             </Card>
-          ) : quickAccess.map((product) => (
-            <Card key={product.id} className="border-primary/10 bg-white/90">
+          ) : quickAccess.map((subscription) => (
+            <Card key={subscription.id} className="border-primary/10 bg-white/90">
               <CardHeader>
-                <Badge variant="secondary" className="w-fit">{productTypeLabels[product.product_type]}</Badge>
-                <CardTitle className="text-xl">{product.product_name}</CardTitle>
-                <CardDescription>{productStatusLabels[product.status]}</CardDescription>
+                <Badge variant="secondary" className="w-fit">{subscription.status === "trialing" ? "Teste ativo" : "Acesso ativo"}</Badge>
+                <CardTitle className="text-xl">{subscription.product?.name}</CardTitle>
+                <CardDescription>{subscription.product?.short_description}</CardDescription>
               </CardHeader>
               <CardContent>
                 <Button asChild className="w-full bg-primary hover:bg-primary/90">
-                  <a href={product.access_url ?? "/meus-produtos"}>
+                  <a href={subscription.product?.route_path ?? "/meus-produtos"}>
                     Acessar
                     <ArrowRight className="h-4 w-4" />
                   </a>

@@ -1,6 +1,6 @@
 import type { DreDraftLine, DreEntry, DreEntryItem, DreTotals } from "@/types/dre";
 
-export const DRE_PRODUCT_KEY = "dre_facil";
+export const DRE_PRODUCT_KEY = "gestor-dre";
 export const DRE_PRODUCT_NAME = "Gestor de DRE";
 
 export const monthNames = [
