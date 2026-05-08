@@ -11,7 +11,7 @@ export default function LoginPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const created = searchParams.get("cadastro") === "sucesso";
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/minha-conta";
+  const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
   const adminAccessError =
     searchParams.get("erro") === "admin_email" ? getAdminAccessError(searchParams.get("email")) : null;
   const [error, setError] = useState<string | null>(null);
@@ -43,17 +43,17 @@ export default function LoginPage() {
       <div className="max-w-xl">
         <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary">Acesso seguro</p>
         <h1 className="font-display mt-4 text-4xl font-semibold leading-tight md:text-5xl">
-          Entre para acompanhar seu diagnostico empresarial.
+          Entre para acompanhar sua jornada de gestao.
         </h1>
         <p className="mt-6 text-lg leading-8 text-muted-foreground">
-          Seu progresso, historico e relatorios ficam disponiveis em uma experiencia pensada para uso rapido no desktop e no mobile.
+          Seus produtos, diagnosticos, progresso e relatorios ficam disponiveis em uma experiencia pensada para uso rapido no desktop e no mobile.
         </p>
       </div>
 
       <Card className="w-full max-w-md border-primary/10 bg-white/90 shadow-xl shadow-slate-200/70">
         <CardHeader>
           <CardTitle className="font-display text-3xl">Entrar na plataforma</CardTitle>
-          <CardDescription>Acesse seu diagnostico, progresso e relatorios.</CardDescription>
+          <CardDescription>Acesse seus produtos, progresso e relatorios.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-5">

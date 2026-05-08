@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { ensureDiagnosticProduct } from "@/lib/user-products";
 import type { Json, Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import type {
   AccountWorkspace,
@@ -689,6 +690,23 @@ export async function refreshSessionProgress(
 
   if (error) {
     throw new Error("Nao foi possivel atualizar o progresso da sessao.");
+  }
+
+  if (traversal.completed) {
+    const { data: session } = await supabase
+      .from("diagnostic_sessions")
+      .select("id, user_id, completed_at, diagnostic_templates(name)")
+      .eq("id", sessionId)
+      .maybeSingle();
+
+    if (session) {
+      await ensureDiagnosticProduct({
+        userId: session.user_id,
+        sessionId: session.id,
+        templateName: session.diagnostic_templates?.name ?? "Diagnostico Empresarial",
+        completedAt: session.completed_at,
+      });
+    }
   }
 
   return traversal;

@@ -1,11 +1,13 @@
 import { Link } from "react-router-dom";
+import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 const navigation = [
-  { href: "#como-funciona", label: "Como funciona" },
-  { href: "#pilares", label: "Pilares" },
-  { href: "#depoimentos", label: "Resultados" },
-  { href: "#faq", label: "FAQ" },
+  { href: "/", label: "Inicio" },
+  { href: "#produtos", label: "Produtos" },
+  { href: "#quem-somos", label: "Sobre" },
+  { href: "#contato", label: "Contato" },
 ];
 
 export function SiteHeader() {
@@ -17,8 +19,8 @@ export function SiteHeader() {
             GF
           </div>
           <div>
-            <p className="font-display text-base font-semibold">Gestores em Foco</p>
-            <p className="text-xs text-muted-foreground">Diagnosticos para crescimento empresarial</p>
+            <p className="font-display text-base font-semibold uppercase tracking-wide">Gestores em Foco</p>
+            <p className="text-xs text-muted-foreground">Mentoria Empresarial</p>
           </div>
         </Link>
 
@@ -30,14 +32,32 @@ export function SiteHeader() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-3">
-          <Button asChild variant="ghost" className="hidden sm:inline-flex">
-            <Link to="/cadastro">Criar conta</Link>
-          </Button>
+        <div className="hidden items-center gap-3 sm:flex">
           <Button asChild className="bg-accent text-accent-foreground hover:bg-accent/90">
-            <Link to="/entrar">Acessar minha conta</Link>
+            <Link to="/entrar">Entrar</Link>
           </Button>
         </div>
+
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button variant="outline" size="icon" className="sm:hidden">
+              <Menu className="h-5 w-5" />
+              <span className="sr-only">Abrir menu</span>
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="right" className="w-72">
+            <div className="mt-8 grid gap-5">
+              {navigation.map((item) => (
+                <a key={item.href} href={item.href} className="text-base font-medium text-muted-foreground transition hover:text-foreground">
+                  {item.label}
+                </a>
+              ))}
+              <Button asChild className="mt-2 bg-accent text-accent-foreground hover:bg-accent/90">
+                <Link to="/entrar">Entrar</Link>
+              </Button>
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
     </header>
   );

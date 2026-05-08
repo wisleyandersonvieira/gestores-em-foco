@@ -460,6 +460,42 @@ export type Database = {
           },
         ]
       }
+      user_products: {
+        Row: {
+          access_url: string | null
+          expires_at: string | null
+          id: string
+          metadata: Json | null
+          product_name: string
+          product_type: Database["public"]["Enums"]["product_type"]
+          purchased_at: string
+          status: Database["public"]["Enums"]["user_product_status"]
+          user_id: string
+        }
+        Insert: {
+          access_url?: string | null
+          expires_at?: string | null
+          id?: string
+          metadata?: Json | null
+          product_name: string
+          product_type: Database["public"]["Enums"]["product_type"]
+          purchased_at?: string
+          status?: Database["public"]["Enums"]["user_product_status"]
+          user_id: string
+        }
+        Update: {
+          access_url?: string | null
+          expires_at?: string | null
+          id?: string
+          metadata?: Json | null
+          product_name?: string
+          product_type?: Database["public"]["Enums"]["product_type"]
+          purchased_at?: string
+          status?: Database["public"]["Enums"]["user_product_status"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           company_name: string | null
@@ -544,18 +580,28 @@ export type Database = {
         Returns: boolean
       }
     }
-    Enums: {
-      app_role: "admin" | "client"
-      link_status: "active" | "expired" | "cancelled"
-      question_type:
-        | "scale"
-        | "single_choice"
-        | "multiple_choice"
-        | "text"
-        | "yes_no"
-      session_status: "not_started" | "in_progress" | "completed"
-      template_status: "draft" | "published" | "archived"
-    }
+      Enums: {
+        app_role: "admin" | "client"
+        link_status: "active" | "expired" | "cancelled"
+        product_type:
+          | "curso_presencial"
+          | "curso_online"
+          | "palestra"
+          | "workshop"
+          | "imersao"
+          | "diagnostico"
+          | "mentoria"
+          | "consultoria"
+        question_type:
+          | "scale"
+          | "single_choice"
+          | "multiple_choice"
+          | "text"
+          | "yes_no"
+        session_status: "not_started" | "in_progress" | "completed"
+        template_status: "draft" | "published" | "archived"
+        user_product_status: "ativo" | "concluido" | "expirado" | "pendente"
+      }
     CompositeTypes: {
       [_ in never]: never
     }
@@ -684,6 +730,16 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "client"],
       link_status: ["active", "expired", "cancelled"],
+      product_type: [
+        "curso_presencial",
+        "curso_online",
+        "palestra",
+        "workshop",
+        "imersao",
+        "diagnostico",
+        "mentoria",
+        "consultoria",
+      ],
       question_type: [
         "scale",
         "single_choice",
@@ -693,6 +749,7 @@ export const Constants = {
       ],
       session_status: ["not_started", "in_progress", "completed"],
       template_status: ["draft", "published", "archived"],
+      user_product_status: ["ativo", "concluido", "expirado", "pendente"],
     },
   },
 } as const
