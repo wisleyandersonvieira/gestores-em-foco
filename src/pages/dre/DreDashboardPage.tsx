@@ -153,12 +153,12 @@ function DreDashboardContent({ userId }: { userId: string }) {
       </div>
 
       <div className="grid gap-5 xl:grid-cols-2">
-        <ChartCard title="Evolucao de faturamento, despesas e lucro">
-          <ChartContainer className="h-80" config={{ credit: { label: "Credito", color: "#16a34a" }, debit: { label: "Debito", color: "#dc2626" }, result: { label: "Lucro", color: "#2563eb" } }}>
-            <LineChart data={chartData}>
+        <ChartCard title="Evolução de faturamento, despesas e lucro">
+          <ChartContainer className="h-80 w-full" config={{ credit: { label: "Crédito", color: "#16a34a" }, debit: { label: "Débito", color: "#dc2626" }, result: { label: "Lucro", color: "#2563eb" } }}>
+            <LineChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
               <CartesianGrid vertical={false} />
               <XAxis dataKey="competence" tickLine={false} axisLine={false} />
-              <YAxis tickFormatter={(value) => `${Number(value) / 1000}k`} />
+              <YAxis tickFormatter={(value) => `${Number(value) / 1000}k`} width={48} />
               <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />} />
               <Line type="monotone" dataKey="credit" stroke="var(--color-credit)" strokeWidth={2} />
               <Line type="monotone" dataKey="debit" stroke="var(--color-debit)" strokeWidth={2} />
@@ -167,12 +167,12 @@ function DreDashboardContent({ userId }: { userId: string }) {
           </ChartContainer>
         </ChartCard>
 
-        <ChartCard title="Comparativo credito, debito e lucro">
-          <ChartContainer className="h-80" config={{ credit: { label: "Credito", color: "#16a34a" }, debit: { label: "Debito", color: "#dc2626" }, result: { label: "Lucro", color: "#2563eb" } }}>
-            <BarChart data={chartData}>
+        <ChartCard title="Comparativo crédito, débito e lucro">
+          <ChartContainer className="h-80 w-full" config={{ credit: { label: "Crédito", color: "#16a34a" }, debit: { label: "Débito", color: "#dc2626" }, result: { label: "Lucro", color: "#2563eb" } }}>
+            <BarChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
               <CartesianGrid vertical={false} />
               <XAxis dataKey="competence" tickLine={false} axisLine={false} />
-              <YAxis tickFormatter={(value) => `${Number(value) / 1000}k`} />
+              <YAxis tickFormatter={(value) => `${Number(value) / 1000}k`} width={48} />
               <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />} />
               <Bar dataKey="credit" fill="var(--color-credit)" radius={6} />
               <Bar dataKey="debit" fill="var(--color-debit)" radius={6} />
@@ -183,11 +183,11 @@ function DreDashboardContent({ userId }: { userId: string }) {
       </div>
 
       <ChartCard title="Top categorias de despesa com maior impacto">
-        <ChartContainer className="h-80" config={{ value: { label: "Impacto", color: "#0f172a" } }}>
-          <BarChart data={categoryImpact}>
+        <ChartContainer className="h-80 w-full" config={{ value: { label: "Impacto", color: "#0f172a" } }}>
+          <BarChart data={categoryImpact} margin={{ top: 16, right: 12, left: 0, bottom: 0 }}>
             <CartesianGrid vertical={false} />
-            <XAxis dataKey="category" tickLine={false} axisLine={false} />
-            <YAxis tickFormatter={(value) => `${Number(value) / 1000}k`} />
+            <XAxis dataKey="category" tickLine={false} axisLine={false} interval={0} height={50} tick={{ fontSize: 11 }} />
+            <YAxis tickFormatter={(value) => `${Number(value) / 1000}k`} width={48} />
             <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />} />
             <Bar dataKey="value" fill="var(--color-value)" radius={6}>
               <LabelList
@@ -202,7 +202,7 @@ function DreDashboardContent({ userId }: { userId: string }) {
       </ChartCard>
 
       <Card className="border-primary/10 bg-white/90">
-        <CardHeader><CardTitle>Analise do Periodo</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Análise do Período</CardTitle></CardHeader>
         <CardContent className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -210,8 +210,8 @@ function DreDashboardContent({ userId }: { userId: string }) {
                 <TableHead>Categoria</TableHead>
                 <TableHead className="text-right">Valor inicial</TableHead>
                 <TableHead className="text-right">Valor atual</TableHead>
-                <TableHead className="text-right">Diferenca</TableHead>
-                <TableHead className="text-right">Variacao</TableHead>
+                <TableHead className="text-right">Diferença</TableHead>
+                <TableHead className="text-right">Variação</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
