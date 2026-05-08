@@ -106,8 +106,8 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background lg:grid lg:grid-cols-[280px_1fr]">
-      <aside className="hidden bg-primary text-primary-foreground lg:block">
+    <div className="min-h-screen bg-background md:grid md:grid-cols-[260px_1fr]">
+      <aside className="hidden bg-primary text-primary-foreground md:block">
         <div className="sticky top-0 flex h-screen flex-col px-5 py-6">
           <Link to="/dashboard" className="mb-8 flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-accent text-sm font-bold text-accent-foreground">GF</div>
@@ -125,7 +125,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       </aside>
 
       <div>
-        <header className="sticky top-0 z-40 border-b border-border/70 bg-background/88 backdrop-blur lg:hidden">
+        <header className="sticky top-0 z-40 border-b border-border/70 bg-background/88 backdrop-blur md:hidden">
           <div className="flex items-center justify-between px-5 py-4">
             <Link to="/dashboard" className="font-display font-semibold uppercase tracking-wide">Gestores em Foco</Link>
             <Sheet open={open} onOpenChange={setOpen}>
@@ -152,7 +152,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           </div>
         </header>
 
-        <main className="mx-auto max-w-7xl px-5 py-8 lg:px-8 lg:py-10">{children(user)}</main>
+        <main className="mx-auto max-w-7xl px-5 py-8 md:px-8 md:py-10">{children(user)}</main>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
-import { BarChart3, FilePlus2, Files, LayoutTemplate, LayoutGrid, ListTree, SearchCheck, UserCircle } from "lucide-react";
+import { BarChart3, FilePlus2, Files, LayoutTemplate, ListTree, SearchCheck, UserCircle } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 
 import { ClientLayout } from "@/components/platform/client-layout";
@@ -11,7 +11,6 @@ import { createDefaultDreCategories } from "@/lib/dre-service";
 import { ProductAccessBlocked } from "@/components/platform/product-access";
 
 const dreNavigation = [
-  { to: "/meus-produtos", label: "Meus Produtos", icon: LayoutGrid },
   { to: "/dre-facil", label: "Dashboard", icon: BarChart3 },
   { to: "/dre-facil/cadastrar", label: "Cadastrar DRE", icon: FilePlus2 },
   { to: "/dre-facil/dres", label: "DREs Cadastrados", icon: Files },
