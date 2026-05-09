@@ -114,7 +114,7 @@ function AvailableProductsContent({ userId }: { userId: string }) {
                 setContractProduct(null);
               }}
             >
-              Solicitar contratacao
+              Solicitar contratação
             </Button>
           </div>
         </DialogContent>
