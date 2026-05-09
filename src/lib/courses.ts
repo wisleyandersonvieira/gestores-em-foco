@@ -9,6 +9,12 @@ export type EnrollmentStatus = "active" | "trialing" | "expired" | "canceled" | 
 export type EnrollmentAccessType = "paid" | "trial" | "free" | "admin" | "test";
 export type LessonProgressStatus = "not_started" | "in_progress" | "completed";
 export type VideoProvider = "youtube" | "vimeo" | "external";
+export type ParsedYouTubeUrl = {
+  provider: "youtube";
+  videoId: string;
+  embedUrl: string;
+  thumbnailUrl: string;
+};
 
 export type Course = {
   id: string;
@@ -281,9 +287,10 @@ export function slugifyCourseTitle(value: string) {
 export function buildEmbedUrl(rawUrl: string, provider?: VideoProvider | null) {
   const url = rawUrl.trim();
   if (!url) return { provider: null, embedUrl: null };
+  if (containsUnsafeMarkup(url)) throw new Error("Nao cole iframe ou HTML no campo de video.");
 
-  const youtubeId = parseYouTubeUrl(url);
-  if (youtubeId) return { provider: "youtube" as const, embedUrl: `https://www.youtube.com/embed/${youtubeId}` };
+  const youtube = parseYouTubeUrl(url);
+  if (youtube) return { provider: "youtube" as const, embedUrl: youtube.embedUrl, thumbnailUrl: youtube.thumbnailUrl };
 
   const vimeoId = parseVimeoUrl(url);
   if (vimeoId) return { provider: "vimeo" as const, embedUrl: `https://player.vimeo.com/video/${vimeoId}` };
@@ -292,18 +299,28 @@ export function buildEmbedUrl(rawUrl: string, provider?: VideoProvider | null) {
   throw new Error("Informe um link valido do YouTube, Vimeo ou uma URL externa HTTPS permitida.");
 }
 
-export function parseYouTubeUrl(rawUrl: string) {
+export function parseYouTubeUrl(rawUrl: string): ParsedYouTubeUrl | null {
+  if (containsUnsafeMarkup(rawUrl)) return null;
   try {
     const url = new URL(rawUrl);
-    if (url.hostname === "youtu.be") return cleanVideoId(url.pathname.slice(1));
-    if (url.hostname.endsWith("youtube.com")) {
-      if (url.pathname.startsWith("/embed/")) return cleanVideoId(url.pathname.split("/embed/")[1]);
-      return cleanVideoId(url.searchParams.get("v") ?? "");
+    const host = url.hostname.replace(/^www\./, "");
+    let videoId: string | null = null;
+    if (host === "youtu.be") videoId = cleanVideoId(url.pathname.slice(1));
+    if (host === "youtube.com" || host === "m.youtube.com") {
+      if (url.pathname.startsWith("/embed/")) videoId = cleanVideoId(url.pathname.split("/embed/")[1]);
+      if (!videoId) videoId = cleanVideoId(url.searchParams.get("v") ?? "");
     }
+    return videoId
+      ? {
+          provider: "youtube",
+          videoId,
+          embedUrl: `https://www.youtube.com/embed/${videoId}`,
+          thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+        }
+      : null;
   } catch {
     return null;
   }
-  return null;
 }
 
 export function parseVimeoUrl(rawUrl: string) {
@@ -326,11 +343,34 @@ function cleanVideoId(value: string) {
 
 function isSafeExternalUrl(rawUrl: string) {
   try {
+    if (containsUnsafeMarkup(rawUrl)) return false;
     const url = new URL(rawUrl);
     return url.protocol === "https:" && !["javascript:", "data:", "file:"].includes(url.protocol);
   } catch {
     return false;
   }
+}
+
+export function parseDurationToSeconds(value: string | number | null | undefined) {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value === "number") return Number.isFinite(value) && value >= 0 ? Math.round(value) : null;
+  const raw = value.trim();
+  if (!raw) return null;
+  if (/^\d+$/.test(raw)) return Number(raw) * 60;
+  const parts = raw.split(":").map((part) => Number(part));
+  if (parts.length < 2 || parts.length > 3 || parts.some((part) => !Number.isInteger(part) || part < 0)) return null;
+  const [hours, minutes, seconds] = parts.length === 3 ? parts : [0, parts[0], parts[1]];
+  if (minutes > 59 || seconds > 59) return null;
+  return hours * 3600 + minutes * 60 + seconds;
+}
+
+export function formatDurationInput(seconds?: number | null) {
+  if (!seconds) return "";
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainingSeconds = seconds % 60;
+  if (hours > 0) return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
+  return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
 export async function getAdminCourses() {
@@ -366,6 +406,9 @@ export async function saveCourse(input: Partial<Course> & { title: string; slug?
 }
 
 export async function saveCourseModule(input: Partial<CourseModule> & { course_id: string; title: string }) {
+  if (!input.course_id) throw new Error("Selecione um curso.");
+  if (!stripHtml(input.title).trim()) throw new Error("Informe o titulo do bloco.");
+  if (!Number.isFinite(Number(input.display_order ?? 0))) throw new Error("Informe uma ordem valida.");
   const payload = {
     course_id: input.course_id,
     title: stripHtml(input.title).trim(),
@@ -380,12 +423,25 @@ export async function saveCourseModule(input: Partial<CourseModule> & { course_i
 }
 
 export async function saveCourseLesson(input: Partial<CourseLesson> & { course_id: string; module_id: string; title: string }) {
+  if (!input.course_id) throw new Error("Selecione um curso.");
+  if (!input.module_id) throw new Error("Selecione um bloco.");
+  if (!stripHtml(input.title).trim()) throw new Error("Informe o titulo da aula.");
+  if (!input.lesson_type) throw new Error("Selecione o tipo da aula.");
+  if (!Number.isFinite(Number(input.display_order ?? 0))) throw new Error("Informe uma ordem valida.");
+
   let videoProvider = input.video_provider ?? null;
   let videoEmbedUrl = input.video_embed_url ?? null;
+  let thumbnailUrl = input.thumbnail_url?.trim() || null;
   if (input.video_url) {
     const embed = buildEmbedUrl(input.video_url, input.video_provider);
     videoProvider = embed.provider;
     videoEmbedUrl = embed.embedUrl;
+    thumbnailUrl = thumbnailUrl || ("thumbnailUrl" in embed ? embed.thumbnailUrl ?? null : null);
+  } else if (input.lesson_type === "video") {
+    throw new Error("Informe o link do video.");
+  }
+  if (input.lesson_type === "video" && videoProvider === "youtube" && !parseYouTubeUrl(input.video_url ?? "")) {
+    throw new Error("Informe um link valido do YouTube.");
   }
 
   const payload = {
@@ -397,8 +453,8 @@ export async function saveCourseLesson(input: Partial<CourseLesson> & { course_i
     video_provider: videoProvider,
     video_url: input.video_url?.trim() || null,
     video_embed_url: videoEmbedUrl,
-    duration_seconds: Number(input.duration_seconds ?? 0) || null,
-    thumbnail_url: input.thumbnail_url?.trim() || null,
+    duration_seconds: parseDurationToSeconds(input.duration_seconds ?? null),
+    thumbnail_url: thumbnailUrl,
     is_preview: Boolean(input.is_preview),
     display_order: Number(input.display_order ?? 0),
     status: input.status ?? "active",
@@ -411,6 +467,12 @@ export async function saveCourseLesson(input: Partial<CourseLesson> & { course_i
 }
 
 export async function saveCourseMaterial(input: Partial<CourseMaterial> & { course_id: string; title: string }) {
+  if (!input.course_id) throw new Error("Selecione um curso.");
+  if (!stripHtml(input.title).trim()) throw new Error("Informe o titulo do material.");
+  if (!input.material_type) throw new Error("Selecione o tipo do material.");
+  if (input.material_type === "link" && !isSafeExternalUrl(input.external_url ?? "")) throw new Error("Informe uma URL valida para o material.");
+  if (input.material_type === "file" && !input.file_path && !input.file_url) throw new Error("Informe a URL ou caminho do arquivo.");
+
   const payload = {
     course_id: input.course_id,
     lesson_id: input.lesson_id || null,
@@ -509,4 +571,8 @@ function sanitizeCoursePayload(input: Partial<Course> & { title: string; slug?: 
 
 function stripHtml(value: string) {
   return value.replace(/[<>]/g, "");
+}
+
+function containsUnsafeMarkup(value: string) {
+  return /<[^>]+>|<\/|script:|javascript:/i.test(value);
 }

@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type React from "react";
-import { BookOpen, CheckCircle2, FileText, Plus, Users } from "lucide-react";
+import { BookOpen, CheckCircle2, FileText, Pencil, Plus, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +20,7 @@ import {
   deleteCourseMaterial,
   deleteCourseModule,
   formatDuration,
+  formatDurationInput,
   getAdminCourses,
   grantCourseAccess,
   saveCourse,
@@ -61,7 +64,8 @@ export function CoursesAdminPanel({ userId, users }: { userId: string | null; us
   const [courseDialog, setCourseDialog] = useState<Course | null | "new">(null);
   const [moduleDialog, setModuleDialog] = useState<CourseModule | null | "new">(null);
   const [lessonDialog, setLessonDialog] = useState<CourseLesson | null | "new">(null);
-  const [materialDialog, setMaterialDialog] = useState<CourseMaterial | null | "new">(null);
+  const [lessonModuleId, setLessonModuleId] = useState<string | null>(null);
+  const [materialDialog, setMaterialDialog] = useState<{ lesson: CourseLesson; material?: CourseMaterial | "new" } | null>(null);
   const [enrollmentDialog, setEnrollmentDialog] = useState<UserCourseEnrollment | null | "new">(null);
   const [search, setSearch] = useState("");
 
@@ -89,6 +93,12 @@ export function CoursesAdminPanel({ userId, users }: { userId: string | null; us
   const courseMaterials = state.materials.filter((material) => material.course_id === selectedCourseId);
   const courseEnrollments = state.enrollments.filter((enrollment) => enrollment.course_id === selectedCourseId);
   const progressStats = calculateProgressStats(courseLessons, courseEnrollments, state.progress);
+  const activeLessons = state.lessons.filter((lesson) => lesson.status === "active");
+
+  const openNewLesson = (moduleId: string) => {
+    setLessonModuleId(moduleId);
+    setLessonDialog("new");
+  };
 
   return (
     <div className="space-y-6">
@@ -101,7 +111,7 @@ export function CoursesAdminPanel({ userId, users }: { userId: string | null; us
         <StatCard label="Cursos cadastrados" value={state.courses.length} icon={BookOpen} />
         <StatCard label="Publicados" value={state.courses.filter((course) => course.status === "published").length} icon={CheckCircle2} />
         <StatCard label="Matriculas" value={state.enrollments.length} icon={Users} />
-        <StatCard label="Aulas" value={state.lessons.length} icon={FileText} />
+        <StatCard label="Aulas" value={activeLessons.length} icon={FileText} />
       </div>
 
       <Tabs defaultValue="courses" className="space-y-4">
@@ -128,8 +138,8 @@ export function CoursesAdminPanel({ userId, users }: { userId: string | null; us
                       <TableCell>{course.category ?? "-"}</TableCell>
                       <TableCell><Badge variant="outline">{statusLabel(course.status)}</Badge></TableCell>
                       <TableCell>{course.price ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: course.currency ?? "BRL" }).format(Number(course.price)) : "Gratuito"}</TableCell>
-                      <TableCell>{state.modules.filter((module) => module.course_id === course.id).length}</TableCell>
-                      <TableCell>{state.lessons.filter((lesson) => lesson.course_id === course.id).length}</TableCell>
+                      <TableCell>{state.modules.filter((module) => module.course_id === course.id && module.status === "active").length}</TableCell>
+                      <TableCell>{state.lessons.filter((lesson) => lesson.course_id === course.id && lesson.status === "active").length}</TableCell>
                       <TableCell>{state.enrollments.filter((enrollment) => enrollment.course_id === course.id).length}</TableCell>
                       <TableCell><Button size="sm" variant="outline" onClick={() => { setSelectedCourseId(course.id); setCourseDialog(course); }}>Editar</Button></TableCell>
                     </TableRow>
@@ -141,36 +151,97 @@ export function CoursesAdminPanel({ userId, users }: { userId: string | null; us
         </TabsContent>
 
         <TabsContent value="content" className="space-y-4">
-          <SelectedCourseHeader course={selectedCourse} />
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={() => setModuleDialog("new")}><Plus className="h-4 w-4" />Modulo</Button>
-            <Button onClick={() => setLessonDialog("new")} disabled={courseModules.length === 0}><Plus className="h-4 w-4" />Aula</Button>
-            <Button onClick={() => setMaterialDialog("new")} disabled={!selectedCourse}><Plus className="h-4 w-4" />Material</Button>
+          <div className="space-y-1">
+            <h3 className="font-display text-2xl font-semibold">Conteudo do curso</h3>
+            <p className="text-sm text-muted-foreground">Organize os blocos, aulas e materiais deste curso.</p>
           </div>
-          <div className="grid gap-4">
-            {courseModules.length ? courseModules.map((module) => {
-              const lessons = courseLessons.filter((lesson) => lesson.module_id === module.id);
-              return (
-                <Card key={module.id} className="bg-white/90">
-                  <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div><CardTitle>{module.title}</CardTitle><CardDescription>{module.description || "Sem descricao"} - {lessons.length} aula(s)</CardDescription></div>
-                    <Button size="sm" variant="outline" onClick={() => setModuleDialog(module)}>Editar modulo</Button>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {lessons.length ? lessons.map((lesson) => (
-                      <div key={lesson.id} className="flex flex-col gap-3 rounded-lg border bg-card p-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <p className="font-medium">{lesson.title} {lesson.is_preview ? <Badge variant="outline">Preview</Badge> : null}</p>
-                          <p className="text-xs text-muted-foreground">{lesson.video_provider ?? lesson.lesson_type} {lesson.duration_seconds ? `- ${formatDuration(lesson.duration_seconds)}` : ""}</p>
-                        </div>
-                        <Button size="sm" variant="outline" onClick={() => setLessonDialog(lesson)}>Editar aula</Button>
-                      </div>
-                    )) : <p className="text-sm text-muted-foreground">Este modulo ainda nao possui aulas cadastradas.</p>}
+
+          <div className="flex flex-col gap-3 md:flex-row md:items-end">
+            <Field label="Selecionar curso" className="w-full md:max-w-md">
+              <Select value={selectedCourseId ?? ""} onValueChange={setSelectedCourseId}>
+                <SelectTrigger><SelectValue placeholder="Selecione um curso" /></SelectTrigger>
+                <SelectContent>{state.courses.map((course) => <SelectItem key={course.id} value={course.id}>{course.title}</SelectItem>)}</SelectContent>
+              </Select>
+            </Field>
+            <Button onClick={() => setModuleDialog("new")} disabled={!selectedCourse} className="w-full bg-accent text-accent-foreground hover:bg-accent/90 md:w-auto">
+              <Plus className="h-4 w-4" />Novo bloco
+            </Button>
+          </div>
+
+          {!selectedCourse ? (
+            <EmptyCard message="Selecione um curso para gerenciar o conteudo." />
+          ) : (
+            <>
+              <CourseContentSummary course={selectedCourse} modules={courseModules} lessons={courseLessons} materials={courseMaterials} />
+              {courseModules.length === 0 ? (
+                <Card className="border-dashed bg-white/80">
+                  <CardContent className="flex flex-col gap-3 p-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+                    <span>Este curso ainda nao possui blocos cadastrados.</span>
+                    <Button onClick={() => setModuleDialog("new")} className="bg-accent text-accent-foreground hover:bg-accent/90"><Plus className="h-4 w-4" />Criar primeiro bloco</Button>
                   </CardContent>
                 </Card>
-              );
-            }) : <Card className="border-dashed bg-white/80"><CardContent className="p-6 text-sm text-muted-foreground">Este curso ainda nao possui modulos cadastrados.</CardContent></Card>}
-          </div>
+              ) : (
+                <Accordion type="multiple" defaultValue={courseModules.map((module) => module.id)} className="space-y-3">
+                  {courseModules.map((module) => {
+                    const lessons = courseLessons.filter((lesson) => lesson.module_id === module.id).sort((a, b) => a.display_order - b.display_order);
+                    return (
+                      <AccordionItem key={module.id} value={module.id} className="rounded-lg border bg-white/90 px-4">
+                        <AccordionTrigger className="gap-3 text-left hover:no-underline">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-display text-lg font-semibold">Bloco {module.display_order} - {module.title}</span>
+                              <Badge variant={module.status === "active" ? "default" : "outline"}>{module.status === "active" ? "Ativo" : "Inativo"}</Badge>
+                              <Badge variant="outline">{lessons.length} aula(s)</Badge>
+                            </div>
+                            <p className="mt-1 line-clamp-2 text-sm font-normal text-muted-foreground">{module.description || "Sem descricao"}</p>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="space-y-3">
+                          <div className="flex flex-wrap gap-2">
+                            <Button size="sm" variant="outline" onClick={() => setModuleDialog(module)}><Pencil className="h-4 w-4" />Editar</Button>
+                            <Button size="sm" variant="outline" onClick={() => openNewLesson(module.id)}><Plus className="h-4 w-4" />Adicionar aula</Button>
+                            <Button size="sm" variant="destructive" onClick={() => handleDeleteModule(module, lessons, reload)}><Trash2 className="h-4 w-4" />Excluir</Button>
+                          </div>
+
+                          {lessons.length === 0 ? (
+                            <div className="flex flex-col gap-3 rounded-md border border-dashed p-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+                              <span>Nenhuma aula cadastrada neste bloco.</span>
+                              <Button size="sm" variant="outline" onClick={() => openNewLesson(module.id)}><Plus className="h-4 w-4" />Adicionar primeira aula</Button>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              {lessons.map((lesson) => {
+                                const lessonMaterials = courseMaterials.filter((material) => material.lesson_id === lesson.id);
+                                return (
+                                  <div key={lesson.id} className="flex flex-col gap-3 rounded-lg border bg-card p-3 md:flex-row md:items-center md:justify-between">
+                                    <div className="min-w-0">
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <p className="font-medium">{lesson.title}</p>
+                                        <Badge variant={lesson.status === "active" ? "default" : "outline"}>{lesson.status === "active" ? "Ativa" : "Inativa"}</Badge>
+                                        {lesson.is_preview ? <Badge variant="outline">Previa gratuita</Badge> : null}
+                                      </div>
+                                      <p className="text-xs text-muted-foreground">
+                                        {lessonTypeLabel(lesson.lesson_type)} {lesson.video_provider ? `- ${providerLabel(lesson.video_provider)}` : ""} {lesson.duration_seconds ? `- ${formatDuration(lesson.duration_seconds)}` : ""} - {lessonMaterials.length} material(is)
+                                      </p>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                      <Button size="sm" variant="outline" onClick={() => setLessonDialog(lesson)}><Pencil className="h-4 w-4" />Editar</Button>
+                                      <Button size="sm" variant="outline" onClick={() => setMaterialDialog({ lesson })}>Materiais</Button>
+                                      <Button size="sm" variant="destructive" onClick={() => handleDeleteLesson(lesson, state.progress, reload)}><Trash2 className="h-4 w-4" />Excluir</Button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </AccordionContent>
+                      </AccordionItem>
+                    );
+                  })}
+                </Accordion>
+              )}
+            </>
+          )}
         </TabsContent>
 
         <TabsContent value="students" className="space-y-4">
@@ -192,9 +263,9 @@ export function CoursesAdminPanel({ userId, users }: { userId: string | null; us
       </Tabs>
 
       <CourseDialog open={Boolean(courseDialog)} value={courseDialog} userId={userId} onClose={() => setCourseDialog(null)} onSaved={reload} />
-      <ModuleDialog open={Boolean(moduleDialog)} value={moduleDialog} course={selectedCourse} onClose={() => setModuleDialog(null)} onSaved={reload} onDelete={reload} />
-      <LessonDialog open={Boolean(lessonDialog)} value={lessonDialog} course={selectedCourse} modules={courseModules} onClose={() => setLessonDialog(null)} onSaved={reload} onDelete={reload} />
-      <MaterialDialog open={Boolean(materialDialog)} value={materialDialog} course={selectedCourse} modules={courseModules} lessons={courseLessons} onClose={() => setMaterialDialog(null)} onSaved={reload} onDelete={reload} />
+      <ModuleDialog open={Boolean(moduleDialog)} value={moduleDialog} course={selectedCourse} modules={courseModules} onClose={() => setModuleDialog(null)} onSaved={reload} />
+      <LessonDialog open={Boolean(lessonDialog)} value={lessonDialog} course={selectedCourse} modules={courseModules} lessons={courseLessons} initialModuleId={lessonModuleId} onClose={() => { setLessonDialog(null); setLessonModuleId(null); }} onSaved={reload} />
+      <MaterialDialog open={Boolean(materialDialog)} value={materialDialog?.material ?? null} course={selectedCourse} lesson={materialDialog?.lesson ?? null} materials={courseMaterials} onClose={() => setMaterialDialog(null)} onSaved={reload} />
       <EnrollmentDialog open={Boolean(enrollmentDialog)} value={enrollmentDialog} course={selectedCourse} users={users} onClose={() => setEnrollmentDialog(null)} onSaved={reload} />
     </div>
   );
@@ -229,41 +300,95 @@ function CourseDialog({ open, value, userId, onClose, onSaved }: { open: boolean
   );
 }
 
-function ModuleDialog(props: { open: boolean; value: CourseModule | "new" | null; course: Course | null; onClose: () => void; onSaved: () => void; onDelete: () => void }) {
+function ModuleDialog(props: { open: boolean; value: CourseModule | "new" | null; course: Course | null; modules: CourseModule[]; onClose: () => void; onSaved: () => void }) {
   const current = typeof props.value === "object" && props.value ? props.value : null;
   const [form, setForm] = useState<Partial<CourseModule> & { title: string }>({ title: "" });
-  useEffect(() => setForm(current ?? { title: "", status: "active", display_order: 0 }), [current, props.open]);
-  return <SimpleEntityDialog title={current ? "Editar modulo" : "Novo modulo"} open={props.open} onClose={props.onClose} onDelete={current ? () => void deleteCourseModule(current.id).then(() => { toast.success("Modulo excluido."); props.onDelete(); props.onClose(); }) : undefined} onSave={() => props.course && saveCourseModule({ ...form, course_id: props.course.id }).then(() => { toast.success("Modulo salvo."); props.onSaved(); props.onClose(); }).catch((error) => toast.error(error.message))}>
-    <Field label="Titulo"><Input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></Field>
-    <Field label="Descricao"><Textarea value={form.description ?? ""} onChange={(event) => setForm({ ...form, description: event.target.value })} /></Field>
-    <Field label="Ordem"><Input type="number" value={form.display_order ?? 0} onChange={(event) => setForm({ ...form, display_order: Number(event.target.value) })} /></Field>
+  useEffect(() => setForm(current ?? { title: "", status: "active", display_order: nextOrder(props.modules) }), [current, props.open, props.modules]);
+  return <SimpleEntityDialog
+    title={current ? "Editar bloco" : "Novo bloco"}
+    description={current ? "Atualize as informacoes do bloco." : "Cadastre um bloco para organizar as aulas do curso."}
+    open={props.open}
+    onClose={props.onClose}
+    saveLabel="Salvar bloco"
+    onSave={() => props.course && saveCourseModule({ ...form, course_id: props.course.id }).then(() => { toast.success(current ? "Bloco atualizado com sucesso." : "Bloco criado com sucesso."); props.onSaved(); props.onClose(); }).catch((error) => toast.error(error.message))}
+  >
+    <Field label="Titulo do bloco"><Input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Introducao ao DRE" /></Field>
+    <Field label="Descricao"><Textarea value={form.description ?? ""} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Primeiros conceitos para entender a estrutura de um DRE." /></Field>
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Field label="Ordem"><Input type="number" min={0} value={form.display_order ?? 0} onChange={(event) => setForm({ ...form, display_order: Number(event.target.value) })} /></Field>
+      <Field label="Status"><Select value={form.status ?? "active"} onValueChange={(status) => setForm({ ...form, status: status as CourseModule["status"] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Ativo</SelectItem><SelectItem value="inactive">Inativo</SelectItem></SelectContent></Select></Field>
+    </div>
   </SimpleEntityDialog>;
 }
 
-function LessonDialog(props: { open: boolean; value: CourseLesson | "new" | null; course: Course | null; modules: CourseModule[]; onClose: () => void; onSaved: () => void; onDelete: () => void }) {
+function LessonDialog(props: { open: boolean; value: CourseLesson | "new" | null; course: Course | null; modules: CourseModule[]; lessons: CourseLesson[]; initialModuleId: string | null; onClose: () => void; onSaved: () => void }) {
   const current = typeof props.value === "object" && props.value ? props.value : null;
-  const [form, setForm] = useState<Partial<CourseLesson> & { title: string }>({ title: "" });
-  useEffect(() => setForm(current ?? { title: "", module_id: props.modules[0]?.id, lesson_type: "video", status: "active", display_order: 0 }), [current, props.open, props.modules]);
-  return <SimpleEntityDialog title={current ? "Editar aula" : "Nova aula"} open={props.open} onClose={props.onClose} onDelete={current ? () => void deleteCourseLesson(current.id).then(() => { toast.success("Aula excluida."); props.onDelete(); props.onClose(); }) : undefined} onSave={() => props.course && form.module_id && saveCourseLesson({ ...form, course_id: props.course.id, module_id: form.module_id }).then(() => { toast.success("Aula salva."); props.onSaved(); props.onClose(); }).catch((error) => toast.error(error.message))}>
-    <Field label="Modulo"><Select value={form.module_id ?? ""} onValueChange={(module_id) => setForm({ ...form, module_id })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{props.modules.map((module) => <SelectItem key={module.id} value={module.id}>{module.title}</SelectItem>)}</SelectContent></Select></Field>
-    <Field label="Titulo"><Input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></Field>
-    <Field label="Descricao"><Textarea value={form.description ?? ""} onChange={(event) => setForm({ ...form, description: event.target.value })} /></Field>
-    <Field label="URL do video"><Input value={form.video_url ?? ""} onChange={(event) => setForm({ ...form, video_url: event.target.value })} placeholder="YouTube, Vimeo ou HTTPS externo" /></Field>
-    <Field label="Duracao em segundos"><Input type="number" value={form.duration_seconds ?? ""} onChange={(event) => setForm({ ...form, duration_seconds: Number(event.target.value) })} /></Field>
-    <Field label="Ordem"><Input type="number" value={form.display_order ?? 0} onChange={(event) => setForm({ ...form, display_order: Number(event.target.value) })} /></Field>
-    <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(form.is_preview)} onChange={(event) => setForm({ ...form, is_preview: event.target.checked })} />Aula preview gratuita</label>
+  const [form, setForm] = useState<Partial<CourseLesson> & { title: string; duration_input?: string }>({ title: "" });
+  useEffect(() => {
+    const moduleId = current?.module_id ?? props.initialModuleId ?? props.modules[0]?.id ?? "";
+    const moduleLessons = props.lessons.filter((lesson) => lesson.module_id === moduleId);
+    setForm(current ? { ...current, duration_input: formatDurationInput(current.duration_seconds) } : { title: "", module_id: moduleId, lesson_type: "video", video_provider: "youtube", status: "active", is_preview: false, display_order: nextOrder(moduleLessons), duration_input: "" });
+  }, [current, props.open, props.modules, props.lessons, props.initialModuleId]);
+  return <SimpleEntityDialog
+    title={current ? "Editar aula" : "Nova aula"}
+    description="Cadastre titulo, video, duracao, ordem e status da aula."
+    open={props.open}
+    onClose={props.onClose}
+    saveLabel="Salvar aula"
+    onSave={() => props.course && form.module_id && saveCourseLesson({ ...form, course_id: props.course.id, module_id: form.module_id, duration_seconds: form.duration_input ?? form.duration_seconds ?? null } as Partial<CourseLesson> & { course_id: string; module_id: string; title: string }).then(() => { toast.success(current ? "Aula atualizada com sucesso." : "Aula criada com sucesso."); props.onSaved(); props.onClose(); }).catch((error) => toast.error(error.message))}
+  >
+    <Field label="Bloco"><Select value={form.module_id ?? ""} onValueChange={(module_id) => { const moduleLessons = props.lessons.filter((lesson) => lesson.module_id === module_id); setForm({ ...form, module_id, display_order: current ? form.display_order : nextOrder(moduleLessons) }); }}><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger><SelectContent>{props.modules.map((module) => <SelectItem key={module.id} value={module.id}>{module.title}</SelectItem>)}</SelectContent></Select></Field>
+    <Field label="Titulo da aula"><Input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Aula 1 - O que e DRE?" /></Field>
+    <Field label="Descricao da aula"><Textarea value={form.description ?? ""} onChange={(event) => setForm({ ...form, description: event.target.value })} /></Field>
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Field label="Tipo da aula"><Select value={form.lesson_type ?? "video"} onValueChange={(lesson_type) => setForm({ ...form, lesson_type: lesson_type as CourseLesson["lesson_type"] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="video">Video</SelectItem><SelectItem value="text">Texto</SelectItem><SelectItem value="file">Arquivo</SelectItem><SelectItem value="external_link">Link externo</SelectItem></SelectContent></Select></Field>
+      <Field label="Provedor do video"><Select value={form.video_provider ?? "youtube"} onValueChange={(video_provider) => setForm({ ...form, video_provider: video_provider as CourseLesson["video_provider"] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="youtube">YouTube</SelectItem><SelectItem value="vimeo">Vimeo</SelectItem><SelectItem value="external">Externo</SelectItem></SelectContent></Select></Field>
+    </div>
+    <Field label="Link do video"><Input value={form.video_url ?? ""} onChange={(event) => setForm({ ...form, video_url: event.target.value })} placeholder="https://www.youtube.com/watch?v=VIDEO_ID" /></Field>
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Field label="Duracao da aula"><Input value={form.duration_input ?? ""} onChange={(event) => setForm({ ...form, duration_input: event.target.value })} placeholder="10, 10:30 ou 01:10:30" /></Field>
+      <Field label="Thumbnail URL"><Input value={form.thumbnail_url ?? ""} onChange={(event) => setForm({ ...form, thumbnail_url: event.target.value })} placeholder="Opcional" /></Field>
+    </div>
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Field label="Ordem"><Input type="number" min={0} value={form.display_order ?? 0} onChange={(event) => setForm({ ...form, display_order: Number(event.target.value) })} /></Field>
+      <Field label="Status"><Select value={form.status ?? "active"} onValueChange={(status) => setForm({ ...form, status: status as CourseLesson["status"] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Ativa</SelectItem><SelectItem value="inactive">Inativa</SelectItem></SelectContent></Select></Field>
+    </div>
+    <label className="flex items-center gap-2 text-sm"><Checkbox checked={Boolean(form.is_preview)} onCheckedChange={(checked) => setForm({ ...form, is_preview: checked === true })} />Permitir assistir esta aula sem contratacao</label>
   </SimpleEntityDialog>;
 }
 
-function MaterialDialog(props: { open: boolean; value: CourseMaterial | "new" | null; course: Course | null; modules: CourseModule[]; lessons: CourseLesson[]; onClose: () => void; onSaved: () => void; onDelete: () => void }) {
+function MaterialDialog(props: { open: boolean; value: CourseMaterial | "new" | null; course: Course | null; lesson: CourseLesson | null; materials: CourseMaterial[]; onClose: () => void; onSaved: () => void }) {
   const current = typeof props.value === "object" && props.value ? props.value : null;
   const [form, setForm] = useState<Partial<CourseMaterial> & { title: string }>({ title: "" });
-  useEffect(() => setForm(current ?? { title: "", material_type: "link", display_order: 0 }), [current, props.open]);
-  return <SimpleEntityDialog title={current ? "Editar material" : "Novo material"} open={props.open} onClose={props.onClose} onDelete={current ? () => void deleteCourseMaterial(current.id).then(() => { toast.success("Material excluido."); props.onDelete(); props.onClose(); }) : undefined} onSave={() => props.course && saveCourseMaterial({ ...form, course_id: props.course.id }).then(() => { toast.success("Material salvo."); props.onSaved(); props.onClose(); }).catch((error) => toast.error(error.message))}>
-    <Field label="Titulo"><Input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></Field>
-    <Field label="Aula"><Select value={form.lesson_id ?? "none"} onValueChange={(lesson_id) => setForm({ ...form, lesson_id: lesson_id === "none" ? null : lesson_id })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Material do curso/modulo</SelectItem>{props.lessons.map((lesson) => <SelectItem key={lesson.id} value={lesson.id}>{lesson.title}</SelectItem>)}</SelectContent></Select></Field>
-    <Field label="URL externa ou signed/backend path"><Input value={form.external_url ?? form.file_path ?? ""} onChange={(event) => setForm({ ...form, material_type: "link", external_url: event.target.value })} /></Field>
+  const lessonMaterials = props.lesson ? props.materials.filter((material) => material.lesson_id === props.lesson?.id).sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0)) : [];
+  useEffect(() => setForm(current ?? { title: "", material_type: "link", display_order: nextOrder(lessonMaterials) }), [current, props.open, props.lesson?.id]);
+  return <SimpleEntityDialog
+    title="Materiais de apoio"
+    description={props.lesson ? props.lesson.title : "Gerencie os materiais da aula."}
+    open={props.open}
+    onClose={props.onClose}
+    saveLabel={current ? "Salvar material" : "Adicionar material"}
+    onSave={() => props.course && props.lesson && saveCourseMaterial({ ...form, course_id: props.course.id, module_id: props.lesson.module_id, lesson_id: props.lesson.id }).then(() => { toast.success(current ? "Material atualizado com sucesso." : "Material adicionado com sucesso."); props.onSaved(); setForm({ title: "", material_type: "link", display_order: nextOrder(lessonMaterials) }); }).catch((error) => toast.error(error.message))}
+  >
+    <div className="space-y-2 rounded-md border p-3">
+      {lessonMaterials.length ? lessonMaterials.map((material) => (
+        <div key={material.id} className="flex flex-col gap-2 rounded-md bg-muted/40 p-2 sm:flex-row sm:items-center sm:justify-between">
+          <div><p className="font-medium">{material.title}</p><p className="text-xs text-muted-foreground">{material.material_type === "link" ? "Link externo" : "Arquivo"} - ordem {material.display_order ?? 0}</p></div>
+          <Button size="sm" variant="destructive" onClick={() => void deleteCourseMaterial(material.id).then(() => { toast.success("Material excluido."); props.onSaved(); }).catch((error) => toast.error(error.message))}>Excluir</Button>
+        </div>
+      )) : <p className="text-sm text-muted-foreground">Nenhum material de apoio cadastrado para esta aula.</p>}
+    </div>
+    <Field label="Titulo do material"><Input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Apostila da Aula 1" /></Field>
     <Field label="Descricao"><Textarea value={form.description ?? ""} onChange={(event) => setForm({ ...form, description: event.target.value })} /></Field>
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Field label="Tipo do material"><Select value={form.material_type ?? "link"} onValueChange={(material_type) => setForm({ ...form, material_type: material_type as CourseMaterial["material_type"] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="link">Link externo</SelectItem><SelectItem value="file">Arquivo</SelectItem></SelectContent></Select></Field>
+      <Field label="Ordem"><Input type="number" min={0} value={form.display_order ?? 0} onChange={(event) => setForm({ ...form, display_order: Number(event.target.value) })} /></Field>
+    </div>
+    {form.material_type === "file" ? (
+      <Field label="URL ou caminho do arquivo"><Input value={form.file_url ?? form.file_path ?? ""} onChange={(event) => setForm({ ...form, file_url: event.target.value })} placeholder="Upload no Storage sera conectado aqui" /></Field>
+    ) : (
+      <Field label="URL externa"><Input value={form.external_url ?? ""} onChange={(event) => setForm({ ...form, external_url: event.target.value })} placeholder="https://..." /></Field>
+    )}
   </SimpleEntityDialog>;
 }
 
@@ -283,8 +408,8 @@ function EnrollmentsTable({ enrollments, progress, lessons, onEdit }: { enrollme
   return <Table><TableHeader><TableRow><TableHead>Aluno</TableHead><TableHead>Status</TableHead><TableHead>Tipo</TableHead><TableHead>Progresso</TableHead><TableHead>Inicio</TableHead><TableHead>Expira</TableHead><TableHead>Acoes</TableHead></TableRow></TableHeader><TableBody>{enrollments.length ? enrollments.map((enrollment) => { const userProgress = progress.filter((item) => item.user_id === enrollment.user_id && item.course_id === enrollment.course_id); const percent = lessons.length ? Math.round((userProgress.filter((item) => item.status === "completed").length / lessons.length) * 100) : 0; return <TableRow key={enrollment.id}><TableCell>{enrollment.profile?.full_name ?? enrollment.profile?.email ?? enrollment.user_id}</TableCell><TableCell><Badge variant="outline">{enrollment.status}</Badge></TableCell><TableCell>{enrollment.access_type}</TableCell><TableCell>{percent}%</TableCell><TableCell>{formatDate(enrollment.started_at)}</TableCell><TableCell>{formatDate(enrollment.expires_at) || "sem fim"}</TableCell><TableCell><Button size="sm" variant="outline" onClick={() => onEdit(enrollment)}>Editar</Button></TableCell></TableRow>; }) : <TableRow><TableCell colSpan={7} className="text-muted-foreground">Nenhum usuario contratou este curso ainda.</TableCell></TableRow>}</TableBody></Table>;
 }
 
-function SimpleEntityDialog({ title, open, children, onClose, onSave, onDelete }: { title: string; open: boolean; children: React.ReactNode; onClose: () => void; onSave: () => void; onDelete?: () => void }) {
-  return <Dialog open={open} onOpenChange={(next) => !next && onClose()}><DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader><div className="grid gap-4">{children}</div><div className="flex justify-between gap-3"><div>{onDelete ? <Button variant="destructive" onClick={onDelete}>Excluir</Button> : null}</div><div className="flex gap-2"><Button variant="outline" onClick={onClose}>Cancelar</Button><Button onClick={onSave}>Salvar</Button></div></div></DialogContent></Dialog>;
+function SimpleEntityDialog({ title, description, open, children, onClose, onSave, saveLabel = "Salvar" }: { title: string; description?: string; open: boolean; children: React.ReactNode; onClose: () => void; onSave: () => void; saveLabel?: string }) {
+  return <Dialog open={open} onOpenChange={(next) => !next && onClose()}><DialogContent className="max-h-[90vh] max-w-2xl overflow-auto"><DialogHeader><DialogTitle>{title}</DialogTitle>{description ? <DialogDescription>{description}</DialogDescription> : null}</DialogHeader><div className="grid gap-4">{children}</div><div className="flex justify-end gap-2"><Button variant="outline" onClick={onClose}>Cancelar</Button><Button onClick={onSave}>{saveLabel}</Button></div></DialogContent></Dialog>;
 }
 
 function Field({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) {
@@ -301,6 +426,77 @@ function MiniMetric({ label, value }: { label: string; value: string | number })
 
 function SelectedCourseHeader({ course }: { course: Course | null }) {
   return course ? <div><h3 className="font-display text-xl font-semibold">{course.title}</h3><p className="text-sm text-muted-foreground">{course.short_description || course.slug}</p></div> : null;
+}
+
+function CourseContentSummary({ course, modules, lessons, materials }: { course: Course; modules: CourseModule[]; lessons: CourseLesson[]; materials: CourseMaterial[] }) {
+  return (
+    <Card className="bg-white/90">
+      <CardHeader className="gap-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle>{course.title}</CardTitle>
+            <CardDescription>{course.short_description || course.slug}</CardDescription>
+          </div>
+          <Badge variant="outline">{statusLabel(course.status)}</Badge>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <MiniMetric label="Blocos" value={modules.length} />
+          <MiniMetric label="Aulas" value={lessons.filter((lesson) => lesson.status === "active").length} />
+          <MiniMetric label="Materiais" value={materials.length} />
+        </div>
+      </CardHeader>
+    </Card>
+  );
+}
+
+function EmptyCard({ message }: { message: string }) {
+  return <Card className="border-dashed bg-white/80"><CardContent className="p-6 text-sm text-muted-foreground">{message}</CardContent></Card>;
+}
+
+function nextOrder(items: Array<{ display_order?: number | null }>) {
+  return items.length ? Math.max(...items.map((item) => Number(item.display_order ?? 0))) + 1 : 1;
+}
+
+async function handleDeleteModule(module: CourseModule, lessons: CourseLesson[], reload: () => Promise<void>) {
+  if (lessons.length > 0) {
+    toast.error("Nao e possivel excluir este bloco porque ele possui aulas cadastradas.");
+    return;
+  }
+  if (!window.confirm("Deseja realmente excluir este bloco?")) return;
+  try {
+    await deleteCourseModule(module.id);
+    toast.success("Bloco excluido com sucesso.");
+    await reload();
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : "Nao foi possivel excluir o bloco.");
+  }
+}
+
+async function handleDeleteLesson(lesson: CourseLesson, progress: UserLessonProgress[], reload: () => Promise<void>) {
+  if (!window.confirm("Deseja realmente excluir esta aula?")) return;
+  try {
+    const hasProgress = progress.some((item) => item.lesson_id === lesson.id);
+    if (hasProgress) {
+      await saveCourseLesson({ ...lesson, status: "inactive" });
+      toast.success("Esta aula possui progresso de alunos. Ela foi inativada para preservar o historico.");
+    } else {
+      await deleteCourseLesson(lesson.id);
+      toast.success("Aula excluida com sucesso.");
+    }
+    await reload();
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : "Nao foi possivel excluir a aula.");
+  }
+}
+
+function lessonTypeLabel(value: CourseLesson["lesson_type"]) {
+  const labels: Record<CourseLesson["lesson_type"], string> = { video: "Video", text: "Texto", file: "Arquivo", quiz: "Quiz", external_link: "Link externo" };
+  return labels[value] ?? value;
+}
+
+function providerLabel(value: string) {
+  const labels: Record<string, string> = { youtube: "YouTube", vimeo: "Vimeo", external: "Externo" };
+  return labels[value] ?? value;
 }
 
 function calculateProgressStats(lessons: CourseLesson[], enrollments: UserCourseEnrollment[], progress: UserLessonProgress[]) {
