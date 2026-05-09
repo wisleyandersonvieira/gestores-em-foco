@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import { getPublishedCourses, getUserCourses, type Course, type UserCourseEnrollment } from "@/lib/courses";
+import { getPublishedCourses, getUserCourseProgressByCourse, getUserCourses, type Course, type UserCourseEnrollment } from "@/lib/courses";
 
 export default function CoursesPage() {
   return <ClientLayout>{(user) => <CoursesContent user={user} />}</ClientLayout>;
@@ -18,14 +18,16 @@ export default function CoursesPage() {
 function CoursesContent({ user }: { user: User }) {
   const [courses, setCourses] = useState<Course[]>([]);
   const [enrollments, setEnrollments] = useState<UserCourseEnrollment[]>([]);
+  const [progressByCourse, setProgressByCourse] = useState<Map<string, number>>(new Map());
   const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([getPublishedCourses(), getUserCourses(user.id)])
-      .then(([available, owned]) => {
+      .then(async ([available, owned]) => {
         setCourses(available);
         setEnrollments(owned);
+        setProgressByCourse(await getUserCourseProgressByCourse(user.id, owned.map((item) => item.course_id)));
       })
       .catch((runtimeError) => setError(runtimeError instanceof Error ? runtimeError.message : "Nao foi possivel carregar os cursos."));
   }, [user.id]);
@@ -60,8 +62,8 @@ function CoursesContent({ user }: { user: User }) {
 
       {error ? <Card className="border-destructive/20 bg-destructive/10"><CardContent className="p-5 text-sm text-destructive">{error}</CardContent></Card> : null}
 
-      <CourseSection title="Meus cursos" empty="Voce ainda nao possui cursos contratados." courses={myCourses} enrollmentByCourse={enrollmentByCourse} owned />
-      <CourseSection title="Conheca novos cursos" empty="Nenhum curso disponivel no momento." courses={availableCourses} enrollmentByCourse={enrollmentByCourse} />
+      <CourseSection title="Meus cursos" empty="Voce ainda nao possui cursos contratados." courses={myCourses} enrollmentByCourse={enrollmentByCourse} progressByCourse={progressByCourse} owned />
+      <CourseSection title="Conheca novos cursos" empty="Nenhum curso disponivel no momento." courses={availableCourses} enrollmentByCourse={enrollmentByCourse} progressByCourse={progressByCourse} />
     </div>
   );
 }
@@ -71,12 +73,14 @@ function CourseSection({
   empty,
   courses,
   enrollmentByCourse,
+  progressByCourse,
   owned,
 }: {
   title: string;
   empty: string;
   courses: Course[];
   enrollmentByCourse: Map<string, UserCourseEnrollment>;
+  progressByCourse: Map<string, number>;
   owned?: boolean;
 }) {
   return (
@@ -91,7 +95,7 @@ function CourseSection({
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {courses.map((course) => {
             const enrollment = enrollmentByCourse.get(course.id);
-            return <CourseCard key={course.id} course={course} enrollment={enrollment} owned={owned} />;
+            return <CourseCard key={course.id} course={course} enrollment={enrollment} progressPercent={progressByCourse.get(course.id) ?? 0} owned={owned} />;
           })}
         </div>
       )}
@@ -99,7 +103,7 @@ function CourseSection({
   );
 }
 
-function CourseCard({ course, enrollment, owned }: { course: Course; enrollment?: UserCourseEnrollment; owned?: boolean }) {
+function CourseCard({ course, enrollment, progressPercent, owned }: { course: Course; enrollment?: UserCourseEnrollment; progressPercent: number; owned?: boolean }) {
   return (
     <Card className="flex h-full overflow-hidden border-primary/10 bg-white/90 shadow-sm">
       <div className="flex w-full flex-col">
@@ -121,8 +125,8 @@ function CourseCard({ course, enrollment, owned }: { course: Course; enrollment?
         <CardContent className="mt-auto space-y-4">
           {owned ? (
             <div className="space-y-2">
-              <div className="flex justify-between text-xs text-muted-foreground"><span>Progresso</span><span>0%</span></div>
-              <Progress value={0} className="h-2" />
+              <div className="flex justify-between text-xs text-muted-foreground"><span>Progresso</span><span>{progressPercent}%</span></div>
+              <Progress value={progressPercent} className="h-2" />
             </div>
           ) : null}
           <Button asChild className="w-full bg-primary hover:bg-primary/90">

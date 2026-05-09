@@ -169,6 +169,30 @@ export async function getUserCourses(userId: string) {
   return ((data ?? []) as UserCourseEnrollment[]).filter((item) => !item.expires_at || new Date(item.expires_at).getTime() > now);
 }
 
+export async function getUserCourseProgressByCourse(userId: string, courseIds: string[]) {
+  const uniqueCourseIds = [...new Set(courseIds)].filter(Boolean);
+  if (uniqueCourseIds.length === 0) return new Map<string, number>();
+
+  const [{ data: lessons, error: lessonsError }, { data: progress, error: progressError }] = await Promise.all([
+    table("course_lessons").select("*").in("course_id", uniqueCourseIds).eq("status", "active"),
+    table("user_lesson_progress").select("*").eq("user_id", userId).in("course_id", uniqueCourseIds),
+  ]);
+
+  if (lessonsError || progressError) throw new Error("Nao foi possivel carregar o progresso dos cursos.");
+
+  const lessonsByCourse = new Map<string, CourseLesson[]>();
+  ((lessons ?? []) as CourseLesson[]).forEach((lesson) => {
+    lessonsByCourse.set(lesson.course_id, [...(lessonsByCourse.get(lesson.course_id) ?? []), lesson]);
+  });
+
+  const progressByCourse = new Map<string, UserLessonProgress[]>();
+  ((progress ?? []) as UserLessonProgress[]).forEach((item) => {
+    progressByCourse.set(item.course_id, [...(progressByCourse.get(item.course_id) ?? []), item]);
+  });
+
+  return new Map(uniqueCourseIds.map((courseId) => [courseId, calculateCourseProgress(progressByCourse.get(courseId) ?? [], lessonsByCourse.get(courseId) ?? [])]));
+}
+
 export async function getCourseBySlug(slug: string) {
   const { data, error } = await table("courses").select("*").eq("slug", slug).maybeSingle();
   if (error || !data) throw new Error("Curso nao encontrado.");
