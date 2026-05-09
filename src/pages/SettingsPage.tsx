@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
-import { Bell, CreditCard, Eye, EyeOff, Globe2, HelpCircle, KeyRound, Link2, LogOut, MonitorCog, RefreshCw, Shield, ShieldCheck, UserCircle } from "lucide-react";
+import { Bell, CreditCard, Eye, EyeOff, HelpCircle, KeyRound, LogOut, MonitorCog, RefreshCw, Shield, ShieldCheck, UserCircle } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -35,10 +35,12 @@ import {
   getUserProfile,
   getUserSubscriptions,
   sendPasswordResetEmail,
+  removeUserAvatar,
   updateNotificationPreferences,
   updateUserPassword,
   updateUserPreferences,
   updateUserProfile,
+  uploadUserAvatar,
   type UserNotificationPreferences,
   type UserPreferences,
   type UserProfile,
@@ -52,9 +54,7 @@ const settingsCards = [
   { value: "seguranca", title: "Seguranca e acesso", description: "Senha, sessoes e acesso.", icon: KeyRound },
   { value: "notificacoes", title: "Notificacoes", description: "Preferencias de avisos.", icon: Bell },
   { value: "aparencia", title: "Aparencia", description: "Tema e densidade visual.", icon: MonitorCog },
-  { value: "regiao", title: "Idioma e regiao", description: "Idioma, moeda e datas.", icon: Globe2 },
   { value: "assinaturas", title: "Assinaturas e produtos", description: "Produtos contratados.", icon: CreditCard },
-  { value: "integracoes", title: "Integracoes", description: "Ferramentas externas futuras.", icon: Link2 },
   { value: "privacidade", title: "Privacidade e dados", description: "Dados e zona de risco.", icon: Shield },
   { value: "suporte", title: "Suporte", description: "Fale com nosso time.", icon: HelpCircle },
 ];
@@ -71,11 +71,14 @@ function SettingsContent({ user }: { user: User }) {
   const navigate = useNavigate();
   const [tab, setTab] = useState("perfil");
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
   const [notifications, setNotifications] = useState<UserNotificationPreferences | null>(null);
   const [subscriptions, setSubscriptions] = useState<UserProductAccess[]>([]);
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isRemovingAvatar, setIsRemovingAvatar] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordConfirmation, setShowPasswordConfirmation] = useState(false);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
@@ -117,6 +120,48 @@ function SettingsContent({ user }: { user: User }) {
     const saved = await updateUserProfile(user.id, profile);
     setProfile(saved);
     toast.success("Perfil salvo com sucesso.");
+  }
+
+  async function handleAvatarFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !profile) return;
+
+    setIsUploadingAvatar(true);
+    try {
+      const saved = await uploadUserAvatar(user.id, file, profile.avatar_path);
+      setProfile({
+        ...saved,
+        full_name: saved.full_name || profile.full_name,
+        company_name: saved.company_name || profile.company_name,
+        role: saved.role || profile.role,
+      });
+      toast.success("Foto de perfil atualizada com sucesso.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível atualizar sua foto. Tente novamente.");
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  }
+
+  async function handleRemoveAvatar() {
+    if (!profile?.avatar_url) return;
+
+    setIsRemovingAvatar(true);
+    try {
+      const saved = await removeUserAvatar(user.id, profile.avatar_path);
+      setProfile({
+        ...saved,
+        full_name: saved.full_name || profile.full_name,
+        company_name: saved.company_name || profile.company_name,
+        role: saved.role || profile.role,
+      });
+      toast.success("Foto removida com sucesso.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível remover sua foto. Tente novamente.");
+    } finally {
+      setIsRemovingAvatar(false);
+    }
   }
 
   async function savePreferences(nextPreferences = preferences) {
@@ -260,10 +305,45 @@ function SettingsContent({ user }: { user: User }) {
             <CardHeader><CardTitle>Perfil da conta</CardTitle><CardDescription>Atualize suas informacoes basicas da plataforma.</CardDescription></CardHeader>
             <CardContent className="space-y-5">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                <Avatar className="h-20 w-20"><AvatarImage src={profile?.avatar_url ?? undefined} /><AvatarFallback>{initials(profile?.full_name || user.email || "U")}</AvatarFallback></Avatar>
-                <div>
-                  <Button variant="outline" disabled>Alterar foto</Button>
-                  <p className="mt-2 text-xs text-muted-foreground">Upload de avatar preparado para futura integracao com storage.</p>
+                <Avatar className="h-20 w-20 border border-border">
+                  <AvatarImage className="object-cover" src={profile?.avatar_url ?? undefined} />
+                  <AvatarFallback>{initials(profile?.full_name || user.email || "U")}</AvatarFallback>
+                </Avatar>
+                <div className="grid gap-2 sm:flex sm:flex-wrap sm:items-center">
+                  <input
+                    ref={avatarInputRef}
+                    className="hidden"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={(event) => void handleAvatarFileChange(event)}
+                  />
+                  <Button variant="outline" disabled={!profile || isUploadingAvatar || isRemovingAvatar} onClick={() => avatarInputRef.current?.click()}>
+                    {isUploadingAvatar ? "Enviando..." : "Alterar foto"}
+                  </Button>
+                  {profile?.avatar_url ? (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="outline" className="border-destructive/35 text-destructive hover:bg-destructive/10 hover:text-destructive" disabled={isUploadingAvatar || isRemovingAvatar}>
+                          {isRemovingAvatar ? "Removendo..." : "Remover foto"}
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Remover foto de perfil?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Sua foto atual sera removida e o avatar voltara a mostrar suas iniciais.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => void handleRemoveAvatar()}>
+                            Remover foto
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  ) : null}
+                  <p className="text-xs text-muted-foreground sm:basis-full">JPG, PNG ou WEBP com ate 2 MB.</p>
                 </div>
               </div>
               <div className="grid gap-4 md:grid-cols-2">
@@ -361,20 +441,6 @@ function SettingsContent({ user }: { user: User }) {
           </SettingsCard>
         </TabsContent>
 
-        <TabsContent value="regiao">
-          <SettingsCard title="Idioma e regiao" description="Configure idioma, moeda, fuso horario e formato de datas.">
-            {preferences ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                <SelectField label="Idioma" value={preferences.language} onChange={(value) => setPreferences({ ...preferences, language: value })} options={[["pt-BR", "Portugues Brasil"], ["en-US", "Ingles"]]} />
-                <SelectField label="Moeda padrao" value={preferences.currency} onChange={(value) => setPreferences({ ...preferences, currency: value })} options={[["BRL", "BRL"], ["USD", "USD"]]} />
-                <SelectField label="Fuso horario" value={preferences.timezone} onChange={(value) => setPreferences({ ...preferences, timezone: value })} options={[["America/Sao_Paulo", "America/Sao_Paulo"], ["America/New_York", "America/New_York"], ["America/Chicago", "America/Chicago"], ["America/Los_Angeles", "America/Los_Angeles"]]} />
-                <SelectField label="Formato de data" value={preferences.date_format} onChange={(value) => setPreferences({ ...preferences, date_format: value })} options={[["DD/MM/YYYY", "DD/MM/YYYY"], ["MM/DD/YYYY", "MM/DD/YYYY"], ["YYYY-MM-DD", "YYYY-MM-DD"]]} />
-                <Button className="w-fit" onClick={() => void savePreferences().catch((error) => toast.error(error.message))}>Salvar idioma e regiao</Button>
-              </div>
-            ) : null}
-          </SettingsCard>
-        </TabsContent>
-
         <TabsContent value="assinaturas">
           <SettingsCard title="Assinaturas e produtos" description="Veja seus produtos contratados e status de acesso.">
             {subscriptions.length === 0 ? (
@@ -403,21 +469,6 @@ function SettingsContent({ user }: { user: User }) {
                 ))}
               </div>
             )}
-          </SettingsCard>
-        </TabsContent>
-
-        <TabsContent value="integracoes">
-          <SettingsCard title="Integracoes" description="Conecte ferramentas externas a sua conta.">
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {[
-                ["Stripe", "Gerencie pagamentos, assinaturas e cobrancas da plataforma."],
-                ["Google", "Conecte sua conta para calendario, arquivos ou login."],
-                ["WhatsApp", "Receba alertas e notificacoes importantes pelo WhatsApp."],
-                ["E-mail", "Configure canais futuros de comunicacao."],
-                ["Webhooks", "Envie eventos da plataforma para sistemas externos."],
-                ["API", "Gerencie acesso programatico futuro."],
-              ].map(([title, text]) => <IntegrationCard key={title} title={title} text={text} />)}
-            </div>
           </SettingsCard>
         </TabsContent>
 
@@ -635,10 +686,6 @@ function Toggle({ label, checked, onChange, disabled }: { label: string; checked
 
 function Placeholder({ title, text, action }: { title: string; text: string; action?: string }) {
   return <div className="rounded-lg border bg-muted/40 p-4"><p className="font-semibold">{title}</p><p className="mt-1 text-sm text-muted-foreground">{text}</p>{action ? <Button className="mt-3" variant="outline" disabled>{action}</Button> : null}</div>;
-}
-
-function IntegrationCard({ title, text }: { title: string; text: string }) {
-  return <div className="rounded-lg border bg-white p-4"><div className="flex items-center justify-between gap-3"><p className="font-semibold">{title}</p><Badge variant="secondary">Em breve</Badge></div><p className="mt-2 text-sm text-muted-foreground">{text}</p><Button className="mt-4 w-full" variant="outline" disabled>Configurar em breve</Button></div>;
 }
 
 function initials(value: string) {

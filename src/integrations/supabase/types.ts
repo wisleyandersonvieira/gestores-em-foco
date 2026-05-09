@@ -954,6 +954,7 @@ export type Database = {
       }
       user_profiles: {
         Row: {
+          avatar_path: string | null
           avatar_url: string | null
           company_name: string | null
           created_at: string
@@ -965,6 +966,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          avatar_path?: string | null
           avatar_url?: string | null
           company_name?: string | null
           created_at?: string
@@ -976,6 +978,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          avatar_path?: string | null
           avatar_url?: string | null
           company_name?: string | null
           created_at?: string

@@ -8,6 +8,10 @@ export type UserPreferences = Tables<"user_preferences">;
 export type UserNotificationPreferences = Tables<"user_notification_preferences">;
 export type SupportRequestInsert = TablesInsert<"support_requests">;
 
+const AVATAR_BUCKET = "avatars";
+const AVATAR_MAX_SIZE_BYTES = 2 * 1024 * 1024;
+const AVATAR_ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
 export async function getUserProfile(userId: string) {
   const { data, error } = await supabase
     .from("user_profiles")
@@ -20,7 +24,7 @@ export async function getUserProfile(userId: string) {
 }
 
 export async function updateUserProfile(userId: string, data: TablesUpdate<"user_profiles">) {
-  if (!String(data.full_name ?? "").trim()) throw new Error("Informe o nome completo.");
+  if ("full_name" in data && !String(data.full_name ?? "").trim()) throw new Error("Informe o nome completo.");
 
   const payload = sanitizeUpsertPayload(data);
   const { data: saved, error } = await supabase
@@ -31,6 +35,61 @@ export async function updateUserProfile(userId: string, data: TablesUpdate<"user
 
   if (error) throw new Error("Nao foi possivel salvar o perfil.");
   return saved;
+}
+
+export function validateAvatarFile(file: File) {
+  if (!AVATAR_ALLOWED_TYPES.has(file.type) || file.size > AVATAR_MAX_SIZE_BYTES) {
+    return "Envie uma imagem em JPG, PNG ou WEBP com até 2 MB.";
+  }
+
+  return null;
+}
+
+export async function uploadUserAvatar(userId: string, file: File, previousAvatarPath?: string | null) {
+  const validationError = validateAvatarFile(file);
+  if (validationError) throw new Error(validationError);
+
+  const extension = getAvatarFileExtension(file);
+  const avatarPath = `${userId}/avatar-${Date.now()}.${extension}`;
+  const { error: uploadError } = await supabase.storage.from(AVATAR_BUCKET).upload(avatarPath, file, {
+    cacheControl: "3600",
+    upsert: true,
+    contentType: file.type,
+  });
+
+  if (uploadError) {
+    if (import.meta.env.DEV) console.error("Avatar upload failed", uploadError);
+    throw new Error("Não foi possível atualizar sua foto. Tente novamente.");
+  }
+
+  const { data } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(avatarPath);
+  const savedProfile = await updateUserProfile(userId, {
+    avatar_url: data.publicUrl,
+    avatar_path: avatarPath,
+  });
+
+  if (previousAvatarPath && previousAvatarPath !== avatarPath) {
+    void supabase.storage
+      .from(AVATAR_BUCKET)
+      .remove([previousAvatarPath])
+      .then(({ error }) => {
+        if (error && import.meta.env.DEV) console.error("Previous avatar removal failed", error);
+      });
+  }
+
+  return savedProfile;
+}
+
+export async function removeUserAvatar(userId: string, avatarPath?: string | null) {
+  if (avatarPath) {
+    const { error } = await supabase.storage.from(AVATAR_BUCKET).remove([avatarPath]);
+    if (error && import.meta.env.DEV) console.error("Avatar removal failed", error);
+  }
+
+  return updateUserProfile(userId, {
+    avatar_url: null,
+    avatar_path: null,
+  });
 }
 
 export async function getUserPreferences(userId: string) {
@@ -122,6 +181,7 @@ function createDefaultProfile(userId: string): UserProfile {
   return {
     id: "new",
     user_id: userId,
+    avatar_path: null,
     full_name: "",
     phone: null,
     company_name: null,
@@ -130,6 +190,16 @@ function createDefaultProfile(userId: string): UserProfile {
     created_at: now,
     updated_at: now,
   };
+}
+
+function getAvatarFileExtension(file: File) {
+  const extensionByType: Record<string, string> = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+  };
+
+  return extensionByType[file.type] ?? "jpg";
 }
 
 function createDefaultPreferences(userId: string): UserPreferences {
