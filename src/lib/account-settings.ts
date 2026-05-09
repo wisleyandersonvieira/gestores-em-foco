@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import { getUserProducts } from "@/lib/products";
+import { validatePassword } from "@/lib/password-security";
 
 export type UserProfile = Tables<"user_profiles">;
 export type UserPreferences = Tables<"user_preferences">;
@@ -91,17 +92,24 @@ export async function createSupportRequest(userId: string, data: Pick<SupportReq
 
 export async function sendPasswordResetEmail(email: string) {
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}/configuracoes`,
+    redirectTo: `${window.location.origin}/reset-password`,
   });
 
-  if (error) throw new Error("Nao foi possivel enviar o e-mail de redefinicao.");
+  if (error) {
+    if (import.meta.env.DEV) console.error("Password reset email failed", error);
+    throw new Error("Não foi possível enviar o link de redefinição. Tente novamente.");
+  }
 }
 
-export async function updateUserPassword(newPassword: string) {
-  if (newPassword.length < 8) throw new Error("A senha precisa ter pelo menos 8 caracteres.");
+export async function updateUserPassword(newPassword: string, confirmation = newPassword) {
+  const validationError = validatePassword(newPassword, confirmation);
+  if (validationError) throw new Error(validationError);
 
   const { error } = await supabase.auth.updateUser({ password: newPassword });
-  if (error) throw new Error("Nao foi possivel atualizar a senha.");
+  if (error) {
+    if (import.meta.env.DEV) console.error("Password update failed", error);
+    throw new Error("Não foi possível alterar a senha. Tente novamente.");
+  }
 }
 
 function createDefaultProfile(userId: string): UserProfile {

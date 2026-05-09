@@ -1,10 +1,21 @@
 import { useEffect, useState } from "react";
-import type { User } from "@supabase/supabase-js";
-import { Bell, CreditCard, Database, Globe2, HelpCircle, KeyRound, Link2, MonitorCog, Shield, UserCircle } from "lucide-react";
-import { Link } from "react-router-dom";
+import type { Session, User } from "@supabase/supabase-js";
+import { Bell, CreditCard, Eye, EyeOff, Globe2, HelpCircle, KeyRound, Link2, LogOut, MonitorCog, RefreshCw, Shield, ShieldCheck, UserCircle } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { ClientLayout } from "@/components/platform/client-layout";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { supabase } from "@/integrations/supabase/client";
 import {
   createSupportRequest,
   getNotificationPreferences,
@@ -31,6 +43,7 @@ import {
   type UserPreferences,
   type UserProfile,
 } from "@/lib/account-settings";
+import { validatePassword } from "@/lib/password-security";
 import { applyTheme, normalizeTheme, storeTheme, type Theme } from "@/lib/theme";
 import type { UserProductAccess } from "@/lib/products";
 
@@ -55,6 +68,7 @@ export default function SettingsPage() {
 }
 
 function SettingsContent({ user }: { user: User }) {
+  const navigate = useNavigate();
   const [tab, setTab] = useState("perfil");
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
@@ -62,6 +76,14 @@ function SettingsContent({ user }: { user: User }) {
   const [subscriptions, setSubscriptions] = useState<UserProductAccess[]>([]);
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordConfirmation, setShowPasswordConfirmation] = useState(false);
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [isSendingResetLink, setIsSendingResetLink] = useState(false);
+  const [isRefreshingSession, setIsRefreshingSession] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [currentSession, setCurrentSession] = useState<Session | null>(null);
+  const [currentUser, setCurrentUser] = useState<User>(user);
   const [support, setSupport] = useState({ subject: "", message: "", type: "duvida" });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
@@ -85,6 +107,10 @@ function SettingsContent({ user }: { user: User }) {
       })
       .catch((error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel carregar configuracoes."));
   }, [user]);
+
+  useEffect(() => {
+    void loadCurrentSession();
+  }, []);
 
   async function saveProfile() {
     if (!profile) return;
@@ -126,14 +152,76 @@ function SettingsContent({ user }: { user: User }) {
   }
 
   async function handlePasswordUpdate() {
-    if (password !== passwordConfirmation) {
-      toast.error("A confirmacao precisa ser igual a nova senha.");
+    const validationError = validatePassword(password, passwordConfirmation);
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
-    await updateUserPassword(password);
-    setPassword("");
-    setPasswordConfirmation("");
-    toast.success("Senha atualizada com sucesso.");
+
+    setIsUpdatingPassword(true);
+    try {
+      await updateUserPassword(password, passwordConfirmation);
+      setPassword("");
+      setPasswordConfirmation("");
+      toast.success("Senha alterada com sucesso.");
+      await loadCurrentSession();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível alterar a senha. Tente novamente.");
+    } finally {
+      setIsUpdatingPassword(false);
+    }
+  }
+
+  async function handleSendPasswordResetEmail() {
+    if (!currentUser.email) {
+      toast.error("Nao foi possivel identificar o e-mail da sua conta.");
+      return;
+    }
+
+    setIsSendingResetLink(true);
+    try {
+      await sendPasswordResetEmail(currentUser.email);
+      toast.success("Enviamos um link de redefinição para o seu e-mail.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível enviar o link de redefinição. Tente novamente.");
+    } finally {
+      setIsSendingResetLink(false);
+    }
+  }
+
+  async function loadCurrentSession() {
+    setIsRefreshingSession(true);
+    try {
+      const [{ data: sessionData, error: sessionError }, { data: userData, error: userError }] = await Promise.all([
+        supabase.auth.getSession(),
+        supabase.auth.getUser(),
+      ]);
+
+      if (sessionError || userError) {
+        if (import.meta.env.DEV) console.error("Session refresh failed", sessionError ?? userError);
+        toast.error("Nao foi possivel atualizar a sessao.");
+        return;
+      }
+
+      setCurrentSession(sessionData.session);
+      if (userData.user) setCurrentUser(userData.user);
+    } finally {
+      setIsRefreshingSession(false);
+    }
+  }
+
+  async function handleSignOut(scope: "local" | "global" = "local") {
+    setIsSigningOut(true);
+    const { error } = await supabase.auth.signOut({ scope });
+    setIsSigningOut(false);
+
+    if (error) {
+      if (import.meta.env.DEV) console.error("Sign out failed", error);
+      toast.error("Nao foi possivel sair da conta. Tente novamente.");
+      return;
+    }
+
+    navigate("/entrar", { replace: true });
   }
 
   async function handleSupportSubmit() {
@@ -195,14 +283,52 @@ function SettingsContent({ user }: { user: User }) {
             <CardHeader><CardTitle>Senha e seguranca</CardTitle><CardDescription>Gerencie sua senha, sessoes e configuracoes de acesso.</CardDescription></CardHeader>
             <CardContent className="grid gap-6 lg:grid-cols-2">
               <div className="space-y-4">
-                <Field label="Nova senha" type="password" value={password} onChange={setPassword} />
-                <Field label="Confirmar nova senha" type="password" value={passwordConfirmation} onChange={setPasswordConfirmation} />
-                <Button onClick={() => void handlePasswordUpdate().catch((error) => toast.error(error.message))}>Alterar senha</Button>
+                <PasswordField
+                  label="Nova senha"
+                  value={password}
+                  placeholder="Nova senha"
+                  visible={showPassword}
+                  onToggleVisible={() => setShowPassword((current) => !current)}
+                  onChange={setPassword}
+                />
+                <PasswordField
+                  label="Confirmar nova senha"
+                  value={passwordConfirmation}
+                  placeholder="Confirmar nova senha"
+                  visible={showPasswordConfirmation}
+                  onToggleVisible={() => setShowPasswordConfirmation((current) => !current)}
+                  onChange={setPasswordConfirmation}
+                />
+                <p className="text-sm text-muted-foreground">A senha deve ter no minimo 8 caracteres, incluindo letras e numeros.</p>
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <Button
+                    className="bg-primary hover:bg-primary/90 sm:w-fit"
+                    disabled={!password || !passwordConfirmation || isUpdatingPassword}
+                    onClick={() => void handlePasswordUpdate()}
+                  >
+                    {isUpdatingPassword ? "Alterando..." : "Alterar senha"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="sm:w-fit"
+                    disabled={isSendingResetLink}
+                    onClick={() => void handleSendPasswordResetEmail()}
+                  >
+                    {isSendingResetLink ? "Enviando..." : "Enviar link de redefinicao"}
+                  </Button>
+                </div>
               </div>
               <div className="space-y-3">
-                <Button variant="outline" onClick={() => user.email && void sendPasswordResetEmail(user.email).then(() => toast.success("Enviamos um link de redefinicao para seu e-mail.")).catch((error) => toast.error(error.message))}>Enviar link de redefinicao</Button>
-                <Placeholder title="Sessoes conectadas" text="Gerenciamento de sessoes sera disponibilizado em breve." />
-                <Placeholder title="Autenticacao em dois fatores" text="Autenticacao em dois fatores sera adicionada em breve." />
+                <SessionCard
+                  user={currentUser}
+                  session={currentSession}
+                  isRefreshing={isRefreshingSession}
+                  isSigningOut={isSigningOut}
+                  onRefresh={() => void loadCurrentSession()}
+                  onSignOut={() => void handleSignOut("local")}
+                  onSignOutEverywhere={() => void handleSignOut("global")}
+                />
+                <TwoFactorCard />
               </div>
             </CardContent>
           </Card>
@@ -361,6 +487,148 @@ function SelectField({ label, value, onChange, options }: { label: string; value
   );
 }
 
+function PasswordField({
+  label,
+  value,
+  placeholder,
+  visible,
+  onToggleVisible,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  visible: boolean;
+  onToggleVisible: () => void;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <Label className="block">
+      {label}
+      <div className="relative mt-2">
+        <Input
+          className="pr-11"
+          type={visible ? "text" : "password"}
+          value={value}
+          placeholder={placeholder}
+          autoComplete="new-password"
+          onChange={(event) => onChange(event.target.value)}
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="absolute right-0 top-0 h-10 w-10 text-muted-foreground hover:text-foreground"
+          onClick={onToggleVisible}
+        >
+          {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          <span className="sr-only">{visible ? "Ocultar senha" : "Mostrar senha"}</span>
+        </Button>
+      </div>
+    </Label>
+  );
+}
+
+function SessionCard({
+  user,
+  session,
+  isRefreshing,
+  isSigningOut,
+  onRefresh,
+  onSignOut,
+  onSignOutEverywhere,
+}: {
+  user: User;
+  session: Session | null;
+  isRefreshing: boolean;
+  isSigningOut: boolean;
+  onRefresh: () => void;
+  onSignOut: () => void;
+  onSignOutEverywhere: () => void;
+}) {
+  return (
+    <div className="rounded-lg border bg-card p-4 text-card-foreground">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold">Sessoes conectadas</p>
+          <p className="mt-1 text-sm text-muted-foreground">Informacoes basicas da sua sessao atual.</p>
+        </div>
+        <Badge className="bg-emerald-600">Ativa</Badge>
+      </div>
+
+      <div className="mt-4 grid gap-2 rounded-lg bg-muted/60 p-3 text-sm">
+        <p className="font-medium">Sessao atual</p>
+        <InfoLine label="Email" value={user.email ?? "Nao informado"} />
+        <InfoLine label="Status" value={session ? "Ativa" : "Nao encontrada"} />
+        <InfoLine label="Ultimo acesso" value={formatDateTime(user.last_sign_in_at)} />
+        <InfoLine label="Conta criada em" value={formatDateTime(user.created_at)} />
+        <InfoLine label="ID do usuario" value={maskUserId(user.id)} />
+      </div>
+
+      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+        <Button variant="outline" disabled={isRefreshing} onClick={onRefresh}>
+          <RefreshCw className="h-4 w-4" />
+          {isRefreshing ? "Atualizando..." : "Atualizar sessao"}
+        </Button>
+        <Button variant="outline" disabled={isSigningOut} onClick={onSignOut}>
+          <LogOut className="h-4 w-4" />
+          {isSigningOut ? "Saindo..." : "Sair desta conta"}
+        </Button>
+      </div>
+
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button variant="outline" className="mt-3 w-full border-destructive/35 text-destructive hover:bg-destructive/10 hover:text-destructive" disabled={isSigningOut}>
+            Sair de todos os dispositivos
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Encerrar sessoes conectadas?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja encerrar todas as sessoes conectadas? Voce precisara entrar novamente neste dispositivo.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={onSignOutEverywhere}>
+              Encerrar sessoes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+function TwoFactorCard() {
+  return (
+    <div className="rounded-lg border bg-card p-4 text-card-foreground">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold">Autenticacao em dois fatores</p>
+          <p className="mt-1 text-sm text-muted-foreground">Adicione uma camada extra de protecao a sua conta.</p>
+        </div>
+        <Badge variant="secondary">Desativada</Badge>
+      </div>
+      <div className="mt-4 flex items-center gap-3 rounded-lg bg-muted/60 p-3 text-sm text-muted-foreground">
+        <ShieldCheck className="h-5 w-5 text-primary" />
+        A autenticacao em dois fatores sera disponibilizada em breve.
+      </div>
+      <Button className="mt-4 w-full" variant="outline" disabled>Configurar 2FA</Button>
+    </div>
+  );
+}
+
+function InfoLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:gap-4">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="break-all font-medium">{value}</span>
+    </div>
+  );
+}
+
 function Toggle({ label, checked, onChange, disabled }: { label: string; checked: boolean; onChange: (value: boolean) => void; disabled?: boolean }) {
   return <label className="flex items-center justify-between gap-4 rounded-lg border bg-white p-4 text-sm"><span>{label}</span><Switch checked={checked} disabled={disabled} onCheckedChange={onChange} /></label>;
 }
@@ -379,4 +647,14 @@ function initials(value: string) {
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("pt-BR").format(new Date(value));
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return "Nao disponivel";
+  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
+}
+
+function maskUserId(value: string) {
+  if (value.length <= 12) return value;
+  return `${value.slice(0, 8)}...${value.slice(-4)}`;
 }

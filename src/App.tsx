@@ -8,6 +8,7 @@ import DashboardPage from "@/pages/DashboardPage";
 import DiagnosticsWorkspacePage from "@/pages/DiagnosticsWorkspacePage";
 import MyProductsPage from "@/pages/MyProductsPage";
 import ProfilePage from "@/pages/ProfilePage";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import SettingsPage from "@/pages/SettingsPage";
 import AdminPage from "@/pages/AdminPage";
 import DiagnosticPage from "@/pages/DiagnosticPage";
@@ -29,6 +30,7 @@ export default function App() {
       <Route path="/" element={<HomePage />} />
       <Route path="/entrar" element={<LoginPage />} />
       <Route path="/cadastro" element={<SignupPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/dashboard" element={<DashboardPage />} />
       <Route path="/meus-produtos" element={<MyProductsPage />} />
       <Route path="/produtos" element={<AvailableProductsPage />} />
