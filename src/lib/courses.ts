@@ -16,6 +16,24 @@ export type ParsedYouTubeUrl = {
   thumbnailUrl: string;
 };
 
+export const COURSE_MATERIALS_BUCKET = "course-materials";
+export const COURSE_MATERIAL_MAX_BYTES = 20 * 1024 * 1024;
+
+const ALLOWED_COURSE_MATERIAL_MIME_TYPES = new Set([
+  "application/pdf",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/csv",
+  "application/csv",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+
+const ALLOWED_COURSE_MATERIAL_EXTENSIONS = new Set(["pdf", "xls", "xlsx", "doc", "docx", "csv", "jpg", "jpeg", "png", "webp"]);
+
 export type Course = {
   id: string;
   title: string;
@@ -203,6 +221,15 @@ export async function getCourseStructure(slug: string, userId?: string): Promise
 }
 
 export async function markLessonInProgress(userId: string, lesson: CourseLesson) {
+  const { data: existing, error: existingError } = await table("user_lesson_progress")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("lesson_id", lesson.id)
+    .maybeSingle();
+
+  if (existingError) throw new Error("Nao foi possivel atualizar seu progresso.");
+  if ((existing as UserLessonProgress | null)?.status === "completed") return;
+
   const payload = {
     user_id: userId,
     course_id: lesson.course_id,
@@ -211,7 +238,10 @@ export async function markLessonInProgress(userId: string, lesson: CourseLesson)
     last_watched_at: new Date().toISOString(),
   };
 
-  const { error } = await table("user_lesson_progress").upsert(payload, { onConflict: "user_id,lesson_id" });
+  const query = existing
+    ? table("user_lesson_progress").update(payload).eq("id", existing.id)
+    : table("user_lesson_progress").insert(payload);
+  const { error } = await query;
   if (error) throw new Error("Nao foi possivel atualizar seu progresso.");
 }
 
@@ -248,9 +278,70 @@ export async function getMaterialDownloadUrl(material: CourseMaterial) {
   if (material.file_url) return material.file_url;
   if (!material.file_path) return "";
 
-  const { data, error } = await supabase.storage.from("course-materials").createSignedUrl(material.file_path, 60 * 5);
+  const { data, error } = await supabase.storage.from(COURSE_MATERIALS_BUCKET).createSignedUrl(material.file_path, 60 * 5);
   if (error || !data?.signedUrl) throw new Error("Nao foi possivel gerar o link do material.");
   return data.signedUrl;
+}
+
+export async function getCourseMaterialSignedUrl(filePath: string) {
+  const { data, error } = await supabase.storage.from(COURSE_MATERIALS_BUCKET).createSignedUrl(filePath, 60 * 5);
+  if (error || !data?.signedUrl) throw new Error("Nao foi possivel preparar o download do material.");
+  return data.signedUrl;
+}
+
+export function validateCourseMaterialFile(file: File | null | undefined) {
+  if (!file) throw new Error("Selecione um arquivo.");
+  if (file.size > COURSE_MATERIAL_MAX_BYTES) throw new Error("Arquivo muito grande. O limite maximo e 20 MB.");
+
+  const extension = getFileExtension(file.name);
+  if (!ALLOWED_COURSE_MATERIAL_EXTENSIONS.has(extension) || !ALLOWED_COURSE_MATERIAL_MIME_TYPES.has(file.type)) {
+    throw new Error("Tipo de arquivo nao permitido. Envie PDF, Excel, Word, CSV ou imagem.");
+  }
+
+  return {
+    safeName: sanitizeFileName(file.name),
+    extension,
+  };
+}
+
+export function sanitizeFileName(fileName: string) {
+  const extension = getFileExtension(fileName);
+  const baseName = fileName.replace(/\.[^.]+$/, "") || "material";
+  const safeBase = baseName
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 90) || "material";
+
+  return extension ? `${safeBase}.${extension}` : safeBase;
+}
+
+export async function uploadCourseMaterial({ courseId, lessonId, file }: { courseId: string; lessonId: string; file: File }) {
+  if (!courseId || !lessonId) throw new Error("Curso e aula sao obrigatorios para enviar o material.");
+  const { safeName } = validateCourseMaterialFile(file);
+  const filePath = `${courseId}/${lessonId}/${Date.now()}-${safeName}`;
+
+  const { error } = await supabase.storage.from(COURSE_MATERIALS_BUCKET).upload(filePath, file, {
+    cacheControl: "3600",
+    upsert: false,
+    contentType: file.type,
+  });
+
+  if (error) throw new Error("Nao foi possivel enviar o arquivo. Tente novamente.");
+
+  return {
+    file_path: filePath,
+    file_name: file.name,
+    file_size: file.size,
+    mime_type: file.type,
+  };
+}
+
+export async function removeCourseMaterialFile(filePath: string) {
+  const { error } = await supabase.storage.from(COURSE_MATERIALS_BUCKET).remove([filePath]);
+  if (error) throw new Error("Nao foi possivel excluir o arquivo do material.");
 }
 
 export function calculateCourseProgress(progress: UserLessonProgress[], lessons: CourseLesson[]) {
@@ -546,6 +637,40 @@ export async function deleteCourseMaterial(id: string) {
   if (error) throw new Error("Nao foi possivel excluir o material.");
 }
 
+export async function deleteCourseMaterialWithFile(material: CourseMaterial) {
+  if (material.file_path) await removeCourseMaterialFile(material.file_path);
+  await deleteCourseMaterial(material.id);
+}
+
+export function formatFileSize(bytes?: number | null) {
+  if (!bytes) return "";
+  const units = ["B", "KB", "MB", "GB"];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${value.toLocaleString("pt-BR", { maximumFractionDigits: unit === 0 ? 0 : 1 })} ${units[unit]}`;
+}
+
+export function materialMimeLabel(mimeType?: string | null, materialType?: CourseMaterial["material_type"]) {
+  if (materialType === "link") return "Link externo";
+  const labels: Record<string, string> = {
+    "application/pdf": "PDF",
+    "application/vnd.ms-excel": "Excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "Excel",
+    "application/msword": "Word",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "Word",
+    "text/csv": "CSV",
+    "application/csv": "CSV",
+    "image/jpeg": "Imagem",
+    "image/png": "Imagem",
+    "image/webp": "Imagem",
+  };
+  return mimeType ? labels[mimeType] ?? mimeType : "Arquivo";
+}
+
 function sanitizeCoursePayload(input: Partial<Course> & { title: string; slug?: string }, userId: string) {
   const status = input.status ?? "draft";
   return {
@@ -575,4 +700,8 @@ function stripHtml(value: string) {
 
 function containsUnsafeMarkup(value: string) {
   return /<[^>]+>|<\/|script:|javascript:/i.test(value);
+}
+
+function getFileExtension(fileName: string) {
+  return fileName.split(".").pop()?.toLowerCase().trim() ?? "";
 }

@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type React from "react";
-import { BookOpen, CheckCircle2, FileText, Pencil, Plus, Trash2, Users } from "lucide-react";
+import { BookOpen, CheckCircle2, Download, FileSpreadsheet, FileText, Image, Link as LinkIcon, Pencil, Plus, Table as TableIcon, Trash2, Upload, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -17,18 +17,24 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
   deleteCourseLesson,
-  deleteCourseMaterial,
+  deleteCourseMaterialWithFile,
   deleteCourseModule,
+  formatFileSize,
   formatDuration,
   formatDurationInput,
   getAdminCourses,
+  getCourseMaterialSignedUrl,
   grantCourseAccess,
+  materialMimeLabel,
+  removeCourseMaterialFile,
   saveCourse,
   saveCourseLesson,
   saveCourseMaterial,
   saveCourseModule,
   slugifyCourseTitle,
   updateCourseEnrollment,
+  uploadCourseMaterial,
+  validateCourseMaterialFile,
   type Course,
   type CourseLesson,
   type CourseMaterial,
@@ -359,33 +365,181 @@ function LessonDialog(props: { open: boolean; value: CourseLesson | "new" | null
 
 function MaterialDialog(props: { open: boolean; value: CourseMaterial | "new" | null; course: Course | null; lesson: CourseLesson | null; materials: CourseMaterial[]; onClose: () => void; onSaved: () => void }) {
   const current = typeof props.value === "object" && props.value ? props.value : null;
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [form, setForm] = useState<Partial<CourseMaterial> & { title: string }>({ title: "" });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [editingMaterial, setEditingMaterial] = useState<CourseMaterial | null>(current);
+  const [saving, setSaving] = useState(false);
+  const [preparingId, setPreparingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const lessonMaterials = props.lesson ? props.materials.filter((material) => material.lesson_id === props.lesson?.id).sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0)) : [];
-  useEffect(() => setForm(current ?? { title: "", material_type: "link", display_order: nextOrder(lessonMaterials) }), [current, props.open, props.lesson?.id]);
+
+  function resetForm(type: CourseMaterial["material_type"] = "link") {
+    setEditingMaterial(null);
+    setSelectedFile(null);
+    setForm({ title: "", material_type: type, display_order: nextOrder(lessonMaterials) });
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  useEffect(() => {
+    setEditingMaterial(current);
+    setSelectedFile(null);
+    setForm(current ?? { title: "", material_type: "link", display_order: nextOrder(lessonMaterials) });
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, [current, props.open, props.lesson?.id, props.materials]);
+
+  async function handleSaveMaterial() {
+    if (!props.course || !props.lesson || saving) return;
+    setSaving(true);
+    let uploadedPath: string | null = null;
+    try {
+      let filePayload: Partial<CourseMaterial> = {};
+      if (form.material_type === "file" && !editingMaterial) {
+        if (!selectedFile) throw new Error("Selecione um arquivo.");
+        const upload = await uploadCourseMaterial({ courseId: props.course.id, lessonId: props.lesson.id, file: selectedFile });
+        uploadedPath = upload.file_path;
+        filePayload = { ...upload, file_url: null };
+      }
+
+      await saveCourseMaterial({
+        ...form,
+        ...filePayload,
+        id: editingMaterial?.id,
+        course_id: props.course.id,
+        module_id: props.lesson.module_id,
+        lesson_id: props.lesson.id,
+        material_type: form.material_type ?? "link",
+        external_url: form.material_type === "link" ? form.external_url : null,
+        file_path: form.material_type === "file" ? filePayload.file_path ?? form.file_path ?? editingMaterial?.file_path ?? null : null,
+        file_url: null,
+        file_name: form.material_type === "file" ? filePayload.file_name ?? form.file_name ?? editingMaterial?.file_name ?? null : null,
+        file_size: form.material_type === "file" ? filePayload.file_size ?? form.file_size ?? editingMaterial?.file_size ?? null : null,
+        mime_type: form.material_type === "file" ? filePayload.mime_type ?? form.mime_type ?? editingMaterial?.mime_type ?? null : null,
+      });
+
+      toast.success(editingMaterial ? "Material atualizado com sucesso." : "Material adicionado com sucesso.");
+      await props.onSaved();
+      resetForm(form.material_type ?? "link");
+    } catch (error) {
+      if (uploadedPath) {
+        try {
+          await removeCourseMaterialFile(uploadedPath);
+        } catch (cleanupError) {
+          if (import.meta.env.DEV) console.error("Falha ao limpar arquivo enviado sem registro.", cleanupError);
+        }
+      }
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel salvar o material.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleOpenMaterial(material: CourseMaterial) {
+    if (preparingId) return;
+    setPreparingId(material.id);
+    try {
+      const url = material.material_type === "link" ? material.external_url : material.file_path ? await getCourseMaterialSignedUrl(material.file_path) : material.file_url;
+      if (url) window.open(url, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel preparar o download do material.");
+    } finally {
+      setPreparingId(null);
+    }
+  }
+
+  async function handleDeleteMaterial(material: CourseMaterial) {
+    if (!window.confirm("Deseja realmente excluir este material?")) return;
+    setDeletingId(material.id);
+    try {
+      await deleteCourseMaterialWithFile(material);
+      toast.success("Material excluido com sucesso.");
+      await props.onSaved();
+      if (editingMaterial?.id === material.id) resetForm();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel excluir o material.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   return <SimpleEntityDialog
     title="Materiais de apoio"
     description={props.lesson ? props.lesson.title : "Gerencie os materiais da aula."}
     open={props.open}
     onClose={props.onClose}
-    saveLabel={current ? "Salvar material" : "Adicionar material"}
-    onSave={() => props.course && props.lesson && saveCourseMaterial({ ...form, course_id: props.course.id, module_id: props.lesson.module_id, lesson_id: props.lesson.id }).then(() => { toast.success(current ? "Material atualizado com sucesso." : "Material adicionado com sucesso."); props.onSaved(); setForm({ title: "", material_type: "link", display_order: nextOrder(lessonMaterials) }); }).catch((error) => toast.error(error.message))}
+    saveLabel={saving ? "Enviando..." : editingMaterial ? "Salvar material" : "Adicionar material"}
+    onSave={() => void handleSaveMaterial()}
+    saving={saving}
   >
     <div className="space-y-2 rounded-md border p-3">
       {lessonMaterials.length ? lessonMaterials.map((material) => (
-        <div key={material.id} className="flex flex-col gap-2 rounded-md bg-muted/40 p-2 sm:flex-row sm:items-center sm:justify-between">
-          <div><p className="font-medium">{material.title}</p><p className="text-xs text-muted-foreground">{material.material_type === "link" ? "Link externo" : "Arquivo"} - ordem {material.display_order ?? 0}</p></div>
-          <Button size="sm" variant="destructive" onClick={() => void deleteCourseMaterial(material.id).then(() => { toast.success("Material excluido."); props.onSaved(); }).catch((error) => toast.error(error.message))}>Excluir</Button>
+        <div key={material.id} className="flex flex-col gap-3 rounded-md bg-muted/40 p-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex min-w-0 gap-3">
+            <MaterialIcon material={material} className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+            <div className="min-w-0">
+              <p className="font-medium">{material.title}</p>
+              <p className="break-all text-xs text-muted-foreground">
+                {material.file_name ?? material.external_url ?? "Material"} {material.file_size ? `- ${formatFileSize(material.file_size)}` : ""} - {materialMimeLabel(material.mime_type, material.material_type)} - ordem {material.display_order ?? 0}
+              </p>
+              {material.description ? <p className="mt-1 text-xs text-muted-foreground">{material.description}</p> : null}
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={() => void handleOpenMaterial(material)} disabled={preparingId === material.id}>{preparingId === material.id ? null : <Download className="h-4 w-4" />}{preparingId === material.id ? "Preparando..." : material.material_type === "link" ? "Abrir" : "Baixar"}</Button>
+            <Button size="sm" variant="outline" onClick={() => { setEditingMaterial(material); setSelectedFile(null); setForm(material); if (fileInputRef.current) fileInputRef.current.value = ""; }}><Pencil className="h-4 w-4" />Editar</Button>
+            <Button size="sm" variant="destructive" onClick={() => void handleDeleteMaterial(material)} disabled={deletingId === material.id}>{deletingId === material.id ? "Excluindo..." : "Excluir"}</Button>
+          </div>
         </div>
       )) : <p className="text-sm text-muted-foreground">Nenhum material de apoio cadastrado para esta aula.</p>}
     </div>
+    {editingMaterial ? <div className="flex items-center justify-between gap-3 rounded-md border border-primary/20 bg-primary/5 p-3 text-sm"><span>Editando: {editingMaterial.title}</span><Button size="sm" variant="outline" onClick={() => resetForm()}>Cancelar edicao</Button></div> : null}
     <Field label="Titulo do material"><Input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Apostila da Aula 1" /></Field>
     <Field label="Descricao"><Textarea value={form.description ?? ""} onChange={(event) => setForm({ ...form, description: event.target.value })} /></Field>
     <div className="grid gap-4 sm:grid-cols-2">
-      <Field label="Tipo do material"><Select value={form.material_type ?? "link"} onValueChange={(material_type) => setForm({ ...form, material_type: material_type as CourseMaterial["material_type"] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="link">Link externo</SelectItem><SelectItem value="file">Arquivo</SelectItem></SelectContent></Select></Field>
+      <Field label="Tipo do material"><Select value={form.material_type ?? "link"} disabled={Boolean(editingMaterial)} onValueChange={(material_type) => { setSelectedFile(null); setForm({ ...form, material_type: material_type as CourseMaterial["material_type"], external_url: "", file_path: null, file_url: null, file_name: null, file_size: null, mime_type: null }); if (fileInputRef.current) fileInputRef.current.value = ""; }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="link">Link externo</SelectItem><SelectItem value="file">Arquivo</SelectItem></SelectContent></Select></Field>
       <Field label="Ordem"><Input type="number" min={0} value={form.display_order ?? 0} onChange={(event) => setForm({ ...form, display_order: Number(event.target.value) })} /></Field>
     </div>
     {form.material_type === "file" ? (
-      <Field label="URL ou caminho do arquivo"><Input value={form.file_url ?? form.file_path ?? ""} onChange={(event) => setForm({ ...form, file_url: event.target.value })} placeholder="Upload no Storage sera conectado aqui" /></Field>
+      <div className="space-y-2">
+        <Label>Arquivo do material</Label>
+        {editingMaterial ? (
+          <div className="rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">A troca de arquivo nao esta habilitada nesta etapa. Voce pode editar titulo, descricao e ordem.</div>
+        ) : selectedFile ? (
+          <div className="flex flex-col gap-3 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="break-all font-medium">{selectedFile.name}</p>
+              <p className="text-xs text-muted-foreground">{materialMimeLabel(selectedFile.type)} - {formatFileSize(selectedFile.size)}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>Trocar arquivo</Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => { setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}>Remover</Button>
+            </div>
+          </div>
+        ) : (
+          <button type="button" className="flex w-full flex-col items-center justify-center rounded-md border border-dashed p-6 text-sm text-muted-foreground transition hover:border-primary hover:text-primary" onClick={() => fileInputRef.current?.click()}>
+            <UploadHint />
+            <span className="mt-2 font-medium">Selecionar arquivo</span>
+            <span className="mt-1">PDF, Excel, Word, CSV ou imagem ate 20 MB</span>
+          </button>
+        )}
+        <Input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          accept=".pdf,.xls,.xlsx,.doc,.docx,.csv,.jpg,.jpeg,.png,.webp,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/csv,application/csv,image/jpeg,image/png,image/webp"
+          onChange={(event) => {
+            const file = event.target.files?.[0] ?? null;
+            try {
+              if (file) validateCourseMaterialFile(file);
+              setSelectedFile(file);
+            } catch (error) {
+              setSelectedFile(null);
+              if (fileInputRef.current) fileInputRef.current.value = "";
+              toast.error(error instanceof Error ? error.message : "Tipo de arquivo nao permitido.");
+            }
+          }}
+        />
+      </div>
     ) : (
       <Field label="URL externa"><Input value={form.external_url ?? ""} onChange={(event) => setForm({ ...form, external_url: event.target.value })} placeholder="https://..." /></Field>
     )}
@@ -408,8 +562,8 @@ function EnrollmentsTable({ enrollments, progress, lessons, onEdit }: { enrollme
   return <Table><TableHeader><TableRow><TableHead>Aluno</TableHead><TableHead>Status</TableHead><TableHead>Tipo</TableHead><TableHead>Progresso</TableHead><TableHead>Inicio</TableHead><TableHead>Expira</TableHead><TableHead>Acoes</TableHead></TableRow></TableHeader><TableBody>{enrollments.length ? enrollments.map((enrollment) => { const userProgress = progress.filter((item) => item.user_id === enrollment.user_id && item.course_id === enrollment.course_id); const percent = lessons.length ? Math.round((userProgress.filter((item) => item.status === "completed").length / lessons.length) * 100) : 0; return <TableRow key={enrollment.id}><TableCell>{enrollment.profile?.full_name ?? enrollment.profile?.email ?? enrollment.user_id}</TableCell><TableCell><Badge variant="outline">{enrollment.status}</Badge></TableCell><TableCell>{enrollment.access_type}</TableCell><TableCell>{percent}%</TableCell><TableCell>{formatDate(enrollment.started_at)}</TableCell><TableCell>{formatDate(enrollment.expires_at) || "sem fim"}</TableCell><TableCell><Button size="sm" variant="outline" onClick={() => onEdit(enrollment)}>Editar</Button></TableCell></TableRow>; }) : <TableRow><TableCell colSpan={7} className="text-muted-foreground">Nenhum usuario contratou este curso ainda.</TableCell></TableRow>}</TableBody></Table>;
 }
 
-function SimpleEntityDialog({ title, description, open, children, onClose, onSave, saveLabel = "Salvar" }: { title: string; description?: string; open: boolean; children: React.ReactNode; onClose: () => void; onSave: () => void; saveLabel?: string }) {
-  return <Dialog open={open} onOpenChange={(next) => !next && onClose()}><DialogContent className="max-h-[90vh] max-w-2xl overflow-auto"><DialogHeader><DialogTitle>{title}</DialogTitle>{description ? <DialogDescription>{description}</DialogDescription> : null}</DialogHeader><div className="grid gap-4">{children}</div><div className="flex justify-end gap-2"><Button variant="outline" onClick={onClose}>Cancelar</Button><Button onClick={onSave}>{saveLabel}</Button></div></DialogContent></Dialog>;
+function SimpleEntityDialog({ title, description, open, children, onClose, onSave, saveLabel = "Salvar", saving = false }: { title: string; description?: string; open: boolean; children: React.ReactNode; onClose: () => void; onSave: () => void; saveLabel?: string; saving?: boolean }) {
+  return <Dialog open={open} onOpenChange={(next) => !next && !saving && onClose()}><DialogContent className="max-h-[90vh] max-w-2xl overflow-auto"><DialogHeader><DialogTitle>{title}</DialogTitle>{description ? <DialogDescription>{description}</DialogDescription> : null}</DialogHeader><div className="grid gap-4">{children}</div><div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button><Button onClick={onSave} disabled={saving}>{saveLabel}</Button></div></DialogContent></Dialog>;
 }
 
 function Field({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) {
@@ -451,6 +605,18 @@ function CourseContentSummary({ course, modules, lessons, materials }: { course:
 
 function EmptyCard({ message }: { message: string }) {
   return <Card className="border-dashed bg-white/80"><CardContent className="p-6 text-sm text-muted-foreground">{message}</CardContent></Card>;
+}
+
+function MaterialIcon({ material, className }: { material: CourseMaterial; className?: string }) {
+  if (material.material_type === "link") return <LinkIcon className={className} />;
+  if (material.mime_type?.includes("spreadsheet") || material.mime_type === "application/vnd.ms-excel") return <FileSpreadsheet className={className} />;
+  if (material.mime_type?.includes("csv")) return <TableIcon className={className} />;
+  if (material.mime_type?.startsWith("image/")) return <Image className={className} />;
+  return <FileText className={className} />;
+}
+
+function UploadHint() {
+  return <Upload className="h-6 w-6" />;
 }
 
 function nextOrder(items: Array<{ display_order?: number | null }>) {

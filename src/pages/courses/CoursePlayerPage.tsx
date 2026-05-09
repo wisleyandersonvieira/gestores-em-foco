@@ -13,8 +13,10 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import {
   formatDuration,
+  formatFileSize,
   getCourseStructure,
   getMaterialDownloadUrl,
+  materialMimeLabel,
   markLessonCompleted,
   markLessonInProgress,
   markLessonNotCompleted,
@@ -33,6 +35,7 @@ function CoursePlayerContent({ user }: { user: User }) {
   const [structure, setStructure] = useState<CourseStructure | null>(null);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [savingProgress, setSavingProgress] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function load() {
@@ -78,6 +81,25 @@ function CoursePlayerContent({ user }: { user: User }) {
 
   const completed = progressByLesson.get(activeLesson.id)?.status === "completed";
 
+  async function toggleLessonCompletion() {
+    if (savingProgress) return;
+    setSavingProgress(true);
+    try {
+      if (completed) {
+        await markLessonNotCompleted(user.id, activeLesson);
+        toast.success("Aula marcada como em andamento.");
+      } else {
+        await markLessonCompleted(user.id, activeLesson);
+        toast.success("Aula concluida.");
+      }
+      await load();
+    } catch (runtimeError) {
+      toast.error(runtimeError instanceof Error ? runtimeError.message : "Nao foi possivel atualizar esta aula.");
+    } finally {
+      setSavingProgress(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <Button asChild variant="ghost" className="gap-2">
@@ -113,15 +135,10 @@ function CoursePlayerContent({ user }: { user: User }) {
                 <Button
                   className={completed ? "" : "bg-accent text-accent-foreground hover:bg-accent/90"}
                   variant={completed ? "outline" : "default"}
-                  onClick={() => {
-                    const action = completed ? markLessonNotCompleted(user.id, activeLesson) : markLessonCompleted(user.id, activeLesson);
-                    void action.then(async () => {
-                      toast.success(completed ? "Aula marcada como em andamento." : "Aula concluida.");
-                      await load();
-                    });
-                  }}
+                  disabled={savingProgress}
+                  onClick={() => void toggleLessonCompletion()}
                 >
-                  {completed ? "Marcar como nao concluida" : "Concluir aula"}
+                  {savingProgress ? "Salvando..." : completed ? "Marcar como nao concluida" : "Concluir aula"}
                 </Button>
               </div>
             </div>
@@ -201,7 +218,10 @@ function MaterialRow({ material }: { material: CourseMaterial }) {
         <FileText className="h-5 w-5 text-primary" />
         <div>
           <p className="font-medium">{material.title}</p>
-          <p className="text-xs text-muted-foreground">{material.file_name ?? material.external_url ?? material.mime_type ?? "Material"}</p>
+          <p className="break-all text-xs text-muted-foreground">
+            {material.file_name ?? material.external_url ?? "Material"} {material.file_size ? `- ${formatFileSize(material.file_size)}` : ""} - {materialMimeLabel(material.mime_type, material.material_type)}
+          </p>
+          {material.description ? <p className="mt-1 text-xs text-muted-foreground">{material.description}</p> : null}
         </div>
       </div>
       <Button
