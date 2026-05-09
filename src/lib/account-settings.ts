@@ -165,7 +165,7 @@ export async function createSupportRequest(userId: string, data: Pick<SupportReq
 
 export async function sendPasswordResetEmail(email: string) {
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}/reset-password`,
+    redirectTo: `${window.location.origin}/redefinir-senha`,
   });
 
   if (error) {

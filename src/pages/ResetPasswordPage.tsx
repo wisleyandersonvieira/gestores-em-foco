@@ -10,6 +10,13 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { validatePassword } from "@/lib/password-security";
 
+function hasRecoveryTokenInUrl() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+
+  return urlParams.get("type") === "recovery" || hashParams.get("type") === "recovery" || urlParams.has("code");
+}
+
 export default function ResetPasswordPage() {
   const navigate = useNavigate();
   const [password, setPassword] = useState("");
@@ -22,17 +29,18 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     let active = true;
+    const openedFromRecoveryLink = hasRecoveryTokenInUrl();
 
     supabase.auth.getSession().then(({ data }) => {
       if (!active) return;
-      setHasRecoverySession(Boolean(data.session));
+      setHasRecoverySession(Boolean(data.session) && openedFromRecoveryLink);
       setIsCheckingSession(false);
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY" || session) {
+      if (event === "PASSWORD_RECOVERY") {
         setHasRecoverySession(Boolean(session));
         setIsCheckingSession(false);
       }
@@ -57,7 +65,6 @@ export default function ResetPasswordPage() {
     const { error } = await supabase.auth.updateUser({ password });
 
     if (error) {
-      if (import.meta.env.DEV) console.error("Password recovery update failed", error);
       toast.error("Nao foi possivel redefinir a senha. Solicite um novo link e tente novamente.");
       setIsSaving(false);
       return;
@@ -69,20 +76,33 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-7xl flex-col items-center justify-center px-6 py-16">
+    <main className="mx-auto flex min-h-screen max-w-7xl flex-col items-center justify-center gap-10 px-6 py-16 lg:flex-row lg:justify-between">
+      <div className="max-w-xl">
+        <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary">Nova senha</p>
+        <h1 className="font-display mt-4 text-4xl font-semibold leading-tight md:text-5xl">
+          Crie uma nova senha de acesso.
+        </h1>
+        <p className="mt-6 text-lg leading-8 text-muted-foreground">
+          Escolha uma senha segura para proteger sua conta e seus dados.
+        </p>
+      </div>
+
       <Card className="w-full max-w-md border-primary/10 bg-white/90 shadow-xl shadow-slate-200/70">
         <CardHeader>
-          <CardTitle className="font-display text-3xl">Redefinir senha</CardTitle>
-          <CardDescription>Informe sua nova senha para continuar.</CardDescription>
+          <CardTitle className="font-display text-3xl">Criar nova senha</CardTitle>
+          <CardDescription>Digite uma nova senha para acessar sua conta.</CardDescription>
         </CardHeader>
         <CardContent>
           {!isCheckingSession && !hasRecoverySession ? (
             <div className="space-y-4">
               <div className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                Este link de redefinicao nao esta ativo ou expirou. Solicite um novo link para continuar.
+                Link invalido ou expirado. Solicite um novo link de redefinicao.
               </div>
               <Button asChild variant="outline" className="w-full">
-                <Link to="/entrar">Voltar para o login</Link>
+                <Link to="/esqueci-minha-senha">Solicitar novo link</Link>
+              </Button>
+              <Button asChild variant="ghost" className="w-full">
+                <Link to="/entrar">Voltar para login</Link>
               </Button>
             </div>
           ) : (
@@ -107,6 +127,11 @@ export default function ResetPasswordPage() {
               <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isSaving || isCheckingSession}>
                 {isSaving ? "Salvando..." : "Salvar nova senha"}
               </Button>
+              <p className="text-center text-sm text-muted-foreground">
+                <Link to="/entrar" className="font-medium text-primary hover:underline">
+                  Voltar para login
+                </Link>
+              </p>
             </form>
           )}
         </CardContent>

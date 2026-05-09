@@ -83,6 +83,12 @@ export default function LoginPage() {
               <Input id="password" name="password" type="password" placeholder="Sua senha" required />
             </div>
 
+            <div className="flex justify-end">
+              <Link to="/esqueci-minha-senha" className="text-sm font-medium text-primary hover:underline">
+                Esqueci minha senha
+              </Link>
+            </div>
+
             <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isPending}>
               {isPending ? "Entrando..." : "Entrar"}
             </Button>
