@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { getAuthErrorMessage } from "@/lib/auth-errors";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,9 +11,12 @@ export default function SignupPage() {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
+  const submitLockRef = useRef(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (submitLockRef.current) return;
+    submitLockRef.current = true;
     setIsPending(true);
     setError(null);
 
@@ -28,6 +32,7 @@ export default function SignupPage() {
       email,
       password,
       options: {
+        emailRedirectTo: `${window.location.origin}/entrar?cadastro=sucesso`,
         data: {
           name,
           company_name: companyName,
@@ -37,10 +42,10 @@ export default function SignupPage() {
       },
     });
 
-    setIsPending(false);
-
     if (authError) {
-      setError(authError.message);
+      submitLockRef.current = false;
+      setIsPending(false);
+      setError(getAuthErrorMessage(authError, "Nao foi possivel criar sua conta. Confira os dados e tente novamente."));
       return;
     }
 

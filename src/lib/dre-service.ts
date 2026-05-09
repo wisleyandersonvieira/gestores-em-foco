@@ -130,7 +130,7 @@ export async function getDreModelWithLines(userId: string, modelId: string): Pro
     .order("display_order", { ascending: true });
 
   if (linesError) {
-    console.error("Erro ao carregar estrutura do modelo DRE:", linesError);
+    if (import.meta.env.DEV) console.error("Erro ao carregar estrutura do modelo DRE:", linesError);
     throw new Error("Nao foi possivel carregar a estrutura do modelo.");
   }
   return { ...model, lines: (lines ?? []) as DreModelWithLines["lines"] };

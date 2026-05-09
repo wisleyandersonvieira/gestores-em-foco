@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
@@ -6,17 +6,33 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
+import { getAuthErrorMessage, isRateLimitError } from "@/lib/auth-errors";
 
 const SUCCESS_MESSAGE = "Se o e-mail estiver cadastrado, enviaremos um link para redefinir sua senha.";
 const ERROR_MESSAGE = "Nao foi possivel enviar o link neste momento. Tente novamente.";
+const RESET_EMAIL_COOLDOWN_SECONDS = 60;
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [isSending, setIsSending] = useState(false);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+  const submitLockRef = useRef(false);
+
+  useEffect(() => {
+    if (cooldownSeconds <= 0) return;
+
+    const timer = window.setTimeout(() => {
+      setCooldownSeconds((current) => Math.max(0, current - 1));
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [cooldownSeconds]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitLockRef.current || cooldownSeconds > 0) return;
+    submitLockRef.current = true;
     setFeedback(null);
     setIsSending(true);
 
@@ -25,12 +41,17 @@ export default function ForgotPasswordPage() {
     });
 
     setIsSending(false);
+    submitLockRef.current = false;
 
     if (error) {
-      setFeedback({ type: "error", message: ERROR_MESSAGE });
+      if (isRateLimitError(error)) {
+        setCooldownSeconds(RESET_EMAIL_COOLDOWN_SECONDS);
+      }
+      setFeedback({ type: "error", message: getAuthErrorMessage(error, ERROR_MESSAGE) });
       return;
     }
 
+    setCooldownSeconds(RESET_EMAIL_COOLDOWN_SECONDS);
     setFeedback({ type: "success", message: SUCCESS_MESSAGE });
   }
 
@@ -79,8 +100,12 @@ export default function ForgotPasswordPage() {
               />
             </div>
 
-            <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isSending}>
-              {isSending ? "Enviando..." : "Enviar link de redefinicao"}
+            <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isSending || cooldownSeconds > 0}>
+              {isSending
+                ? "Enviando..."
+                : cooldownSeconds > 0
+                  ? `Enviar novamente em ${cooldownSeconds}s`
+                  : "Enviar link de redefinicao"}
             </Button>
           </form>
 

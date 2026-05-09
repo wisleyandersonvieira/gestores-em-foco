@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { getAdminAccessError } from "@/lib/admin-access";
+import { getAuthErrorMessage } from "@/lib/auth-errors";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,9 +17,12 @@ export default function LoginPage() {
     searchParams.get("erro") === "admin_email" ? getAdminAccessError(searchParams.get("email")) : null;
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
+  const submitLockRef = useRef(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (submitLockRef.current) return;
+    submitLockRef.current = true;
     setIsPending(true);
     setError(null);
 
@@ -28,10 +32,10 @@ export default function LoginPage() {
 
     const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
 
-    setIsPending(false);
-
     if (authError) {
-      setError("Email ou senha invalidos.");
+      submitLockRef.current = false;
+      setIsPending(false);
+      setError(getAuthErrorMessage(authError, "Email ou senha invalidos."));
       return;
     }
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
+import { getAuthErrorMessage } from "@/lib/auth-errors";
 import { validatePassword } from "@/lib/password-security";
 
 function hasRecoveryTokenInUrl() {
@@ -26,6 +27,7 @@ export default function ResetPasswordPage() {
   const [hasRecoverySession, setHasRecoverySession] = useState(false);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const submitLockRef = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -54,6 +56,7 @@ export default function ResetPasswordPage() {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitLockRef.current) return;
 
     const validationError = validatePassword(password, passwordConfirmation);
     if (validationError) {
@@ -61,11 +64,13 @@ export default function ResetPasswordPage() {
       return;
     }
 
+    submitLockRef.current = true;
     setIsSaving(true);
     const { error } = await supabase.auth.updateUser({ password });
 
     if (error) {
-      toast.error("Nao foi possivel redefinir a senha. Solicite um novo link e tente novamente.");
+      toast.error(getAuthErrorMessage(error, "Nao foi possivel redefinir sua senha. Solicite um novo link e tente novamente."));
+      submitLockRef.current = false;
       setIsSaving(false);
       return;
     }

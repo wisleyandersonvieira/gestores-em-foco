@@ -71,6 +71,7 @@ const settingsCards = [
   { value: "privacidade", title: "Privacidade e dados", description: "Dados e zona de risco.", icon: Shield },
   { value: "suporte", title: "Suporte", description: "Fale com nosso time.", icon: HelpCircle },
 ];
+const RESET_LINK_COOLDOWN_SECONDS = 60;
 
 export default function SettingsPage() {
   return (
@@ -97,6 +98,7 @@ function SettingsContent({ user }: { user: User }) {
   const [showPasswordConfirmation, setShowPasswordConfirmation] = useState(false);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [isSendingResetLink, setIsSendingResetLink] = useState(false);
+  const [resetLinkCooldownSeconds, setResetLinkCooldownSeconds] = useState(0);
   const [isRefreshingSession, setIsRefreshingSession] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [exportingFormat, setExportingFormat] = useState<ExportFormat | null>(null);
@@ -107,6 +109,8 @@ function SettingsContent({ user }: { user: User }) {
   const [support, setSupport] = useState({ subject: "", message: "", type: "duvida" });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const passwordUpdateLockRef = useRef(false);
+  const resetLinkLockRef = useRef(false);
 
   useEffect(() => {
     void Promise.all([
@@ -134,6 +138,16 @@ function SettingsContent({ user }: { user: User }) {
   useEffect(() => {
     void loadCurrentSession();
   }, []);
+
+  useEffect(() => {
+    if (resetLinkCooldownSeconds <= 0) return;
+
+    const timer = window.setTimeout(() => {
+      setResetLinkCooldownSeconds((current) => Math.max(0, current - 1));
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [resetLinkCooldownSeconds]);
 
   async function saveProfile() {
     if (!profile) return;
@@ -217,12 +231,15 @@ function SettingsContent({ user }: { user: User }) {
   }
 
   async function handlePasswordUpdate() {
+    if (passwordUpdateLockRef.current) return;
+
     const validationError = validatePassword(password, passwordConfirmation);
     if (validationError) {
       toast.error(validationError);
       return;
     }
 
+    passwordUpdateLockRef.current = true;
     setIsUpdatingPassword(true);
     try {
       await updateUserPassword(password, passwordConfirmation);
@@ -233,23 +250,29 @@ function SettingsContent({ user }: { user: User }) {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível alterar a senha. Tente novamente.");
     } finally {
+      passwordUpdateLockRef.current = false;
       setIsUpdatingPassword(false);
     }
   }
 
   async function handleSendPasswordResetEmail() {
+    if (resetLinkLockRef.current || resetLinkCooldownSeconds > 0) return;
+
     if (!currentUser.email) {
       toast.error("Nao foi possivel identificar o e-mail da sua conta.");
       return;
     }
 
+    resetLinkLockRef.current = true;
     setIsSendingResetLink(true);
     try {
       await sendPasswordResetEmail(currentUser.email);
       toast.success("Enviamos um link de redefinição para o seu e-mail.");
+      setResetLinkCooldownSeconds(RESET_LINK_COOLDOWN_SECONDS);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível enviar o link de redefinição. Tente novamente.");
     } finally {
+      resetLinkLockRef.current = false;
       setIsSendingResetLink(false);
     }
   }
@@ -257,19 +280,16 @@ function SettingsContent({ user }: { user: User }) {
   async function loadCurrentSession() {
     setIsRefreshingSession(true);
     try {
-      const [{ data: sessionData, error: sessionError }, { data: userData, error: userError }] = await Promise.all([
-        supabase.auth.getSession(),
-        supabase.auth.getUser(),
-      ]);
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
 
-      if (sessionError || userError) {
-        if (import.meta.env.DEV) console.error("Session refresh failed", sessionError ?? userError);
+      if (sessionError) {
+        if (import.meta.env.DEV) console.error("Session refresh failed", sessionError);
         toast.error("Nao foi possivel atualizar a sessao.");
         return;
       }
 
       setCurrentSession(sessionData.session);
-      if (userData.user) setCurrentUser(userData.user);
+      if (sessionData.session?.user) setCurrentUser(sessionData.session.user);
     } finally {
       setIsRefreshingSession(false);
     }
@@ -468,10 +488,14 @@ function SettingsContent({ user }: { user: User }) {
                   <Button
                     variant="outline"
                     className="sm:w-fit"
-                    disabled={isSendingResetLink}
+                    disabled={isSendingResetLink || resetLinkCooldownSeconds > 0}
                     onClick={() => void handleSendPasswordResetEmail()}
                   >
-                    {isSendingResetLink ? "Enviando..." : "Enviar link de redefinicao"}
+                    {isSendingResetLink
+                      ? "Enviando..."
+                      : resetLinkCooldownSeconds > 0
+                        ? `Enviar novamente em ${resetLinkCooldownSeconds}s`
+                        : "Enviar link de redefinicao"}
                   </Button>
                 </div>
               </div>

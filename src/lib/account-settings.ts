@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { getAuthErrorMessage } from "@/lib/auth-errors";
 import type { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import { getUserProducts } from "@/lib/products";
 import { validatePassword } from "@/lib/password-security";
@@ -170,7 +171,7 @@ export async function sendPasswordResetEmail(email: string) {
 
   if (error) {
     if (import.meta.env.DEV) console.error("Password reset email failed", error);
-    throw new Error("Não foi possível enviar o link de redefinição. Tente novamente.");
+    throw new Error(getAuthErrorMessage(error, "Não foi possível enviar o link de redefinição. Tente novamente."));
   }
 }
 
@@ -181,7 +182,7 @@ export async function updateUserPassword(newPassword: string, confirmation = new
   const { error } = await supabase.auth.updateUser({ password: newPassword });
   if (error) {
     if (import.meta.env.DEV) console.error("Password update failed", error);
-    throw new Error("Não foi possível alterar a senha. Tente novamente.");
+    throw new Error(getAuthErrorMessage(error, "Não foi possível alterar a senha. Tente novamente."));
   }
 }
 
