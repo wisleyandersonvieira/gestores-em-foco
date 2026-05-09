@@ -49,10 +49,14 @@ import { validatePassword } from "@/lib/password-security";
 import {
   cancelPrivacyRequest,
   createPrivacyRequest,
-  downloadJson,
-  exportUserData,
+  exportAsExcel,
+  exportAsJson,
+  exportAsPdf,
+  exportFormatLabel,
+  getExportData,
   getActiveDeletionRequest,
   getPrivacyRequests,
+  type ExportFormat,
   type PrivacyRequest,
 } from "@/lib/privacy-requests";
 import { applyTheme, normalizeTheme, storeTheme, type Theme } from "@/lib/theme";
@@ -95,7 +99,7 @@ function SettingsContent({ user }: { user: User }) {
   const [isSendingResetLink, setIsSendingResetLink] = useState(false);
   const [isRefreshingSession, setIsRefreshingSession] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [isRequestingExport, setIsRequestingExport] = useState(false);
+  const [exportingFormat, setExportingFormat] = useState<ExportFormat | null>(null);
   const [isRequestingDeletion, setIsRequestingDeletion] = useState(false);
   const [isCancelingDeletion, setIsCancelingDeletion] = useState(false);
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
@@ -297,18 +301,25 @@ function SettingsContent({ user }: { user: User }) {
     return nextRequests;
   }
 
-  async function handleRequestExport() {
-    setIsRequestingExport(true);
+  async function handleExport(format: ExportFormat) {
+    setExportingFormat(format);
     try {
-      const data = await exportUserData(currentUser);
-      downloadJson(data, `meus-dados-${new Date().toISOString().slice(0, 10)}.json`);
-      await createPrivacyRequest(user.id, "export", "completed");
+      const data = await getExportData(currentUser);
+      if (format === "xlsx") exportAsExcel(data);
+      if (format === "pdf") exportAsPdf(data);
+      if (format === "json") exportAsJson(data);
+      await createPrivacyRequest(user.id, "export", "completed", format);
       await reloadPrivacyRequests();
-      toast.success("Seus dados foram exportados com sucesso.");
+      const messages: Record<ExportFormat, string> = {
+        xlsx: "Arquivo Excel exportado com sucesso.",
+        pdf: "Relatório PDF exportado com sucesso.",
+        json: "JSON técnico exportado com sucesso.",
+      };
+      toast.success(messages[format]);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Nao foi possivel registrar a solicitacao de exportacao.");
+      toast.error(error instanceof Error ? error.message : "Não foi possível gerar a exportação. Tente novamente.");
     } finally {
-      setIsRequestingExport(false);
+      setExportingFormat(null);
     }
   }
 
@@ -544,10 +555,19 @@ function SettingsContent({ user }: { user: User }) {
               <div className="grid gap-4 lg:grid-cols-2">
                 <div className="rounded-lg border bg-card p-4 text-card-foreground">
                   <p className="font-semibold">Exportar meus dados</p>
-                  <p className="mt-2 text-sm text-muted-foreground">Baixe ou solicite uma copia dos dados vinculados a sua conta.</p>
-                  <Button className="mt-4 w-full sm:w-fit" disabled={isRequestingExport} onClick={() => void handleRequestExport()}>
-                    {isRequestingExport ? "Solicitando..." : "Solicitar exportacao"}
-                  </Button>
+                  <p className="mt-2 text-sm text-muted-foreground">Baixe uma copia dos dados vinculados a sua conta no formato desejado.</p>
+                  <p className="mt-2 text-xs text-muted-foreground">Excel e recomendado para conferencia completa dos dados. PDF e ideal para leitura. JSON e indicado para uso tecnico e portabilidade.</p>
+                  <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                    <Button className="w-full sm:w-fit" disabled={Boolean(exportingFormat)} onClick={() => void handleExport("xlsx")}>
+                      {exportingFormat === "xlsx" ? "Gerando Excel..." : "Exportar em Excel"}
+                    </Button>
+                    <Button variant="outline" className="w-full sm:w-fit" disabled={Boolean(exportingFormat)} onClick={() => void handleExport("pdf")}>
+                      {exportingFormat === "pdf" ? "Gerando PDF..." : "Exportar em PDF"}
+                    </Button>
+                    <Button variant="outline" className="w-full sm:w-fit" disabled={Boolean(exportingFormat)} onClick={() => void handleExport("json")}>
+                      {exportingFormat === "json" ? "Gerando JSON..." : "Exportar JSON tecnico"}
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="rounded-lg border border-[var(--danger-border)] bg-[var(--danger-bg)] p-4">
@@ -584,16 +604,20 @@ function SettingsContent({ user }: { user: User }) {
                   <p className="mt-3 text-sm text-muted-foreground">Nenhuma solicitacao registrada.</p>
                 ) : (
                   <div className="mt-4 grid gap-2">
-                    <div className="hidden grid-cols-3 gap-3 border-b pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:grid">
+                    <div className="hidden grid-cols-5 gap-3 border-b pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:grid">
                       <span>Tipo</span>
+                      <span>Formato</span>
                       <span>Status</span>
                       <span>Solicitado em</span>
+                      <span>Processado em</span>
                     </div>
                     {privacyRequests.map((request) => (
-                      <div key={request.id} className="grid gap-2 rounded-lg border bg-background/60 p-3 text-sm sm:grid-cols-3 sm:border-0 sm:bg-transparent sm:p-0">
+                      <div key={request.id} className="grid gap-2 rounded-lg border bg-background/60 p-3 text-sm sm:grid-cols-5 sm:border-0 sm:bg-transparent sm:p-0">
                         <span><span className="text-muted-foreground sm:hidden">Tipo: </span>{privacyRequestTypeLabel(request.request_type)}</span>
+                        <span><span className="text-muted-foreground sm:hidden">Formato: </span>{exportFormatLabel(request.export_format)}</span>
                         <span><Badge variant="outline">{privacyRequestStatusLabel(request.status)}</Badge></span>
                         <span className="text-muted-foreground">{formatDateTime(request.requested_at)}</span>
+                        <span className="text-muted-foreground">{formatDateTime(request.processed_at) || "-"}</span>
                       </div>
                     ))}
                   </div>

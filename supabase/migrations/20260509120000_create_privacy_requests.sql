@@ -5,13 +5,25 @@ create table if not exists public.privacy_requests (
   status text not null default 'pending',
   requested_at timestamptz not null default now(),
   processed_at timestamptz,
+  export_format text,
   file_url text,
   notes text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint privacy_requests_type_check check (request_type in ('export', 'account_deletion')),
-  constraint privacy_requests_status_check check (status in ('pending', 'processing', 'completed', 'rejected', 'canceled'))
+  constraint privacy_requests_status_check check (status in ('pending', 'processing', 'completed', 'rejected', 'canceled')),
+  constraint privacy_requests_export_format_check check (export_format is null or export_format in ('xlsx', 'pdf', 'json'))
 );
+
+alter table public.privacy_requests
+add column if not exists export_format text;
+
+alter table public.privacy_requests
+drop constraint if exists privacy_requests_export_format_check;
+
+alter table public.privacy_requests
+add constraint privacy_requests_export_format_check
+check (export_format is null or export_format in ('xlsx', 'pdf', 'json'));
 
 create index if not exists privacy_requests_user_requested_idx
 on public.privacy_requests(user_id, requested_at desc);

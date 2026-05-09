@@ -955,6 +955,7 @@ export type Database = {
       privacy_requests: {
         Row: {
           created_at: string
+          export_format: string | null
           file_url: string | null
           id: string
           notes: string | null
@@ -967,6 +968,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          export_format?: string | null
           file_url?: string | null
           id?: string
           notes?: string | null
@@ -979,6 +981,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          export_format?: string | null
           file_url?: string | null
           id?: string
           notes?: string | null
