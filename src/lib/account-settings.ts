@@ -11,6 +11,9 @@ export type SupportRequestInsert = TablesInsert<"support_requests">;
 const AVATAR_BUCKET = "avatars";
 const AVATAR_MAX_SIZE_BYTES = 5 * 1024 * 1024;
 const AVATAR_ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const SUPPORT_ALLOWED_TYPES = new Set(["duvida", "problema", "sugestao", "financeiro"]);
+const SUPPORT_SUBJECT_MAX_LENGTH = 120;
+const SUPPORT_MESSAGE_MAX_LENGTH = 5000;
 
 export async function getUserProfile(userId: string) {
   const { data, error } = await supabase
@@ -26,7 +29,7 @@ export async function getUserProfile(userId: string) {
 export async function updateUserProfile(userId: string, data: TablesUpdate<"user_profiles">) {
   if ("full_name" in data && !String(data.full_name ?? "").trim()) throw new Error("Informe o nome completo.");
 
-  const payload = sanitizeUpsertPayload(data);
+  const payload = sanitizeUserProfilePayload(sanitizeUpsertPayload(data));
   const { data: saved, error } = await supabase
     .from("user_profiles")
     .upsert({ ...payload, user_id: userId }, { onConflict: "user_id" })
@@ -53,7 +56,7 @@ export async function uploadUserAvatar(userId: string, file: File, previousAvata
   const avatarPath = `${userId}/avatar-${Date.now()}.${extension}`;
   const { error: uploadError } = await supabase.storage.from(AVATAR_BUCKET).upload(avatarPath, file, {
     cacheControl: "3600",
-    upsert: true,
+    upsert: false,
     contentType: file.type,
   });
 
@@ -146,11 +149,17 @@ export async function getUserSubscriptions(userId: string) {
 }
 
 export async function createSupportRequest(userId: string, data: Pick<SupportRequestInsert, "subject" | "message" | "type">) {
-  if (!data.subject.trim()) throw new Error("Informe o assunto.");
-  if (!data.message.trim()) throw new Error("Informe a mensagem.");
-  if (!data.type) throw new Error("Selecione o tipo.");
+  const subject = stripHtml(String(data.subject ?? "")).trim();
+  const message = stripHtml(String(data.message ?? "")).trim();
+  const type = String(data.type ?? "").trim();
 
-  const { error } = await supabase.from("support_requests").insert({ ...data, user_id: userId });
+  if (!subject) throw new Error("Informe o assunto.");
+  if (!message) throw new Error("Informe a mensagem.");
+  if (!SUPPORT_ALLOWED_TYPES.has(type)) throw new Error("Selecione um tipo valido.");
+  if (subject.length > SUPPORT_SUBJECT_MAX_LENGTH) throw new Error("O assunto deve ter no maximo 120 caracteres.");
+  if (message.length > SUPPORT_MESSAGE_MAX_LENGTH) throw new Error("A mensagem deve ter no maximo 5000 caracteres.");
+
+  const { error } = await supabase.from("support_requests").insert({ subject, message, type, user_id: userId });
   if (error) throw new Error("Nao foi possivel enviar sua solicitacao.");
 }
 
@@ -236,4 +245,27 @@ function createDefaultNotifications(userId: string): UserNotificationPreferences
 function sanitizeUpsertPayload<T extends { id?: string | null; created_at?: string | null; updated_at?: string | null }>(data: T) {
   const { id: _id, created_at: _createdAt, updated_at: _updatedAt, ...payload } = data;
   return payload;
+}
+
+function sanitizeUserProfilePayload<T extends Record<string, unknown>>(data: T) {
+  const blockedFields = new Set(["user_id", "email", "role", "is_active"]);
+  const payload: Record<string, unknown> = {};
+
+  Object.entries(data).forEach(([key, value]) => {
+    if (blockedFields.has(key)) return;
+    payload[key] = typeof value === "string" ? stripHtml(value).trim().slice(0, maxLengthForProfileField(key)) : value;
+  });
+
+  return payload;
+}
+
+function maxLengthForProfileField(key: string) {
+  if (key === "full_name" || key === "company_name") return 120;
+  if (key === "phone") return 32;
+  if (key === "avatar_url" || key === "avatar_path") return 500;
+  return 255;
+}
+
+function stripHtml(value: string) {
+  return value.replace(/[<>]/g, "");
 }

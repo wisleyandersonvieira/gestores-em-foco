@@ -5,7 +5,7 @@ import { Activity, Box, Eye, Headphones, LayoutDashboard, Plus, Settings, Users 
 import { DiagnosticFlowBuilder } from "@/components/admin/diagnostic-flow-builder";
 import { LinkManager } from "@/components/admin/link-manager";
 import { supabase } from "@/integrations/supabase/client";
-import { getAdminAccessError, isAllowedAdminEmail } from "@/lib/admin-access";
+import { getAdminAccessError, isCurrentUserAdmin } from "@/lib/admin-access";
 import { getAdminData, updateSupportRequest, type AdminPeriod } from "@/lib/admin-dashboard";
 import {
   archiveTemplate,
@@ -67,20 +67,17 @@ export default function AdminPage() {
           return;
         }
 
-        if (!isAllowedAdminEmail(session.user.email)) {
-          await supabase.auth.signOut();
-          navigate(`/entrar?erro=admin_email&email=${encodeURIComponent(session.user.email ?? "")}`);
+        const isAdmin = await isCurrentUserAdmin();
+        if (!isAdmin) {
+          setError(getAdminAccessError());
+          navigate("/minha-conta");
           return;
         }
 
         setUserId(session.user.id);
         setAdminUserId(session.user.id);
 
-        const profile = await getAdminProfile(session.user.id);
-        if (profile.role !== "admin") {
-          navigate("/minha-conta");
-          return;
-        }
+        await getAdminProfile(session.user.id);
 
         const loadedTemplates = await listTemplates();
         setTemplates(loadedTemplates);

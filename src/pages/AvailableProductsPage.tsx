@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { activateProductSubscriptionForTest, getAvailableProducts, getUserProducts, productBenefits, type Product, type UserProductAccess } from "@/lib/products";
+import { getAvailableProducts, getUserProducts, productBenefits, type Product, type UserProductAccess } from "@/lib/products";
 
 const productIcons: Record<string, ComponentType<{ className?: string }>> = {
   diagnosticos: BarChart3,
@@ -28,7 +28,6 @@ function AvailableProductsContent({ userId }: { userId: string }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [userProducts, setUserProducts] = useState<UserProductAccess[]>([]);
   const [contractProduct, setContractProduct] = useState<Product | null>(null);
-  const [activatingSlug, setActivatingSlug] = useState<string | null>(null);
 
   async function reload() {
     await Promise.all([getAvailableProducts(), getUserProducts(userId)])
@@ -95,10 +94,8 @@ function AvailableProductsContent({ userId }: { userId: string }) {
       <Dialog open={Boolean(contractProduct)} onOpenChange={(open) => !open && setContractProduct(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Liberar acesso de teste</DialogTitle>
-            <DialogDescription>
-              Nesta etapa, o acesso sera liberado sem pagamento para testes. Depois este fluxo sera substituido pela contratacao via Stripe.
-            </DialogDescription>
+            <DialogTitle>Contratar produto</DialogTitle>
+            <DialogDescription>O acesso sera liberado apos confirmacao segura do pagamento ou por um administrador autorizado.</DialogDescription>
           </DialogHeader>
           <div className="rounded-lg bg-muted p-4 text-sm">
             Produto selecionado: <strong>{contractProduct?.name}</strong>
@@ -106,22 +103,13 @@ function AvailableProductsContent({ userId }: { userId: string }) {
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
             <Button variant="outline" onClick={() => setContractProduct(null)}>Cancelar</Button>
             <Button
-              disabled={!contractProduct || activatingSlug === contractProduct.slug}
+              disabled={!contractProduct}
               onClick={() => {
-                if (!contractProduct) return;
-                setActivatingSlug(contractProduct.slug);
-                void activateProductSubscriptionForTest(contractProduct.slug)
-                  .then(async () => {
-                    toast.success("Acesso liberado. O produto foi adicionado em Meus Produtos.");
-                    setContractProduct(null);
-                    await reload();
-                    window.dispatchEvent(new Event("product-access-updated"));
-                  })
-                  .catch((error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel liberar acesso."))
-                  .finally(() => setActivatingSlug(null));
+                toast.info("Checkout em preparacao. Solicite a liberacao ao suporte ou administrador.");
+                setContractProduct(null);
               }}
             >
-              {contractProduct && activatingSlug === contractProduct.slug ? "Liberando..." : "Liberar acesso"}
+              Solicitar contratacao
             </Button>
           </div>
         </DialogContent>

@@ -516,13 +516,14 @@ export async function getDiagnosticRuntimeByToken(token: string, userId: string)
 
     session = insertedSession;
 
-    await supabase
-      .from("diagnostic_links")
-      .update({
-        uses_count: (link.uses_count ?? 0) + 1,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", link.id);
+    const { error: usageError } = await supabase.rpc("mark_diagnostic_link_used" as any, {
+      p_link_id: link.id,
+      p_user_id: userId,
+    });
+
+    if (usageError) {
+      throw new Error("link_unavailable");
+    }
   }
 
   const { data: answers, error: answersError } = await supabase

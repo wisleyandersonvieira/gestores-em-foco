@@ -1,34 +1,15 @@
-const rawAdminEmails = import.meta.env.VITE_ADMIN_EMAILS ?? "";
+import { supabase } from "@/integrations/supabase/client";
 
-export function getAllowedAdminEmails() {
-  return rawAdminEmails
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-export function isAllowedAdminEmail(email: string | null | undefined) {
-  if (!email) {
+export async function isCurrentUserAdmin() {
+  const { data, error } = await supabase.rpc("is_admin" as any);
+  if (error) {
+    if (import.meta.env.DEV) console.error("Admin access check failed", error);
     return false;
   }
 
-  const allowedEmails = getAllowedAdminEmails();
-  if (allowedEmails.length === 0) {
-    return false;
-  }
-
-  return allowedEmails.includes(email.trim().toLowerCase());
+  return Boolean(data);
 }
 
-export function getAdminAccessError(email: string | null | undefined) {
-  if (!email) {
-    return "Sua conta nao possui um email valido para acesso administrativo.";
-  }
-
-  const allowedEmails = getAllowedAdminEmails();
-  if (allowedEmails.length === 0) {
-    return "A lista de emails administrativos ainda nao foi configurada no ambiente.";
-  }
-
-  return `O email ${email} nao esta autorizado para acessar o painel administrativo.`;
+export function getAdminAccessError() {
+  return "Sua conta nao esta autorizada para acessar o painel administrativo.";
 }

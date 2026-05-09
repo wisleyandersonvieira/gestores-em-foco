@@ -66,7 +66,7 @@ export async function checkProductAccess(userId: string, productSlug: string) {
   });
 
   if (error) {
-    console.error("Erro ao verificar acesso ao produto:", error);
+    if (import.meta.env.DEV) console.error("Erro ao verificar acesso ao produto:", error);
     return false;
   }
 
@@ -91,14 +91,8 @@ export async function getUserProductAccessMap(userId: string) {
 }
 
 export async function activateProductSubscriptionForTest(productSlug: string) {
-  const { error } = await supabase.rpc("activate_product_subscription_for_test", {
-    p_product_slug: productSlug,
-  });
-
-  if (error) {
-    console.error("Erro ao ativar assinatura de teste:", error);
-    throw new Error("Nao foi possivel liberar o acesso de teste.");
-  }
+  void productSlug;
+  throw new Error("A liberacao de produtos precisa ser feita por checkout, webhook ou administrador autorizado.");
 }
 
 export async function createStripeCheckoutSession(_productSlug: string) {
