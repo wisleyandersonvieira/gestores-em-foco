@@ -11,7 +11,7 @@ export default function LoginPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const created = searchParams.get("cadastro") === "sucesso";
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
+  const callbackUrl = searchParams.get("redirect") ?? searchParams.get("callbackUrl") ?? "/dashboard";
   const adminAccessError =
     searchParams.get("erro") === "admin_email" ? getAdminAccessError(searchParams.get("email")) : null;
   const [error, setError] = useState<string | null>(null);
