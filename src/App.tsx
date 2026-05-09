@@ -50,6 +50,12 @@ export default function App() {
       <Route path="/minha-conta" element={<AccountPage />} />
       <Route path="/minha-conta/diagnostico/:sessionId/resultado" element={<DiagnosticReportPage />} />
       <Route path="/admin" element={<AdminPage />} />
+      <Route path="/admin/produtos" element={<AdminPage />} />
+      <Route path="/admin/produtos/diagnostico" element={<AdminPage />} />
+      <Route path="/admin/produtos/dre" element={<AdminPage />} />
+      <Route path="/admin/usuarios" element={<AdminPage />} />
+      <Route path="/admin/acessos" element={<AdminPage />} />
+      <Route path="/admin/suporte" element={<AdminPage />} />
       <Route path="/diagnostico/:token" element={<DiagnosticPage />} />
       <Route path="/termos-de-uso" element={<PlaceholderLegalPage title="Termos de Uso" />} />
       <Route path="/politica-de-privacidade" element={<PlaceholderLegalPage title="Politica de Privacidade" />} />

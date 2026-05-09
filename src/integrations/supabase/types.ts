@@ -1110,9 +1110,14 @@ export type Database = {
       }
       support_requests: {
         Row: {
+          admin_notes: string | null
           created_at: string
           id: string
           message: string
+          priority: string
+          product_slug: string | null
+          solved_at: string | null
+          solved_by: string | null
           status: string
           subject: string
           type: string
@@ -1120,9 +1125,14 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          admin_notes?: string | null
           created_at?: string
           id?: string
           message: string
+          priority?: string
+          product_slug?: string | null
+          solved_at?: string | null
+          solved_by?: string | null
           status?: string
           subject: string
           type: string
@@ -1130,14 +1140,61 @@ export type Database = {
           user_id: string
         }
         Update: {
+          admin_notes?: string | null
           created_at?: string
           id?: string
           message?: string
+          priority?: string
+          product_slug?: string | null
+          solved_at?: string | null
+          solved_by?: string | null
           status?: string
           subject?: string
           type?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      site_access_logs: {
+        Row: {
+          access_type: string
+          created_at: string
+          id: string
+          ip_hash: string | null
+          page_title: string | null
+          path: string | null
+          product_slug: string | null
+          referrer: string | null
+          session_id: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          access_type?: string
+          created_at?: string
+          id?: string
+          ip_hash?: string | null
+          page_title?: string | null
+          path?: string | null
+          product_slug?: string | null
+          referrer?: string | null
+          session_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          access_type?: string
+          created_at?: string
+          id?: string
+          ip_hash?: string | null
+          page_title?: string | null
+          path?: string | null
+          product_slug?: string | null
+          referrer?: string | null
+          session_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
