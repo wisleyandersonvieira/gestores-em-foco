@@ -31,6 +31,7 @@ import {
   type UserPreferences,
   type UserProfile,
 } from "@/lib/account-settings";
+import { applyTheme, normalizeTheme, storeTheme, type Theme } from "@/lib/theme";
 import type { UserProductAccess } from "@/lib/products";
 
 const settingsCards = [
@@ -94,9 +95,27 @@ function SettingsContent({ user }: { user: User }) {
 
   async function savePreferences(nextPreferences = preferences) {
     if (!nextPreferences) return;
-    const saved = await updateUserPreferences(user.id, nextPreferences);
+    const safePreferences = { ...nextPreferences, theme: normalizeTheme(nextPreferences.theme) };
+    const saved = await updateUserPreferences(user.id, safePreferences);
     setPreferences(saved);
     toast.success("Preferencias salvas.");
+  }
+
+  async function saveAppearance() {
+    if (!preferences) return;
+
+    const theme = normalizeTheme(preferences.theme);
+    const saved = await updateUserPreferences(user.id, {
+      ...preferences,
+      theme,
+      density: preferences.density || "default",
+    });
+
+    const savedTheme = normalizeTheme(saved.theme);
+    setPreferences({ ...saved, theme: savedTheme });
+    storeTheme(savedTheme);
+    applyTheme(savedTheme);
+    toast.success("Preferências de aparência salvas com sucesso.");
   }
 
   async function saveNotifications(nextNotifications = notifications) {
@@ -208,9 +227,9 @@ function SettingsContent({ user }: { user: User }) {
           <SettingsCard title="Aparencia" description="Personalize a forma como a plataforma e exibida.">
             {preferences ? (
               <div className="grid gap-4 md:grid-cols-2">
-                <SelectField label="Tema" value={preferences.theme} onChange={(value) => setPreferences({ ...preferences, theme: value })} options={[["light", "Tema claro"], ["dark", "Tema escuro"], ["system", "Preferencia do sistema"]]} />
-                <SelectField label="Tamanho da interface" value={preferences.density} onChange={(value) => setPreferences({ ...preferences, density: value })} options={[["compact", "Compacto"], ["default", "Padrao"], ["comfortable", "Confortavel"]]} />
-                <Button className="w-fit" onClick={() => void savePreferences().catch((error) => toast.error(error.message))}>Salvar aparencia</Button>
+                <SelectField label="Tema" value={normalizeTheme(preferences.theme)} onChange={(value) => setPreferences({ ...preferences, theme: value as Theme })} options={[["light", "Tema claro"], ["dark", "Tema escuro"]]} />
+                <SelectField label="Tamanho da interface" value={preferences.density || "default"} onChange={(value) => setPreferences({ ...preferences, density: value })} options={[["default", "Padrao"]]} />
+                <Button className="w-fit" onClick={() => void saveAppearance().catch((error) => toast.error(error.message))}>Salvar aparencia</Button>
               </div>
             ) : null}
           </SettingsCard>

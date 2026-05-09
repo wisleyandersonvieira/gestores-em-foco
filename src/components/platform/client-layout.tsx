@@ -6,6 +6,7 @@ import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { useTheme } from "@/hooks/use-theme";
 import { getUserProductAccessMap, PRODUCT_SLUGS } from "@/lib/products";
 
 const generalNavigation = [
@@ -37,7 +38,7 @@ function NavItems({ productAccess, onNavigate }: { productAccess: Set<string>; o
           onClick={onNavigate}
           className={({ isActive }) =>
             `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
-              isActive ? "bg-accent text-accent-foreground" : "text-primary-foreground/78 hover:bg-white/10 hover:text-white"
+              isActive ? "bg-accent text-accent-foreground" : "text-sidebar-foreground/78 hover:bg-white/10 hover:text-white"
             }`
           }
         >
@@ -55,6 +56,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [productAccess, setProductAccess] = useState<Set<string>>(new Set());
+  useTheme(user?.id);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -108,17 +110,17 @@ export function ClientLayout({ children }: ClientLayoutProps) {
 
   return (
     <div className="min-h-screen bg-background md:grid md:grid-cols-[260px_1fr]">
-      <aside className="hidden bg-primary text-primary-foreground md:block">
+      <aside className="hidden bg-sidebar text-sidebar-foreground md:block">
         <div className="sticky top-0 flex h-screen flex-col px-5 py-6">
           <Link to="/dashboard" className="mb-8 flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-accent text-sm font-bold text-accent-foreground">GF</div>
             <div>
               <p className="font-display text-base font-semibold uppercase tracking-wide">Gestores em Foco</p>
-              <p className="text-xs text-primary-foreground/65">Area do cliente</p>
+              <p className="text-xs text-sidebar-foreground/65">Area do cliente</p>
             </div>
           </Link>
           <NavItems productAccess={productAccess} />
-          <Button variant="ghost" className="mt-auto justify-start gap-3 text-primary-foreground/78 hover:bg-white/10 hover:text-white" onClick={handleSignOut}>
+          <Button variant="ghost" className="mt-auto justify-start gap-3 text-sidebar-foreground/78 hover:bg-white/10 hover:text-white" onClick={handleSignOut}>
             <LogOut className="h-4 w-4" />
             Sair
           </Button>
@@ -136,14 +138,14 @@ export function ClientLayout({ children }: ClientLayoutProps) {
                   <span className="sr-only">Abrir menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-80 bg-primary text-primary-foreground">
+              <SheetContent side="left" className="w-80 bg-sidebar text-sidebar-foreground">
                 <div className="mt-8 grid gap-8">
                   <div>
                     <p className="font-display text-lg font-semibold uppercase tracking-wide">Gestores em Foco</p>
-                    <p className="text-sm text-primary-foreground/65">{user.email}</p>
+                    <p className="text-sm text-sidebar-foreground/65">{user.email}</p>
                   </div>
                   <NavItems productAccess={productAccess} onNavigate={() => setOpen(false)} />
-                  <Button variant="ghost" className="justify-start gap-3 text-primary-foreground/78 hover:bg-white/10 hover:text-white" onClick={handleSignOut}>
+                  <Button variant="ghost" className="justify-start gap-3 text-sidebar-foreground/78 hover:bg-white/10 hover:text-white" onClick={handleSignOut}>
                     <LogOut className="h-4 w-4" />
                     Sair
                   </Button>
