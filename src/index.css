@@ -22,6 +22,9 @@
     --accent-foreground: 24 100% 12%;
     --destructive: 0 76% 55%;
     --destructive-foreground: 210 40% 98%;
+    --danger-color: #dc2626;
+    --danger-bg: #fff5f5;
+    --danger-border: #fecaca;
     --border: 214 29% 86%;
     --input: 214 29% 86%;
     --ring: 219 71% 28%;
@@ -54,6 +57,9 @@
     --accent-foreground: 24 100% 12%;
     --destructive: 0 73% 54%;
     --destructive-foreground: 210 40% 98%;
+    --danger-color: #f87171;
+    --danger-bg: rgba(127, 29, 29, 0.25);
+    --danger-border: rgba(248, 113, 113, 0.35);
     --border: 215 25% 27%;
     --input: 215 25% 27%;
     --ring: 217 91% 60%;

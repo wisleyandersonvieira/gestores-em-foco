@@ -20,7 +20,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -46,6 +46,15 @@ import {
   type UserProfile,
 } from "@/lib/account-settings";
 import { validatePassword } from "@/lib/password-security";
+import {
+  cancelPrivacyRequest,
+  createPrivacyRequest,
+  downloadJson,
+  exportUserData,
+  getActiveDeletionRequest,
+  getPrivacyRequests,
+  type PrivacyRequest,
+} from "@/lib/privacy-requests";
 import { applyTheme, normalizeTheme, storeTheme, type Theme } from "@/lib/theme";
 import type { UserProductAccess } from "@/lib/products";
 
@@ -75,6 +84,7 @@ function SettingsContent({ user }: { user: User }) {
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
   const [notifications, setNotifications] = useState<UserNotificationPreferences | null>(null);
   const [subscriptions, setSubscriptions] = useState<UserProductAccess[]>([]);
+  const [privacyRequests, setPrivacyRequests] = useState<PrivacyRequest[]>([]);
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
@@ -85,10 +95,14 @@ function SettingsContent({ user }: { user: User }) {
   const [isSendingResetLink, setIsSendingResetLink] = useState(false);
   const [isRefreshingSession, setIsRefreshingSession] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isRequestingExport, setIsRequestingExport] = useState(false);
+  const [isRequestingDeletion, setIsRequestingDeletion] = useState(false);
+  const [isCancelingDeletion, setIsCancelingDeletion] = useState(false);
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
   const [currentUser, setCurrentUser] = useState<User>(user);
   const [support, setSupport] = useState({ subject: "", message: "", type: "duvida" });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
 
   useEffect(() => {
     void Promise.all([
@@ -96,8 +110,9 @@ function SettingsContent({ user }: { user: User }) {
       getUserPreferences(user.id),
       getNotificationPreferences(user.id),
       getUserSubscriptions(user.id),
+      getPrivacyRequests(user.id),
     ])
-      .then(([nextProfile, nextPreferences, nextNotifications, nextSubscriptions]) => {
+      .then(([nextProfile, nextPreferences, nextNotifications, nextSubscriptions, nextPrivacyRequests]) => {
         setProfile({
           ...nextProfile,
           full_name: nextProfile.full_name || String(user.user_metadata?.name ?? user.user_metadata?.full_name ?? ""),
@@ -107,6 +122,7 @@ function SettingsContent({ user }: { user: User }) {
         setPreferences(nextPreferences);
         setNotifications(nextNotifications);
         setSubscriptions(nextSubscriptions);
+        setPrivacyRequests(nextPrivacyRequests);
       })
       .catch((error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel carregar configuracoes."));
   }, [user]);
@@ -275,6 +291,56 @@ function SettingsContent({ user }: { user: User }) {
     toast.success("Sua solicitacao foi enviada com sucesso.");
   }
 
+  async function reloadPrivacyRequests() {
+    const nextRequests = await getPrivacyRequests(user.id);
+    setPrivacyRequests(nextRequests);
+    return nextRequests;
+  }
+
+  async function handleRequestExport() {
+    setIsRequestingExport(true);
+    try {
+      const data = await exportUserData(currentUser);
+      downloadJson(data, `meus-dados-${new Date().toISOString().slice(0, 10)}.json`);
+      await createPrivacyRequest(user.id, "export", "completed");
+      await reloadPrivacyRequests();
+      toast.success("Seus dados foram exportados com sucesso.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel registrar a solicitacao de exportacao.");
+    } finally {
+      setIsRequestingExport(false);
+    }
+  }
+
+  async function handleRequestAccountDeletion() {
+    setIsRequestingDeletion(true);
+    try {
+      // A exclusao definitiva deve acontecer somente em backend seguro, Edge Function ou fluxo administrativo com service role protegida.
+      await createPrivacyRequest(user.id, "account_deletion", "pending");
+      await reloadPrivacyRequests();
+      setDeleteDialogOpen(false);
+      setDeleteConfirmation("");
+      toast.success("Sua solicitação de exclusão foi registrada. Nossa equipe analisará o pedido.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel registrar a solicitacao de exclusao.");
+    } finally {
+      setIsRequestingDeletion(false);
+    }
+  }
+
+  async function handleCancelDeletionRequest(requestId: string) {
+    setIsCancelingDeletion(true);
+    try {
+      await cancelPrivacyRequest(user.id, requestId);
+      await reloadPrivacyRequests();
+      toast.success("Solicitação cancelada com sucesso.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel cancelar a solicitacao.");
+    } finally {
+      setIsCancelingDeletion(false);
+    }
+  }
+
   return (
     <div className="space-y-8">
       <div>
@@ -343,7 +409,7 @@ function SettingsContent({ user }: { user: User }) {
                       </AlertDialogContent>
                     </AlertDialog>
                   ) : null}
-                  <p className="text-xs text-muted-foreground sm:basis-full">JPG, PNG ou WEBP com ate 2 MB.</p>
+                  <p className="text-xs text-muted-foreground sm:basis-full">JPG, PNG ou WEBP com ate 5 MB.</p>
                 </div>
               </div>
               <div className="grid gap-4 md:grid-cols-2">
@@ -474,14 +540,65 @@ function SettingsContent({ user }: { user: User }) {
 
         <TabsContent value="privacidade">
           <SettingsCard title="Privacidade e dados" description="Gerencie seus dados e preferencias de privacidade.">
-            <div className="grid gap-4 lg:grid-cols-2">
-              <Placeholder title="Exportar meus dados" text="Exportacao de dados sera implementada em breve." action="Solicitar exportacao" />
-              <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4">
-                <p className="font-semibold text-destructive">Zona de risco</p>
-                <p className="mt-2 text-sm text-muted-foreground">A exclusao pode remover acesso aos produtos, dados e historico.</p>
-                <Button className="mt-4" variant="destructive" onClick={() => setDeleteDialogOpen(true)}>Solicitar exclusao da conta</Button>
+            <div className="space-y-5">
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="rounded-lg border bg-card p-4 text-card-foreground">
+                  <p className="font-semibold">Exportar meus dados</p>
+                  <p className="mt-2 text-sm text-muted-foreground">Baixe ou solicite uma copia dos dados vinculados a sua conta.</p>
+                  <Button className="mt-4 w-full sm:w-fit" disabled={isRequestingExport} onClick={() => void handleRequestExport()}>
+                    {isRequestingExport ? "Solicitando..." : "Solicitar exportacao"}
+                  </Button>
+                </div>
+
+                <div className="rounded-lg border border-[var(--danger-border)] bg-[var(--danger-bg)] p-4">
+                  <p className="font-semibold text-[var(--danger-color)]">Zona de risco</p>
+                  <p className="mt-2 text-sm text-muted-foreground">A exclusao pode remover seu acesso aos produtos, dados cadastrados e historico da plataforma.</p>
+                  {getActiveDeletionRequest(privacyRequests) ? (
+                    <div className="mt-4 rounded-lg border border-[var(--danger-border)] bg-background/60 p-3 text-sm">
+                      <p className="font-medium text-[var(--danger-color)]">Voce possui uma solicitacao de exclusao em andamento.</p>
+                      <Button
+                        className="mt-3 w-full sm:w-fit"
+                        variant="outline"
+                        disabled={isCancelingDeletion}
+                        onClick={() => {
+                          const activeRequest = getActiveDeletionRequest(privacyRequests);
+                          if (activeRequest) void handleCancelDeletionRequest(activeRequest.id);
+                        }}
+                      >
+                        {isCancelingDeletion ? "Cancelando..." : "Cancelar solicitacao"}
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button className="mt-4 w-full sm:w-fit" variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
+                      Solicitar exclusao da conta
+                    </Button>
+                  )}
+                </div>
               </div>
-              <Button asChild variant="outline" className="w-fit"><Link to="/politica-de-privacidade">Ver politica de privacidade</Link></Button>
+
+              <Button asChild variant="outline" className="w-full sm:w-fit"><Link to="/politica-de-privacidade">Ver politica de privacidade</Link></Button>
+
+              <div className="rounded-lg border bg-card p-4 text-card-foreground">
+                <p className="font-semibold">Historico de solicitacoes</p>
+                {privacyRequests.length === 0 ? (
+                  <p className="mt-3 text-sm text-muted-foreground">Nenhuma solicitacao registrada.</p>
+                ) : (
+                  <div className="mt-4 grid gap-2">
+                    <div className="hidden grid-cols-3 gap-3 border-b pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:grid">
+                      <span>Tipo</span>
+                      <span>Status</span>
+                      <span>Solicitado em</span>
+                    </div>
+                    {privacyRequests.map((request) => (
+                      <div key={request.id} className="grid gap-2 rounded-lg border bg-background/60 p-3 text-sm sm:grid-cols-3 sm:border-0 sm:bg-transparent sm:p-0">
+                        <span><span className="text-muted-foreground sm:hidden">Tipo: </span>{privacyRequestTypeLabel(request.request_type)}</span>
+                        <span><Badge variant="outline">{privacyRequestStatusLabel(request.status)}</Badge></span>
+                        <span className="text-muted-foreground">{formatDateTime(request.requested_at)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </SettingsCard>
         </TabsContent>
@@ -510,9 +627,20 @@ function SettingsContent({ user }: { user: User }) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Solicitar exclusao da conta</DialogTitle>
-            <DialogDescription>Essa acao pode remover acesso aos produtos, dados e historico. Nesta etapa, a exclusao real ainda nao sera executada automaticamente.</DialogDescription>
+            <DialogDescription>
+              A exclusao da conta pode remover seu acesso aos produtos contratados, dados cadastrados, historico de uso e configuracoes da plataforma. Essa acao pode ser irreversivel apos processamento.
+            </DialogDescription>
           </DialogHeader>
-          <Button variant="destructive" onClick={() => { setDeleteDialogOpen(false); toast.success("Solicitacao de exclusao registrada. Esta funcionalidade sera concluida em etapa futura."); }}>Confirmar solicitacao</Button>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">Por seguranca, sua solicitacao sera analisada antes da exclusao definitiva.</p>
+            <Label>Para continuar, digite: EXCLUIR<Input className="mt-2" value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} /></Label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancelar</Button>
+            <Button variant="destructive" disabled={deleteConfirmation !== "EXCLUIR" || isRequestingDeletion} onClick={() => void handleRequestAccountDeletion()}>
+              {isRequestingDeletion ? "Registrando..." : "Confirmar solicitacao"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
@@ -704,4 +832,25 @@ function formatDateTime(value?: string | null) {
 function maskUserId(value: string) {
   if (value.length <= 12) return value;
   return `${value.slice(0, 8)}...${value.slice(-4)}`;
+}
+
+function privacyRequestTypeLabel(value: string) {
+  const labels: Record<string, string> = {
+    export: "Exportacao",
+    account_deletion: "Exclusao da conta",
+  };
+
+  return labels[value] ?? value;
+}
+
+function privacyRequestStatusLabel(value: string) {
+  const labels: Record<string, string> = {
+    pending: "Pendente",
+    processing: "Em processamento",
+    completed: "Concluida",
+    rejected: "Rejeitada",
+    canceled: "Cancelada",
+  };
+
+  return labels[value] ?? value;
 }

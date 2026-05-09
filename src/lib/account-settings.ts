@@ -9,7 +9,7 @@ export type UserNotificationPreferences = Tables<"user_notification_preferences"
 export type SupportRequestInsert = TablesInsert<"support_requests">;
 
 const AVATAR_BUCKET = "avatars";
-const AVATAR_MAX_SIZE_BYTES = 2 * 1024 * 1024;
+const AVATAR_MAX_SIZE_BYTES = 5 * 1024 * 1024;
 const AVATAR_ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 export async function getUserProfile(userId: string) {
@@ -39,7 +39,7 @@ export async function updateUserProfile(userId: string, data: TablesUpdate<"user
 
 export function validateAvatarFile(file: File) {
   if (!AVATAR_ALLOWED_TYPES.has(file.type) || file.size > AVATAR_MAX_SIZE_BYTES) {
-    return "Envie uma imagem em JPG, PNG ou WEBP com até 2 MB.";
+    return "Envie uma imagem em JPG, PNG ou WEBP com até 5 MB.";
   }
 
   return null;
