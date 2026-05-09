@@ -22,9 +22,10 @@ export async function getUserProfile(userId: string) {
 export async function updateUserProfile(userId: string, data: TablesUpdate<"user_profiles">) {
   if (!String(data.full_name ?? "").trim()) throw new Error("Informe o nome completo.");
 
+  const payload = sanitizeUpsertPayload(data);
   const { data: saved, error } = await supabase
     .from("user_profiles")
-    .upsert({ ...data, user_id: userId }, { onConflict: "user_id" })
+    .upsert({ ...payload, user_id: userId }, { onConflict: "user_id" })
     .select("*")
     .single();
 
@@ -44,13 +45,17 @@ export async function getUserPreferences(userId: string) {
 }
 
 export async function updateUserPreferences(userId: string, data: TablesUpdate<"user_preferences">) {
+  const payload = sanitizeUpsertPayload(data);
   const { data: saved, error } = await supabase
     .from("user_preferences")
-    .upsert({ ...data, user_id: userId }, { onConflict: "user_id" })
+    .upsert({ ...payload, user_id: userId }, { onConflict: "user_id" })
     .select("*")
     .single();
 
-  if (error) throw new Error("Nao foi possivel salvar preferencias.");
+  if (error) {
+    if (import.meta.env.DEV) console.error("User preferences upsert failed", error);
+    throw new Error("Nao foi possivel salvar preferencias.");
+  }
   return saved;
 }
 
@@ -66,7 +71,7 @@ export async function getNotificationPreferences(userId: string) {
 }
 
 export async function updateNotificationPreferences(userId: string, data: TablesUpdate<"user_notification_preferences">) {
-  const payload = { ...data, user_id: userId, security_alerts: true };
+  const payload = { ...sanitizeUpsertPayload(data), user_id: userId, security_alerts: true };
   const { data: saved, error } = await supabase
     .from("user_notification_preferences")
     .upsert(payload, { onConflict: "user_id" })
@@ -156,4 +161,9 @@ function createDefaultNotifications(userId: string): UserNotificationPreferences
     created_at: now,
     updated_at: now,
   };
+}
+
+function sanitizeUpsertPayload<T extends { id?: string | null; created_at?: string | null; updated_at?: string | null }>(data: T) {
+  const { id: _id, created_at: _createdAt, updated_at: _updatedAt, ...payload } = data;
+  return payload;
 }
