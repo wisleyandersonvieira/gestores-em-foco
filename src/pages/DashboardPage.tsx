@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, BarChart3, Bell, Package } from "lucide-react";
+import { ArrowRight, Bell, Package } from "lucide-react";
 
 import { ClientLayout } from "@/components/platform/client-layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getUserProducts, PRODUCT_SLUGS, type UserProductAccess } from "@/lib/products";
+import { getUserProducts, type UserProductAccess } from "@/lib/products";
 
 export default function DashboardPage() {
   return (
@@ -24,19 +24,18 @@ function DashboardContent({ userId, name }: { userId: string; name: string }) {
   }, [userId]);
 
   const activeProducts = useMemo(() => products.length, [products]);
-  const hasDiagnostics = useMemo(() => products.some((product) => product.product_slug === PRODUCT_SLUGS.diagnostics), [products]);
   const quickAccess = products.slice(0, 3);
 
   return (
     <div className="space-y-8">
       <div>
         <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary">Dashboard do Cliente</p>
-        <h1 className="font-display mt-3 text-3xl font-semibold md:text-4xl">Ola, {name}! 👋</h1>
+        <h1 className="font-display mt-3 text-3xl font-semibold md:text-4xl">Olá, {name}!</h1>
       </div>
 
       {error ? <Card className="border-destructive/20 bg-destructive/10"><CardContent className="p-5 text-sm text-destructive">{error}</CardContent></Card> : null}
 
-      <div className="grid gap-5 md:grid-cols-2">
+      <div className="grid max-w-md gap-5">
         <Card className="border-primary/10 bg-white/90">
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <div>
@@ -44,15 +43,6 @@ function DashboardContent({ userId, name }: { userId: string; name: string }) {
               <CardTitle className="mt-2 text-4xl">{activeProducts}</CardTitle>
             </div>
             <Package className="h-9 w-9 text-accent" />
-          </CardHeader>
-        </Card>
-        <Card className="border-primary/10 bg-white/90">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <div>
-              <CardDescription>Acesso a Diagnosticos</CardDescription>
-              <CardTitle className="mt-2 text-4xl">{hasDiagnostics ? "Ativo" : "-"}</CardTitle>
-            </div>
-            <BarChart3 className="h-9 w-9 text-accent" />
           </CardHeader>
         </Card>
       </div>

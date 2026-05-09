@@ -8,12 +8,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { supabase } from "@/integrations/supabase/client";
 import { formatCoursePrice, getPublishedCourses, type Course } from "@/lib/courses";
 
 export default function PublicCoursesPage() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
     document.title = "Cursos Online de Gestão Empresarial";
@@ -23,6 +25,18 @@ export default function PublicCoursesPage() {
       .then(setCourses)
       .catch(() => setCourses([]))
       .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setIsAuthenticated(Boolean(session?.user));
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(Boolean(session?.user));
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const filteredCourses = useMemo(() => {
@@ -111,7 +125,7 @@ export default function PublicCoursesPage() {
           ) : (
             <div className="grid max-w-5xl gap-6 md:grid-cols-2 xl:max-w-none xl:grid-cols-3 2xl:grid-cols-4">
               {filteredCourses.map((course) => (
-                <CourseShelfCard key={course.id} course={course} />
+                <CourseShelfCard key={course.id} course={course} isAuthenticated={isAuthenticated} />
               ))}
             </div>
           )}
@@ -122,7 +136,10 @@ export default function PublicCoursesPage() {
   );
 }
 
-function CourseShelfCard({ course }: { course: Course }) {
+function CourseShelfCard({ course, isAuthenticated }: { course: Course; isAuthenticated: boolean }) {
+  const coursePath = `/cursos/${course.slug}`;
+  const href = isAuthenticated ? coursePath : `/login?redirect=${encodeURIComponent(coursePath)}`;
+
   return (
     <Card className="flex h-full overflow-hidden border-primary/10 bg-card shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
       <div className="flex w-full flex-col">
@@ -148,8 +165,8 @@ function CourseShelfCard({ course }: { course: Course }) {
         </CardHeader>
         <CardContent className="mt-auto p-5 pt-0">
           <Button asChild className="w-full bg-primary hover:bg-primary/90">
-            <Link to={`/login?redirect=${encodeURIComponent(`/cursos/${course.slug}`)}`}>
-              Entrar para acessar
+            <Link to={href}>
+              {isAuthenticated ? "Acessar curso" : "Entrar para acessar"}
               <ArrowRight className="h-4 w-4" />
             </Link>
           </Button>
