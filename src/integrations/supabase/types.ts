@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_users: {
+        Row: {
+          created_at: string
+          id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      audit_logs: {
+        Row: {
+          action: string
+          actor_user_id: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          metadata: Json | null
+        }
+        Insert: {
+          action: string
+          actor_user_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          metadata?: Json | null
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          metadata?: Json | null
+        }
+        Relationships: []
+      }
       diagnostic_answers: {
         Row: {
           answer_json: Json | null
@@ -752,6 +803,48 @@ export type Database = {
           },
         ]
       }
+      privacy_requests: {
+        Row: {
+          created_at: string
+          export_format: string | null
+          file_url: string | null
+          id: string
+          notes: string | null
+          processed_at: string | null
+          request_type: string
+          requested_at: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          export_format?: string | null
+          file_url?: string | null
+          id?: string
+          notes?: string | null
+          processed_at?: string | null
+          request_type: string
+          requested_at?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          export_format?: string | null
+          file_url?: string | null
+          id?: string
+          notes?: string | null
+          processed_at?: string | null
+          request_type?: string
+          requested_at?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       product_subscriptions: {
         Row: {
           created_at: string
@@ -887,147 +980,91 @@ export type Database = {
         }
         Relationships: []
       }
-      user_product_subscriptions: {
+      site_access_logs: {
         Row: {
           access_type: string
-          canceled_at: string | null
           created_at: string
-          current_period_end: string | null
-          current_period_start: string | null
           id: string
-          plan_name: string | null
-          product_id: string
-          product_slug: string
-          status: string
-          stripe_customer_id: string | null
-          stripe_price_id: string | null
-          stripe_subscription_id: string | null
-          trial_ends_at: string | null
-          updated_at: string
-          user_id: string
+          ip_hash: string | null
+          page_title: string | null
+          path: string | null
+          product_slug: string | null
+          referrer: string | null
+          session_id: string | null
+          user_agent: string | null
+          user_id: string | null
         }
         Insert: {
           access_type?: string
-          canceled_at?: string | null
           created_at?: string
-          current_period_end?: string | null
-          current_period_start?: string | null
           id?: string
-          plan_name?: string | null
-          product_id: string
-          product_slug: string
-          status?: string
-          stripe_customer_id?: string | null
-          stripe_price_id?: string | null
-          stripe_subscription_id?: string | null
-          trial_ends_at?: string | null
-          updated_at?: string
-          user_id: string
+          ip_hash?: string | null
+          page_title?: string | null
+          path?: string | null
+          product_slug?: string | null
+          referrer?: string | null
+          session_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
         }
         Update: {
           access_type?: string
-          canceled_at?: string | null
           created_at?: string
-          current_period_end?: string | null
-          current_period_start?: string | null
           id?: string
-          plan_name?: string | null
-          product_id?: string
-          product_slug?: string
-          status?: string
-          stripe_customer_id?: string | null
-          stripe_price_id?: string | null
-          stripe_subscription_id?: string | null
-          trial_ends_at?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_product_subscriptions_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      privacy_requests: {
-        Row: {
-          created_at: string
-          export_format: string | null
-          file_url: string | null
-          id: string
-          notes: string | null
-          processed_at: string | null
-          request_type: string
-          requested_at: string
-          status: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          export_format?: string | null
-          file_url?: string | null
-          id?: string
-          notes?: string | null
-          processed_at?: string | null
-          request_type: string
-          requested_at?: string
-          status?: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          export_format?: string | null
-          file_url?: string | null
-          id?: string
-          notes?: string | null
-          processed_at?: string | null
-          request_type?: string
-          requested_at?: string
-          status?: string
-          updated_at?: string
-          user_id?: string
+          ip_hash?: string | null
+          page_title?: string | null
+          path?: string | null
+          product_slug?: string | null
+          referrer?: string | null
+          session_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
-      user_profiles: {
+      support_requests: {
         Row: {
-          avatar_path: string | null
-          avatar_url: string | null
-          company_name: string | null
+          admin_notes: string | null
           created_at: string
-          full_name: string | null
           id: string
-          phone: string | null
-          role: string | null
+          message: string
+          priority: string
+          product_slug: string | null
+          solved_at: string | null
+          solved_by: string | null
+          status: string
+          subject: string
+          type: string
           updated_at: string
           user_id: string
         }
         Insert: {
-          avatar_path?: string | null
-          avatar_url?: string | null
-          company_name?: string | null
+          admin_notes?: string | null
           created_at?: string
-          full_name?: string | null
           id?: string
-          phone?: string | null
-          role?: string | null
+          message: string
+          priority?: string
+          product_slug?: string | null
+          solved_at?: string | null
+          solved_by?: string | null
+          status?: string
+          subject: string
+          type: string
           updated_at?: string
           user_id: string
         }
         Update: {
-          avatar_path?: string | null
-          avatar_url?: string | null
-          company_name?: string | null
+          admin_notes?: string | null
           created_at?: string
-          full_name?: string | null
           id?: string
-          phone?: string | null
-          role?: string | null
+          message?: string
+          priority?: string
+          product_slug?: string | null
+          solved_at?: string | null
+          solved_by?: string | null
+          status?: string
+          subject?: string
+          type?: string
           updated_at?: string
           user_id?: string
         }
@@ -1108,95 +1145,70 @@ export type Database = {
         }
         Relationships: []
       }
-      support_requests: {
+      user_product_subscriptions: {
         Row: {
-          admin_notes: string | null
+          access_type: string
+          canceled_at: string | null
           created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
           id: string
-          message: string
-          priority: string
-          product_slug: string | null
-          solved_at: string | null
-          solved_by: string | null
+          plan_name: string | null
+          product_id: string
+          product_slug: string
           status: string
-          subject: string
-          type: string
+          stripe_customer_id: string | null
+          stripe_price_id: string | null
+          stripe_subscription_id: string | null
+          trial_ends_at: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
-          admin_notes?: string | null
+          access_type?: string
+          canceled_at?: string | null
           created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
           id?: string
-          message: string
-          priority?: string
-          product_slug?: string | null
-          solved_at?: string | null
-          solved_by?: string | null
+          plan_name?: string | null
+          product_id: string
+          product_slug: string
           status?: string
-          subject: string
-          type: string
+          stripe_customer_id?: string | null
+          stripe_price_id?: string | null
+          stripe_subscription_id?: string | null
+          trial_ends_at?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
-          admin_notes?: string | null
+          access_type?: string
+          canceled_at?: string | null
           created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
           id?: string
-          message?: string
-          priority?: string
-          product_slug?: string | null
-          solved_at?: string | null
-          solved_by?: string | null
+          plan_name?: string | null
+          product_id?: string
+          product_slug?: string
           status?: string
-          subject?: string
-          type?: string
+          stripe_customer_id?: string | null
+          stripe_price_id?: string | null
+          stripe_subscription_id?: string | null
+          trial_ends_at?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
-      }
-      site_access_logs: {
-        Row: {
-          access_type: string
-          created_at: string
-          id: string
-          ip_hash: string | null
-          page_title: string | null
-          path: string | null
-          product_slug: string | null
-          referrer: string | null
-          session_id: string | null
-          user_agent: string | null
-          user_id: string | null
-        }
-        Insert: {
-          access_type?: string
-          created_at?: string
-          id?: string
-          ip_hash?: string | null
-          page_title?: string | null
-          path?: string | null
-          product_slug?: string | null
-          referrer?: string | null
-          session_id?: string | null
-          user_agent?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          access_type?: string
-          created_at?: string
-          id?: string
-          ip_hash?: string | null
-          page_title?: string | null
-          path?: string | null
-          product_slug?: string | null
-          referrer?: string | null
-          session_id?: string | null
-          user_agent?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_product_subscriptions_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_products: {
         Row: {
@@ -1230,6 +1242,45 @@ export type Database = {
           product_type?: Database["public"]["Enums"]["product_type"]
           purchased_at?: string
           status?: Database["public"]["Enums"]["user_product_status"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_profiles: {
+        Row: {
+          avatar_path: string | null
+          avatar_url: string | null
+          company_name: string | null
+          created_at: string
+          full_name: string | null
+          id: string
+          phone: string | null
+          role: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_path?: string | null
+          avatar_url?: string | null
+          company_name?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          role?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_path?: string | null
+          avatar_url?: string | null
+          company_name?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          role?: string | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -1313,6 +1364,10 @@ export type Database = {
         Returns: undefined
       }
       is_admin: { Args: never; Returns: boolean }
+      mark_diagnostic_link_used: {
+        Args: { p_link_id: string; p_user_id: string }
+        Returns: undefined
+      }
       user_can_access_template: {
         Args: { p_template_id: string }
         Returns: boolean
