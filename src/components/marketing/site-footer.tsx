@@ -12,11 +12,11 @@ export function SiteFooter() {
           </p>
         </div>
         <div className="grid gap-3 text-sm text-primary-foreground/80">
-          <a href="#produtos" className="transition hover:text-white">Produtos</a>
-          <a href="#quem-somos" className="transition hover:text-white">Quem somos</a>
+          <a href="/#produtos" className="transition hover:text-white">Produtos</a>
+          <a href="/#quem-somos" className="transition hover:text-white">Quem somos</a>
           <Link to="/entrar" className="transition hover:text-white">Acessar conta</Link>
           <Link to="/termos-de-uso" className="transition hover:text-white">Termos de Uso</Link>
-          <Link to="/politica-de-privacidade" className="transition hover:text-white">Politica de Privacidade</Link>
+          <Link to="/politica-de-privacidade" className="transition hover:text-white">Política de Privacidade</Link>
         </div>
         <div>
           <p className="text-sm font-semibold">Redes sociais</p>

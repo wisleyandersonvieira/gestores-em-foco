@@ -4,10 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 const navigation = [
-  { href: "/", label: "Inicio" },
-  { href: "#produtos", label: "Produtos" },
-  { href: "#quem-somos", label: "Sobre" },
-  { href: "#contato", label: "Contato" },
+  { href: "/", label: "Início" },
+  { href: "/#produtos", label: "Produtos" },
+  { href: "/#quem-somos", label: "Sobre" },
+  { href: "/#contato", label: "Contato" },
 ];
 
 export function SiteHeader() {

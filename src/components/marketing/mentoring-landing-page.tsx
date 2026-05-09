@@ -4,9 +4,8 @@ import {
   Award,
   BookOpen,
   BriefcaseBusiness,
-  ClipboardCheck,
   GraduationCap,
-  Lightbulb,
+  LayoutDashboard,
   MessagesSquare,
   Presentation,
   Rocket,
@@ -22,33 +21,32 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const aboutPillars = [
-  { icon: Award, title: "Experiencia", text: "Vivencia pratica com gestores, liderancas e empresas em diferentes fases de crescimento." },
-  { icon: Target, title: "Resultados", text: "Programas focados em clareza, priorizacao e execucao para melhorar a rotina de gestao." },
-  { icon: ShieldCheck, title: "Metodologia Propria", text: "Jornadas estruturadas para diagnosticar, orientar e acompanhar a evolucao empresarial." },
+  { icon: Award, title: "Experiência", text: "Vivência prática com gestores, lideranças e empresas em diferentes fases de crescimento." },
+  { icon: Target, title: "Resultados", text: "Programas focados em clareza, priorização e execução para melhorar a rotina de gestão." },
+  { icon: ShieldCheck, title: "Metodologia Própria", text: "Jornadas estruturadas para diagnosticar, orientar e acompanhar a evolução empresarial." },
 ];
 
 const products = [
-  { icon: GraduationCap, name: "Cursos Presenciais", text: "Formacoes intensivas para gestores que valorizam troca direta e aplicacao pratica.", available: false },
-  { icon: BookOpen, name: "Cursos Online", text: "Conteudos digitais para desenvolver lideranca, estrategia e rotina de gestao.", available: false },
-  { icon: Presentation, name: "Palestras", text: "Encontros de alto impacto para eventos, empresas e comunidades empresariais.", available: false },
-  { icon: Lightbulb, name: "Workshops", text: "Sessoes praticas para resolver desafios especificos com metodo e direcionamento.", available: false },
-  { icon: Rocket, name: "Imersoes", text: "Experiencias profundas para acelerar decisoes e transformar a gestao da empresa.", available: false },
-  { icon: ClipboardCheck, name: "Diagnostico Empresarial", text: "Mapeie a maturidade da sua empresa e receba um relatorio para agir com prioridade.", available: true, href: "/entrar?callbackUrl=/dashboard" },
-  { icon: MessagesSquare, name: "Mentorias", text: "Acompanhamento individual ou em grupo para evoluir como gestor e dono de empresa.", available: false },
-  { icon: BriefcaseBusiness, name: "Consultorias", text: "Projetos consultivos para ajustar processos, estrategia e indicadores de gestao.", available: false },
+  { icon: GraduationCap, name: "Cursos Presenciais", text: "Formações intensivas para gestores que valorizam troca direta, prática aplicada e desenvolvimento em grupo." },
+  { icon: BookOpen, name: "Cursos Online", text: "Conteúdos digitais para desenvolver liderança, estratégia e rotina de gestão no seu próprio ritmo.", href: "/cursos", cta: "Ver cursos" },
+  { icon: Presentation, name: "Palestras", text: "Encontros de alto impacto para eventos, empresas e comunidades empresariais." },
+  { icon: LayoutDashboard, name: "Soluções", text: "Ferramentas digitais para diagnosticar, organizar e acompanhar a gestão da sua empresa.", href: "/solucoes", cta: "Ver soluções" },
+  { icon: Rocket, name: "Imersões", text: "Experiências profundas para acelerar decisões e transformar a gestão da empresa." },
+  { icon: MessagesSquare, name: "Mentorias", text: "Acompanhamento individual ou em grupo para evoluir como gestor e dono de empresa." },
+  { icon: BriefcaseBusiness, name: "Consultorias", text: "Projetos consultivos para ajustar processos, estratégia e indicadores de gestão." },
 ];
 
 const steps = [
   "Crie sua conta gratuita",
-  "Escolha o produto ideal para voce",
-  "Acesse o conteudo e transforme sua gestao",
-  "Acompanhe sua evolucao",
+  "Escolha o produto ideal para você",
+  "Acesse o conteúdo e transforme sua gestão",
+  "Acompanhe sua evolução",
 ];
 
 const testimonials = [
-  { quote: "A mentoria nos ajudou a organizar prioridades e melhorar a tomada de decisao da diretoria.", author: "Mariana Costa", role: "Diretora Executiva" },
-  { quote: "O diagnostico mostrou com clareza onde nossa gestao precisava de processo e acompanhamento.", author: "Rafael Nunes", role: "Socio fundador" },
-  { quote: "Os encontros trouxeram linguagem pratica para liderar melhor e cobrar execucao sem perder alinhamento.", author: "Bianca Rocha", role: "Gerente de Operacoes" },
+  { quote: "A mentoria nos ajudou a organizar prioridades e melhorar a tomada de decisão da diretoria.", author: "Mariana Costa", role: "Diretora Executiva" },
+  { quote: "O diagnóstico mostrou com clareza onde nossa gestão precisava de processo e acompanhamento.", author: "Rafael Nunes", role: "Sócio fundador" },
+  { quote: "Os encontros trouxeram linguagem prática para liderar melhor e cobrar execução sem perder alinhamento.", author: "Bianca Rocha", role: "Gerente de Operações" },
 ];
 
 export function MentoringLandingPage() {
@@ -62,15 +60,15 @@ export function MentoringLandingPage() {
             <div>
               <Badge className="mb-6 border-accent/30 bg-accent/15 text-accent">GESTORES EM FOCO</Badge>
               <h1 className="font-display max-w-3xl text-4xl font-semibold leading-tight md:text-6xl">
-                Transforme a Gestao da Sua Empresa
+                Transforme a gestão da sua empresa
               </h1>
               <p className="mt-6 max-w-2xl text-lg leading-8 text-primary-foreground/80">
-                Mentoria empresarial, cursos, workshops e imersoes para gestores e donos de empresas que querem resultados reais.
+                Mentoria empresarial, cursos, soluções digitais, palestras e imersões para gestores e donos de empresas que querem resultados reais.
               </p>
               <div className="mt-8 flex flex-col gap-4 sm:flex-row">
                 <Button asChild size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90">
                   <a href="#produtos">
-                    Conhecer Nossos Produtos
+                    Conhecer nossos produtos
                     <ArrowRight className="h-4 w-4" />
                   </a>
                 </Button>
@@ -82,11 +80,11 @@ export function MentoringLandingPage() {
             <div className="grid gap-4">
               <Card className="border-white/15 bg-white/10 text-white backdrop-blur">
                 <CardContent className="grid gap-4 p-6 sm:grid-cols-3">
-                  {["Mentorias", "Cursos", "Diagnosticos"].map((label) => (
+                  {["Mentorias", "Cursos", "Soluções"].map((label) => (
                     <div key={label} className="rounded-lg border border-white/15 bg-white/10 p-4">
                       <Sparkles className="mb-4 h-5 w-5 text-accent" />
                       <p className="font-semibold">{label}</p>
-                      <p className="mt-1 text-sm text-white/70">para evoluir a gestao</p>
+                      <p className="mt-1 text-sm text-white/70">para evoluir a gestão</p>
                     </div>
                   ))}
                 </CardContent>
@@ -115,7 +113,7 @@ export function MentoringLandingPage() {
               <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary">Quem somos</p>
               <h2 className="font-display mt-3 text-3xl font-semibold md:text-4xl">Especialistas no desenvolvimento de gestores.</h2>
               <p className="mt-5 text-base leading-8 text-muted-foreground">
-                A Gestores em Foco desenvolve gestores e donos de empresas por meio de mentorias, cursos, workshops, imersoes, consultorias e diagnosticos empresariais. Este texto e um placeholder editavel para apresentar historia, metodo e diferenciais da empresa.
+                A Gestores em Foco desenvolve gestores e donos de empresas por meio de mentorias, cursos, soluções digitais, palestras, imersões e consultorias. Nossa metodologia combina diagnóstico, orientação prática e acompanhamento para melhorar decisões, processos e resultados.
               </p>
             </div>
             <div className="grid gap-5 md:grid-cols-3">
@@ -136,27 +134,11 @@ export function MentoringLandingPage() {
           <div className="mx-auto max-w-7xl px-6">
             <div className="mb-10 max-w-2xl">
               <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary">Nossos produtos</p>
-              <h2 className="font-display mt-3 text-3xl font-semibold md:text-4xl">Educacao empresarial para cada momento da sua gestao.</h2>
+              <h2 className="font-display mt-3 text-3xl font-semibold md:text-4xl">Educação empresarial para cada momento da sua gestão.</h2>
             </div>
             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
               {products.map((product) => (
-                <Card key={product.name} className="flex h-full flex-col border-primary/10 bg-background/80 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
-                  <CardHeader>
-                    <div className="flex items-start justify-between gap-3">
-                      <product.icon className="h-9 w-9 text-primary" />
-                      <Badge variant={product.available ? "default" : "secondary"} className={product.available ? "bg-emerald-600" : ""}>
-                        {product.available ? "Disponivel" : "Em breve"}
-                      </Badge>
-                    </div>
-                    <CardTitle className="text-xl">{product.name}</CardTitle>
-                    <CardDescription className="leading-6">{product.text}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="mt-auto">
-                    <Button asChild variant={product.available ? "default" : "outline"} className={product.available ? "w-full bg-primary hover:bg-primary/90" : "w-full"}>
-                      {product.available ? <Link to={product.href ?? "/entrar"}>Saiba Mais</Link> : <a href="#contato">Saiba Mais</a>}
-                    </Button>
-                  </CardContent>
-                </Card>
+                <ProductCard key={product.name} product={product} />
               ))}
             </div>
           </div>
@@ -185,7 +167,7 @@ export function MentoringLandingPage() {
           <div className="mx-auto max-w-7xl px-6">
             <div className="mb-10 max-w-2xl">
               <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary">Depoimentos</p>
-              <h2 className="font-display mt-3 text-3xl font-semibold md:text-4xl">Historias de gestores em evolucao.</h2>
+              <h2 className="font-display mt-3 text-3xl font-semibold md:text-4xl">Histórias de gestores em evolução.</h2>
             </div>
             <div className="grid gap-6 lg:grid-cols-3">
               {testimonials.map((item) => (
@@ -207,8 +189,8 @@ export function MentoringLandingPage() {
           <Card className="overflow-hidden border-none bg-primary text-primary-foreground">
             <CardContent className="flex flex-col gap-8 p-8 md:flex-row md:items-center md:justify-between md:p-10">
               <div>
-                <p className="text-sm uppercase tracking-[0.24em] text-primary-foreground/70">Proximo passo</p>
-                <h2 className="font-display mt-3 text-3xl font-semibold">Entre na plataforma e acompanhe sua evolucao empresarial.</h2>
+                <p className="text-sm uppercase tracking-[0.24em] text-primary-foreground/70">Próximo passo</p>
+                <h2 className="font-display mt-3 text-3xl font-semibold">Entre na plataforma e acompanhe sua evolução empresarial.</h2>
               </div>
               <Button asChild size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90">
                 <Link to="/entrar">Acessar Minha Conta</Link>
@@ -219,5 +201,37 @@ export function MentoringLandingPage() {
       </main>
       <SiteFooter />
     </div>
+  );
+}
+
+type Product = (typeof products)[number];
+
+function ProductCard({ product }: { product: Product }) {
+  const content = (
+    <Card className={`flex h-full flex-col border-primary/10 bg-background/80 shadow-sm transition ${product.href ? "hover:-translate-y-1 hover:shadow-lg" : ""}`}>
+      <CardHeader className="gap-4">
+        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <product.icon className="h-6 w-6" />
+        </div>
+        <div>
+          <CardTitle className="text-xl">{product.name}</CardTitle>
+          <CardDescription className="mt-3 leading-6">{product.text}</CardDescription>
+        </div>
+        {product.cta ? (
+          <span className="mt-auto inline-flex items-center gap-2 pt-2 text-sm font-semibold text-primary">
+            {product.cta}
+            <ArrowRight className="h-4 w-4" />
+          </span>
+        ) : null}
+      </CardHeader>
+    </Card>
+  );
+
+  if (!product.href) return content;
+
+  return (
+    <Link to={product.href} className="block h-full cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+      {content}
+    </Link>
   );
 }

@@ -16,6 +16,7 @@ import DiagnosticReportPage from "@/pages/DiagnosticReportPage";
 import CoursesPage from "@/pages/courses/CoursesPage";
 import CourseDetailPage from "@/pages/courses/CourseDetailPage";
 import CoursePlayerPage from "@/pages/courses/CoursePlayerPage";
+import PublicCoursesPage from "@/pages/courses/PublicCoursesPage";
 import DreAccountPage from "@/pages/dre/DreAccountPage";
 import DreAnalysisPage from "@/pages/dre/DreAnalysisPage";
 import DreCategoriesPage from "@/pages/dre/DreCategoriesPage";
@@ -26,19 +27,23 @@ import DreEntryViewPage from "@/pages/dre/DreEntryViewPage";
 import DreModelsPage from "@/pages/dre/DreModelsPage";
 import NotFound from "@/pages/NotFound";
 import PlaceholderLegalPage from "@/pages/PlaceholderLegalPage";
+import SolucoesPage from "@/pages/SolucoesPage";
 
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/entrar" element={<LoginPage />} />
+      <Route path="/login" element={<LoginPage />} />
       <Route path="/cadastro" element={<SignupPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/dashboard" element={<DashboardPage />} />
       <Route path="/meus-produtos" element={<MyProductsPage />} />
       <Route path="/produtos" element={<AvailableProductsPage />} />
       <Route path="/diagnosticos" element={<DiagnosticsWorkspacePage />} />
-      <Route path="/cursos" element={<CoursesPage />} />
+      <Route path="/solucoes" element={<SolucoesPage />} />
+      <Route path="/cursos" element={<PublicCoursesPage />} />
+      <Route path="/meus-cursos" element={<CoursesPage />} />
       <Route path="/cursos/:courseSlug" element={<CourseDetailPage />} />
       <Route path="/cursos/:courseSlug/aulas" element={<CoursePlayerPage />} />
       <Route path="/cursos/:courseSlug/aulas/:lessonId" element={<CoursePlayerPage />} />
@@ -67,7 +72,7 @@ export default function App() {
       <Route path="/admin/suporte" element={<AdminPage />} />
       <Route path="/diagnostico/:token" element={<DiagnosticPage />} />
       <Route path="/termos-de-uso" element={<PlaceholderLegalPage title="Termos de Uso" />} />
-      <Route path="/politica-de-privacidade" element={<PlaceholderLegalPage title="Politica de Privacidade" />} />
+      <Route path="/politica-de-privacidade" element={<PlaceholderLegalPage title="Política de Privacidade" />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

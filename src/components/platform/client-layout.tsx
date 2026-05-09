@@ -13,13 +13,13 @@ const generalNavigation = [
   { to: "/dashboard", label: "Início / Dashboard", icon: Home },
   { to: "/meus-produtos", label: "Meus Produtos", icon: Package },
   { to: "/produtos", label: "Todos os Produtos", icon: LayoutGrid },
-  { to: "/cursos", label: "Cursos", icon: BookOpen },
+  { to: "/meus-cursos", label: "Cursos", icon: BookOpen },
   { to: "/meu-perfil", label: "Meu Perfil", icon: UserCircle },
   { to: "/configuracoes", label: "Configurações", icon: Settings },
 ];
 
 const productNavigation = [
-  { to: "/diagnosticos", label: "Diagnosticos", icon: BarChart3, slug: PRODUCT_SLUGS.diagnostics },
+  { to: "/diagnosticos", label: "Diagnósticos", icon: BarChart3, slug: PRODUCT_SLUGS.diagnostics },
   { to: "/dre-facil", label: "Gestor de DRE", icon: ReceiptText, slug: PRODUCT_SLUGS.dre },
 ];
 
@@ -117,7 +117,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
             <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-accent text-sm font-bold text-accent-foreground">GF</div>
             <div>
               <p className="font-display text-base font-semibold uppercase tracking-wide">Gestores em Foco</p>
-              <p className="text-xs text-sidebar-foreground/65">Area do cliente</p>
+              <p className="text-xs text-sidebar-foreground/65">Área do cliente</p>
             </div>
           </Link>
           <NavItems productAccess={productAccess} />
