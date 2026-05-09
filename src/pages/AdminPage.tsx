@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Activity, Box, Eye, Headphones, LayoutDashboard, Plus, Settings, Users } from "lucide-react";
 
 import { DiagnosticFlowBuilder } from "@/components/admin/diagnostic-flow-builder";
+import { CoursesAdminPanel } from "@/components/admin/courses-admin-panel";
 import { LinkManager } from "@/components/admin/link-manager";
 import { supabase } from "@/integrations/supabase/client";
 import { getAdminAccessError, isCurrentUserAdmin } from "@/lib/admin-access";
@@ -31,7 +32,7 @@ export default function AdminPage() {
   const location = useLocation();
   const initialRoute = getAdminRouteState(location.pathname);
   const [section, setSection] = useState(initialRoute.section);
-  const [productSection, setProductSection] = useState<"all" | "diagnosticos" | "gestor-dre">(initialRoute.productSection);
+  const [productSection, setProductSection] = useState<"all" | "diagnosticos" | "gestor-dre" | "cursos">(initialRoute.productSection);
   const [period, setPeriod] = useState<AdminPeriod>("30d");
   const [adminData, setAdminData] = useState<any | null>(null);
   const [adminUserId, setAdminUserId] = useState<string | null>(null);
@@ -374,6 +375,7 @@ function ProductsPanel(props: any) {
           ["all", "Todos os produtos"],
           ["diagnosticos", "Diagnostico"],
           ["gestor-dre", "Gestor de DRE"],
+          ["cursos", "Cursos"],
         ].map(([value, label]) => <Button key={value} variant={props.productSection === value ? "default" : "outline"} onClick={() => props.onProductSectionChange(value)}>{label}</Button>)}
       </div>
       {props.productSection === "all" ? (
@@ -400,6 +402,7 @@ function ProductsPanel(props: any) {
       ) : null}
       {props.productSection === "diagnosticos" ? <DiagnosticAdminPanel {...props} /> : null}
       {props.productSection === "gestor-dre" ? <DreAdminPanel data={props.data} /> : null}
+      {props.productSection === "cursos" ? <CoursesAdminPanel userId={props.userId} users={props.data?.users ?? []} /> : null}
     </div>
   );
 }
@@ -546,7 +549,7 @@ function displayName(item: any) {
 }
 
 function productLabel(value?: string | null) {
-  const labels: Record<string, string> = { diagnosticos: "Diagnostico", "gestor-dre": "Gestor de DRE", global: "Global" };
+  const labels: Record<string, string> = { diagnosticos: "Diagnostico", "gestor-dre": "Gestor de DRE", cursos: "Cursos", global: "Global" };
   return value ? labels[value] ?? value : "-";
 }
 
@@ -565,9 +568,10 @@ function subscriptionStatusLabel(value?: string) {
   return value ? labels[value] ?? value : "-";
 }
 
-function getAdminRouteState(pathname: string): { section: string; productSection: "all" | "diagnosticos" | "gestor-dre" } {
+function getAdminRouteState(pathname: string): { section: string; productSection: "all" | "diagnosticos" | "gestor-dre" | "cursos" } {
   if (pathname.includes("/admin/produtos/diagnostico")) return { section: "products", productSection: "diagnosticos" };
   if (pathname.includes("/admin/produtos/dre")) return { section: "products", productSection: "gestor-dre" };
+  if (pathname.includes("/admin/produtos/cursos")) return { section: "products", productSection: "cursos" };
   if (pathname.includes("/admin/produtos")) return { section: "products", productSection: "all" };
   if (pathname.includes("/admin/usuarios")) return { section: "users", productSection: "all" };
   if (pathname.includes("/admin/acessos")) return { section: "access", productSection: "all" };

@@ -13,6 +13,9 @@ import SettingsPage from "@/pages/SettingsPage";
 import AdminPage from "@/pages/AdminPage";
 import DiagnosticPage from "@/pages/DiagnosticPage";
 import DiagnosticReportPage from "@/pages/DiagnosticReportPage";
+import CoursesPage from "@/pages/courses/CoursesPage";
+import CourseDetailPage from "@/pages/courses/CourseDetailPage";
+import CoursePlayerPage from "@/pages/courses/CoursePlayerPage";
 import DreAccountPage from "@/pages/dre/DreAccountPage";
 import DreAnalysisPage from "@/pages/dre/DreAnalysisPage";
 import DreCategoriesPage from "@/pages/dre/DreCategoriesPage";
@@ -35,6 +38,10 @@ export default function App() {
       <Route path="/meus-produtos" element={<MyProductsPage />} />
       <Route path="/produtos" element={<AvailableProductsPage />} />
       <Route path="/diagnosticos" element={<DiagnosticsWorkspacePage />} />
+      <Route path="/cursos" element={<CoursesPage />} />
+      <Route path="/cursos/:courseSlug" element={<CourseDetailPage />} />
+      <Route path="/cursos/:courseSlug/aulas" element={<CoursePlayerPage />} />
+      <Route path="/cursos/:courseSlug/aulas/:lessonId" element={<CoursePlayerPage />} />
       <Route path="/gestor-dre" element={<Navigate to="/dre-facil" replace />} />
       <Route path="/dre-facil" element={<DreDashboardPage />} />
       <Route path="/dre-facil/cadastrar" element={<DreEntryFormPage />} />
@@ -53,6 +60,8 @@ export default function App() {
       <Route path="/admin/produtos" element={<AdminPage />} />
       <Route path="/admin/produtos/diagnostico" element={<AdminPage />} />
       <Route path="/admin/produtos/dre" element={<AdminPage />} />
+      <Route path="/admin/produtos/cursos" element={<AdminPage />} />
+      <Route path="/admin/produtos/cursos/:courseId" element={<AdminPage />} />
       <Route path="/admin/usuarios" element={<AdminPage />} />
       <Route path="/admin/acessos" element={<AdminPage />} />
       <Route path="/admin/suporte" element={<AdminPage />} />

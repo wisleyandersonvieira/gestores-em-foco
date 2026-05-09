@@ -4,6 +4,7 @@ import type { Tables } from "@/integrations/supabase/types";
 export const PRODUCT_SLUGS = {
   diagnostics: "diagnosticos",
   dre: "gestor-dre",
+  courses: "cursos",
 } as const;
 
 export type Product = Tables<"products">;
@@ -26,6 +27,12 @@ export const productBenefits: Record<string, string[]> = {
     "Lancamento mensal por competencia",
     "Dashboard de faturamento, despesas e lucro",
     "Analise comparativa mensal, trimestral e semestral",
+  ],
+  cursos: [
+    "Cursos em video",
+    "Modulos e aulas organizados",
+    "Materiais de apoio",
+    "Acompanhamento de progresso",
   ],
 };
 

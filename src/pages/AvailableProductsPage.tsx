@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ComponentType } from "react";
-import { BarChart3, CheckCircle2, Package, ReceiptText } from "lucide-react";
+import { BarChart3, BookOpen, CheckCircle2, Package, ReceiptText } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -14,6 +14,7 @@ import { getAvailableProducts, getUserProducts, productBenefits, type Product, t
 const productIcons: Record<string, ComponentType<{ className?: string }>> = {
   diagnosticos: BarChart3,
   "gestor-dre": ReceiptText,
+  cursos: BookOpen,
 };
 
 export default function AvailableProductsPage() {
@@ -78,7 +79,11 @@ function AvailableProductsContent({ userId }: { userId: string }) {
                     </div>
                   ))}
                 </div>
-                {hasAccess ? (
+                {product.slug === "cursos" ? (
+                  <Button asChild className="w-full bg-primary hover:bg-primary/90">
+                    <Link to="/cursos">Ver cursos</Link>
+                  </Button>
+                ) : hasAccess ? (
                   <Button asChild className="w-full bg-primary hover:bg-primary/90">
                     <Link to={product.route_path ?? "/dashboard"}>Acessar produto</Link>
                   </Button>
