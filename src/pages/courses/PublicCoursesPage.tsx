@@ -10,20 +10,28 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCoursePrice, getPublishedCourses, type Course } from "@/lib/courses";
+import { getPublicProductBySlug, PRODUCT_SLUGS } from "@/lib/products";
 
 export default function PublicCoursesPage() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [coursesProductVisible, setCoursesProductVisible] = useState(true);
 
   useEffect(() => {
     document.title = "Cursos Online de Gestão Empresarial";
     setMetaDescription("Cursos digitais para desenvolver liderança, finanças, estratégia e rotina de gestão empresarial.");
 
-    getPublishedCourses()
-      .then(setCourses)
-      .catch(() => setCourses([]))
+    Promise.all([getPublicProductBySlug(PRODUCT_SLUGS.courses), getPublishedCourses()])
+      .then(([product, nextCourses]) => {
+        setCoursesProductVisible(Boolean(product));
+        setCourses(product ? nextCourses : []);
+      })
+      .catch(() => {
+        setCoursesProductVisible(false);
+        setCourses([]);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -103,6 +111,21 @@ export default function PublicCoursesPage() {
             <Card className="border-primary/10 bg-card">
               <CardContent className="p-6 text-sm text-muted-foreground">Carregando cursos...</CardContent>
             </Card>
+          ) : !coursesProductVisible ? (
+            <Card className="border-dashed bg-card">
+              <CardContent className="flex flex-col items-start gap-5 p-6 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <BookOpen className="h-6 w-6" />
+                  </div>
+                  <p className="mt-5 text-lg font-semibold">Cursos indisponíveis no momento</p>
+                  <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Novos cursos online serão publicados em breve.</p>
+                </div>
+                <Button asChild variant="outline">
+                  <Link to="/produtos">Voltar para produtos</Link>
+                </Button>
+              </CardContent>
+            </Card>
           ) : courses.length === 0 ? (
             <Card className="border-dashed bg-card">
               <CardContent className="flex flex-col items-start gap-5 p-6 md:flex-row md:items-center md:justify-between">
@@ -114,7 +137,7 @@ export default function PublicCoursesPage() {
                   <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Novos cursos online serão publicados em breve.</p>
                 </div>
                 <Button asChild variant="outline">
-                  <Link to="/#produtos">Voltar aos produtos</Link>
+                  <Link to="/produtos">Voltar para produtos</Link>
                 </Button>
               </CardContent>
             </Card>

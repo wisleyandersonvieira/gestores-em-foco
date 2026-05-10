@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, BarChart3, CheckCircle2, ClipboardCheck } from "lucide-react";
 
@@ -7,6 +7,7 @@ import { SiteHeader } from "@/components/marketing/site-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getAvailableProducts, PRODUCT_SLUGS } from "@/lib/products";
 
 const solutions = [
   {
@@ -19,6 +20,7 @@ const solutions = [
       "Relatório para tomada de decisão",
     ],
     href: "/login?produto=diagnostico",
+    slug: PRODUCT_SLUGS.diagnostics,
   },
   {
     icon: BarChart3,
@@ -30,14 +32,25 @@ const solutions = [
       "Acompanhamento de margem e resultado",
     ],
     href: "/login?produto=gestor-dre",
+    slug: PRODUCT_SLUGS.dre,
   },
 ];
 
 export default function SolucoesPage() {
+  const [visibleProductSlugs, setVisibleProductSlugs] = useState<Set<string> | null>(null);
+
   useEffect(() => {
     document.title = "Soluções para Gestão Empresarial";
     setMetaDescription("Ferramentas digitais para diagnóstico empresarial, gestão de DRE e acompanhamento da performance da empresa.");
+    getAvailableProducts()
+      .then((products) => setVisibleProductSlugs(new Set(products.map((product) => product.slug))))
+      .catch(() => setVisibleProductSlugs(new Set()));
   }, []);
+
+  const visibleSolutions = useMemo(() => {
+    if (!visibleProductSlugs) return solutions;
+    return solutions.filter((solution) => visibleProductSlugs.has(solution.slug));
+  }, [visibleProductSlugs]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -79,8 +92,21 @@ export default function SolucoesPage() {
             </p>
           </div>
 
+          {visibleSolutions.length === 0 ? (
+            <Card className="border-dashed bg-card">
+              <CardContent className="flex flex-col items-start gap-5 p-6 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-lg font-semibold">Nenhuma solução disponível no momento</p>
+                  <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Estamos preparando novas soluções para sua gestão. Volte em breve.</p>
+                </div>
+                <Button asChild variant="outline">
+                  <Link to="/">Voltar para início</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
           <div className="grid gap-6 lg:grid-cols-2">
-            {solutions.map((solution) => (
+            {visibleSolutions.map((solution) => (
               <Card key={solution.title} className="flex h-full flex-col border-primary/10 bg-card shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
                 <CardHeader className="space-y-4 p-5">
                   <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -110,6 +136,7 @@ export default function SolucoesPage() {
               </Card>
             ))}
           </div>
+          )}
         </section>
       </main>
       <SiteFooter />

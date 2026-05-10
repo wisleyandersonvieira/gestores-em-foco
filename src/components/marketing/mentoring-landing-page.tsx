@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
   Award,
@@ -19,6 +20,7 @@ import { SiteHeader } from "@/components/marketing/site-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getAvailableProducts, PRODUCT_SLUGS } from "@/lib/products";
 
 const aboutPillars = [
   { icon: Award, title: "Experiência", text: "Vivência prática com gestores, lideranças e empresas em diferentes fases de crescimento." },
@@ -28,9 +30,9 @@ const aboutPillars = [
 
 const products = [
   { icon: GraduationCap, name: "Cursos Presenciais", text: "Formações intensivas para gestores que valorizam troca direta, prática aplicada e desenvolvimento em grupo." },
-  { icon: BookOpen, name: "Cursos Online", text: "Conteúdos digitais para desenvolver liderança, estratégia e rotina de gestão no seu próprio ritmo.", href: "/cursos", cta: "Ver cursos" },
+  { icon: BookOpen, name: "Cursos Online", text: "Conteúdos digitais para desenvolver liderança, estratégia e rotina de gestão no seu próprio ritmo.", href: "/cursos", cta: "Ver cursos", slug: PRODUCT_SLUGS.courses },
   { icon: Presentation, name: "Palestras", text: "Encontros de alto impacto para eventos, empresas e comunidades empresariais." },
-  { icon: LayoutDashboard, name: "Soluções", text: "Ferramentas digitais para diagnosticar, organizar e acompanhar a gestão da sua empresa.", href: "/solucoes", cta: "Ver soluções" },
+  { icon: LayoutDashboard, name: "Soluções", text: "Ferramentas digitais para diagnosticar, organizar e acompanhar a gestão da sua empresa.", href: "/solucoes", cta: "Ver soluções", solutionShelf: true },
   { icon: Rocket, name: "Imersões", text: "Experiências profundas para acelerar decisões e transformar a gestão da empresa." },
   { icon: MessagesSquare, name: "Mentorias", text: "Acompanhamento individual ou em grupo para evoluir como gestor e dono de empresa." },
   { icon: BriefcaseBusiness, name: "Consultorias", text: "Projetos consultivos para ajustar processos, estratégia e indicadores de gestão." },
@@ -50,6 +52,24 @@ const testimonials = [
 ];
 
 export function MentoringLandingPage() {
+  const [visibleProductSlugs, setVisibleProductSlugs] = useState<Set<string> | null>(null);
+
+  useEffect(() => {
+    getAvailableProducts()
+      .then((availableProducts) => setVisibleProductSlugs(new Set(availableProducts.map((product) => product.slug))))
+      .catch(() => setVisibleProductSlugs(new Set()));
+  }, []);
+
+  const visibleProducts = useMemo(() => {
+    if (!visibleProductSlugs) return products;
+    const hasVisibleSolution = visibleProductSlugs.has(PRODUCT_SLUGS.diagnostics) || visibleProductSlugs.has(PRODUCT_SLUGS.dre);
+    return products.filter((product) => {
+      if ("slug" in product && product.slug) return visibleProductSlugs.has(product.slug);
+      if ("solutionShelf" in product && product.solutionShelf) return hasVisibleSolution;
+      return true;
+    });
+  }, [visibleProductSlugs]);
+
   return (
     <div className="relative overflow-hidden">
       <SiteHeader />
@@ -137,7 +157,7 @@ export function MentoringLandingPage() {
               <h2 className="font-display mt-3 text-3xl font-semibold md:text-4xl">Educação empresarial para cada momento da sua gestão.</h2>
             </div>
             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-              {products.map((product) => (
+              {visibleProducts.map((product) => (
                 <ProductCard key={product.name} product={product} />
               ))}
             </div>

@@ -41,11 +41,40 @@ export async function getAvailableProducts() {
     .from("products")
     .select("*")
     .eq("status", "active")
+    .eq("is_public_visible", true)
     .order("display_order", { ascending: true })
     .order("name", { ascending: true });
 
   if (error) throw new Error("Nao foi possivel carregar os produtos disponiveis.");
   return data ?? [];
+}
+
+export async function getPublicProductBySlug(productSlug: string) {
+  const { data, error } = await supabase
+    .from("products")
+    .select("*")
+    .eq("slug", productSlug)
+    .eq("status", "active")
+    .eq("is_public_visible", true)
+    .maybeSingle();
+
+  if (error) throw new Error("Nao foi possivel carregar o produto.");
+  return data as Product | null;
+}
+
+export async function updateProductVisibility(productId: string, isPublicVisible: boolean) {
+  const { data, error } = await supabase
+    .from("products")
+    .update({ is_public_visible: isPublicVisible })
+    .eq("id", productId)
+    .select("*")
+    .single();
+
+  if (error || !data) {
+    throw new Error("Não foi possível atualizar a visibilidade do produto.");
+  }
+
+  return data as Product;
 }
 
 export async function getUserProducts(userId: string) {

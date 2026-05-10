@@ -43,6 +43,7 @@ export type Course = {
   cover_url: string | null;
   thumbnail_url: string | null;
   instructor_name: string | null;
+  is_public_visible: boolean;
   category: string | null;
   level: CourseLevel;
   status: CourseStatus;
@@ -150,6 +151,7 @@ export async function getPublishedCourses() {
   const { data, error } = await table("courses")
     .select("*")
     .eq("status", "published")
+    .eq("is_public_visible", true)
     .order("display_order", { ascending: true })
     .order("title", { ascending: true });
 
@@ -520,6 +522,20 @@ export async function saveCourse(input: Partial<Course> & { title: string; slug?
   return data as Course;
 }
 
+export async function updateCourseVisibility(courseId: string, isPublicVisible: boolean) {
+  const { data, error } = await table("courses")
+    .update({ is_public_visible: isPublicVisible })
+    .eq("id", courseId)
+    .select("*")
+    .single();
+
+  if (error || !data) {
+    throw new Error("Não foi possível atualizar a visibilidade do curso.");
+  }
+
+  return data as Course;
+}
+
 export async function saveCourseModule(input: Partial<CourseModule> & { course_id: string; title: string }) {
   if (!input.course_id) throw new Error("Selecione um curso.");
   if (!stripHtml(input.title).trim()) throw new Error("Informe o titulo do bloco.");
@@ -708,6 +724,7 @@ function sanitizeCoursePayload(input: Partial<Course> & { title: string; slug?: 
     category: stripHtml(input.category ?? "").trim() || null,
     level: input.level ?? "beginner",
     status,
+    is_public_visible: input.is_public_visible ?? true,
     price: input.price === null || input.price === undefined ? null : Number(input.price),
     currency: input.currency ?? "BRL",
     checkout_url: input.checkout_url?.trim() || null,

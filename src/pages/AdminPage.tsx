@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Activity, Box, Eye, Headphones, LayoutDashboard, Plus, Settings, Users } from "lucide-react";
+import { Activity, Box, Eye, EyeOff, Headphones, LayoutDashboard, Plus, Settings, Users } from "lucide-react";
+import { toast } from "sonner";
 
 import { DiagnosticFlowBuilder } from "@/components/admin/diagnostic-flow-builder";
 import { CoursesAdminPanel } from "@/components/admin/courses-admin-panel";
@@ -8,6 +9,7 @@ import { LinkManager } from "@/components/admin/link-manager";
 import { supabase } from "@/integrations/supabase/client";
 import { getAdminAccessError, isCurrentUserAdmin } from "@/lib/admin-access";
 import { getAdminData, updateSupportRequest, type AdminPeriod } from "@/lib/admin-dashboard";
+import { updateProductVisibility } from "@/lib/products";
 import {
   archiveTemplate,
   createTemplate,
@@ -260,6 +262,7 @@ export default function AdminPage() {
               onSelectTemplate={setSelectedTemplateId}
               onArchiveTemplate={handleArchiveTemplate}
               onSaveTemplate={handleSaveTemplate}
+              onRefreshAdminData={refreshAdminData}
             />
           ) : null}
           {section === "users" ? <UsersPanel data={adminData} search={userSearch} onSearch={setUserSearch} /> : null}
@@ -364,6 +367,21 @@ function OverviewPanel({ data, period, onPeriodChange, onOpenSupport }: { data: 
 
 function ProductsPanel(props: any) {
   const products = props.data?.products ?? [];
+  const [visibilityTarget, setVisibilityTarget] = useState<any | null>(null);
+  const nextVisibility = visibilityTarget ? !Boolean(visibilityTarget.is_public_visible) : true;
+
+  async function confirmVisibilityChange() {
+    if (!visibilityTarget) return;
+    try {
+      await updateProductVisibility(visibilityTarget.id, nextVisibility);
+      toast.success(nextVisibility ? "Exibição no site habilitada com sucesso." : "Exibição no site desabilitada com sucesso.");
+      setVisibilityTarget(null);
+      await props.onRefreshAdminData?.();
+    } catch (runtimeError) {
+      toast.error(runtimeError instanceof Error ? runtimeError.message : "Não foi possível atualizar a visibilidade.");
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -385,7 +403,10 @@ function ProductsPanel(props: any) {
               <CardHeader>
                 <div className="flex items-start justify-between gap-3">
                   <div><CardTitle>{product.name}</CardTitle><CardDescription>{product.short_description}</CardDescription></div>
-                  <Badge>{product.status}</Badge>
+                  <div className="flex flex-col items-end gap-2">
+                    <Badge>{product.status}</Badge>
+                    <VisibilityBadge visible={product.is_public_visible !== false} />
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -394,7 +415,13 @@ function ProductsPanel(props: any) {
                   <MiniMetric label="Trial" value={product.trialSubscriptions} />
                   <MiniMetric label="Inativas" value={product.inactiveSubscriptions} />
                 </div>
-                <Button onClick={() => props.onProductSectionChange(product.slug)}>Gerenciar</Button>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Button onClick={() => props.onProductSectionChange(product.slug)}>Gerenciar</Button>
+                  <Button variant="outline" onClick={() => setVisibilityTarget(product)}>
+                    {product.is_public_visible === false ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                    {product.is_public_visible === false ? "Habilitar no site" : "Desabilitar no site"}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           )) : <EmptyCard text="Nenhum produto cadastrado." />}
@@ -403,6 +430,25 @@ function ProductsPanel(props: any) {
       {props.productSection === "diagnosticos" ? <DiagnosticAdminPanel {...props} /> : null}
       {props.productSection === "gestor-dre" ? <DreAdminPanel data={props.data} /> : null}
       {props.productSection === "cursos" ? <CoursesAdminPanel userId={props.userId} users={props.data?.users ?? []} /> : null}
+      <Dialog open={Boolean(visibilityTarget)} onOpenChange={(open) => !open && setVisibilityTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{nextVisibility ? "Habilitar exibição no site" : "Desabilitar exibição no site"}</DialogTitle>
+            <DialogDescription>
+              {nextVisibility
+                ? "Este item voltará a aparecer nas páginas públicas e nas prateleiras de contratação."
+                : "Este item deixará de aparecer nas páginas públicas e nas prateleiras de contratação. Usuários que já possuem acesso continuarão podendo utilizar normalmente."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg bg-muted p-4 text-sm">
+            Produto: <strong>{visibilityTarget?.name}</strong>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setVisibilityTarget(null)}>Cancelar</Button>
+            <Button onClick={() => void confirmVisibilityChange()}>{nextVisibility ? "Habilitar" : "Desabilitar"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -521,6 +567,10 @@ function StatCard({ label, value }: { label: string; value: any }) {
 
 function MiniMetric({ label, value }: { label: string; value: any }) {
   return <div className="rounded-lg border bg-muted/40 p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-xl font-semibold">{value ?? 0}</p></div>;
+}
+
+function VisibilityBadge({ visible }: { visible: boolean }) {
+  return visible ? <Badge className="bg-emerald-600">Visível no site</Badge> : <Badge variant="secondary">Oculto no site</Badge>;
 }
 
 function EmptyCard({ text }: { text: string }) {

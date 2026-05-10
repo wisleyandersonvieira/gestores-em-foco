@@ -297,6 +297,7 @@ export type Database = {
           estimated_duration_minutes: number | null
           id: string
           instructor_name: string | null
+          is_public_visible: boolean
           level: string | null
           price: number | null
           published_at: string | null
@@ -319,6 +320,7 @@ export type Database = {
           estimated_duration_minutes?: number | null
           id?: string
           instructor_name?: string | null
+          is_public_visible?: boolean
           level?: string | null
           price?: number | null
           published_at?: string | null
@@ -341,6 +343,7 @@ export type Database = {
           estimated_duration_minutes?: number | null
           id?: string
           instructor_name?: string | null
+          is_public_visible?: boolean
           level?: string | null
           price?: number | null
           published_at?: string | null
@@ -1188,6 +1191,7 @@ export type Database = {
           highlight_color: string | null
           icon: string | null
           id: string
+          is_public_visible: boolean
           name: string
           price_cents: number | null
           product_type: string
@@ -1208,6 +1212,7 @@ export type Database = {
           highlight_color?: string | null
           icon?: string | null
           id?: string
+          is_public_visible?: boolean
           name: string
           price_cents?: number | null
           product_type?: string
@@ -1228,6 +1233,7 @@ export type Database = {
           highlight_color?: string | null
           icon?: string | null
           id?: string
+          is_public_visible?: boolean
           name?: string
           price_cents?: number | null
           product_type?: string

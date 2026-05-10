@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type React from "react";
-import { BookOpen, CheckCircle2, Download, FileSpreadsheet, FileText, Image, Link as LinkIcon, Pencil, Plus, Table as TableIcon, Trash2, Upload, Users } from "lucide-react";
+import { BookOpen, CheckCircle2, Download, Eye, EyeOff, FileSpreadsheet, FileText, Image, Link as LinkIcon, Pencil, Plus, Table as TableIcon, Trash2, Upload, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -32,6 +32,7 @@ import {
   saveCourseMaterial,
   saveCourseModule,
   slugifyCourseTitle,
+  updateCourseVisibility,
   updateCourseEnrollment,
   uploadCourseMaterial,
   validateCourseMaterialFile,
@@ -73,6 +74,7 @@ export function CoursesAdminPanel({ userId, users }: { userId: string | null; us
   const [lessonModuleId, setLessonModuleId] = useState<string | null>(null);
   const [materialDialog, setMaterialDialog] = useState<{ lesson: CourseLesson; material?: CourseMaterial | "new" } | null>(null);
   const [enrollmentDialog, setEnrollmentDialog] = useState<UserCourseEnrollment | null | "new">(null);
+  const [visibilityTarget, setVisibilityTarget] = useState<Course | null>(null);
   const [search, setSearch] = useState("");
 
   async function reload() {
@@ -100,11 +102,24 @@ export function CoursesAdminPanel({ userId, users }: { userId: string | null; us
   const courseEnrollments = state.enrollments.filter((enrollment) => enrollment.course_id === selectedCourseId);
   const progressStats = calculateProgressStats(courseLessons, courseEnrollments, state.progress);
   const activeLessons = state.lessons.filter((lesson) => lesson.status === "active");
+  const nextVisibility = visibilityTarget ? !visibilityTarget.is_public_visible : true;
 
   const openNewLesson = (moduleId: string) => {
     setLessonModuleId(moduleId);
     setLessonDialog("new");
   };
+
+  async function confirmVisibilityChange() {
+    if (!visibilityTarget) return;
+    try {
+      await updateCourseVisibility(visibilityTarget.id, nextVisibility);
+      toast.success(nextVisibility ? "Exibição no site habilitada com sucesso." : "Exibição no site desabilitada com sucesso.");
+      setVisibilityTarget(null);
+      await reload();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível atualizar a visibilidade.");
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -136,20 +151,29 @@ export function CoursesAdminPanel({ userId, users }: { userId: string | null; us
           <Card className="bg-white/90">
             <CardContent className="p-0">
               <Table>
-                <TableHeader><TableRow><TableHead>Curso</TableHead><TableHead>Categoria</TableHead><TableHead>Status</TableHead><TableHead>Preco</TableHead><TableHead>Modulos</TableHead><TableHead>Aulas</TableHead><TableHead>Alunos</TableHead><TableHead>Acoes</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Curso</TableHead><TableHead>Categoria</TableHead><TableHead>Status</TableHead><TableHead>Visibilidade</TableHead><TableHead>Preco</TableHead><TableHead>Modulos</TableHead><TableHead>Aulas</TableHead><TableHead>Alunos</TableHead><TableHead>Acoes</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {filteredCourses.length ? filteredCourses.map((course) => (
                     <TableRow key={course.id} className={course.id === selectedCourseId ? "bg-primary/5" : ""}>
                       <TableCell><button className="text-left font-medium hover:text-primary" onClick={() => setSelectedCourseId(course.id)}>{course.title}</button><p className="text-xs text-muted-foreground">{course.slug}</p></TableCell>
                       <TableCell>{course.category ?? "-"}</TableCell>
                       <TableCell><Badge variant="outline">{statusLabel(course.status)}</Badge></TableCell>
+                      <TableCell><VisibilityBadge visible={course.is_public_visible} /></TableCell>
                       <TableCell>{course.price ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: course.currency ?? "BRL" }).format(Number(course.price)) : "Gratuito"}</TableCell>
                       <TableCell>{state.modules.filter((module) => module.course_id === course.id && module.status === "active").length}</TableCell>
                       <TableCell>{state.lessons.filter((lesson) => lesson.course_id === course.id && lesson.status === "active").length}</TableCell>
                       <TableCell>{state.enrollments.filter((enrollment) => enrollment.course_id === course.id).length}</TableCell>
-                      <TableCell><Button size="sm" variant="outline" onClick={() => { setSelectedCourseId(course.id); setCourseDialog(course); }}>Editar</Button></TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-2">
+                          <Button size="sm" variant="outline" onClick={() => { setSelectedCourseId(course.id); setCourseDialog(course); }}>Editar</Button>
+                          <Button size="sm" variant="outline" onClick={() => setVisibilityTarget(course)}>
+                            {course.is_public_visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            {course.is_public_visible ? "Desabilitar no site" : "Habilitar no site"}
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
-                  )) : <TableRow><TableCell colSpan={8} className="text-muted-foreground">Nenhum curso cadastrado ainda.</TableCell></TableRow>}
+                  )) : <TableRow><TableCell colSpan={9} className="text-muted-foreground">Nenhum curso cadastrado ainda.</TableCell></TableRow>}
                 </TableBody>
               </Table>
             </CardContent>
@@ -273,6 +297,25 @@ export function CoursesAdminPanel({ userId, users }: { userId: string | null; us
       <LessonDialog open={Boolean(lessonDialog)} value={lessonDialog} course={selectedCourse} modules={courseModules} lessons={courseLessons} initialModuleId={lessonModuleId} onClose={() => { setLessonDialog(null); setLessonModuleId(null); }} onSaved={reload} />
       <MaterialDialog open={Boolean(materialDialog)} value={materialDialog?.material ?? null} course={selectedCourse} lesson={materialDialog?.lesson ?? null} materials={courseMaterials} onClose={() => setMaterialDialog(null)} onSaved={reload} />
       <EnrollmentDialog open={Boolean(enrollmentDialog)} value={enrollmentDialog} course={selectedCourse} users={users} onClose={() => setEnrollmentDialog(null)} onSaved={reload} />
+      <Dialog open={Boolean(visibilityTarget)} onOpenChange={(open) => !open && setVisibilityTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{nextVisibility ? "Habilitar exibição no site" : "Desabilitar exibição no site"}</DialogTitle>
+            <DialogDescription>
+              {nextVisibility
+                ? "Este item voltará a aparecer nas páginas públicas e nas prateleiras de contratação."
+                : "Este item deixará de aparecer nas páginas públicas e nas prateleiras de contratação. Usuários que já possuem acesso continuarão podendo utilizar normalmente."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg bg-muted p-4 text-sm">
+            Curso: <strong>{visibilityTarget?.title}</strong>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setVisibilityTarget(null)}>Cancelar</Button>
+            <Button onClick={() => void confirmVisibilityChange()}>{nextVisibility ? "Habilitar" : "Desabilitar"}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -280,7 +323,7 @@ export function CoursesAdminPanel({ userId, users }: { userId: string | null; us
 function CourseDialog({ open, value, userId, onClose, onSaved }: { open: boolean; value: Course | "new" | null; userId: string | null; onClose: () => void; onSaved: () => void }) {
   const course = typeof value === "object" && value ? value : null;
   const [form, setForm] = useState<Partial<Course> & { title: string }>({ title: "" });
-  useEffect(() => setForm(course ?? { title: "", slug: "", status: "draft", level: "beginner", currency: "BRL", display_order: 0 }), [course, open]);
+  useEffect(() => setForm(course ?? { title: "", slug: "", status: "draft", level: "beginner", currency: "BRL", display_order: 0, is_public_visible: true }), [course, open]);
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent className="max-h-[90vh] max-w-3xl overflow-auto">
@@ -298,6 +341,7 @@ function CourseDialog({ open, value, userId, onClose, onSaved }: { open: boolean
           <Field label="Capa URL"><Input value={form.cover_url ?? ""} onChange={(event) => setForm({ ...form, cover_url: event.target.value })} /></Field>
           <Field label="Status"><Select value={form.status ?? "draft"} onValueChange={(status) => setForm({ ...form, status: status as Course["status"] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="draft">Rascunho</SelectItem><SelectItem value="published">Publicado</SelectItem><SelectItem value="archived">Arquivado</SelectItem></SelectContent></Select></Field>
           <Field label="Ordem"><Input type="number" value={form.display_order ?? 0} onChange={(event) => setForm({ ...form, display_order: Number(event.target.value) })} /></Field>
+          <label className="flex items-center gap-2 text-sm md:col-span-2"><Checkbox checked={form.is_public_visible !== false} onCheckedChange={(checked) => setForm({ ...form, is_public_visible: checked === true })} />Exibir este curso no site público</label>
           <Field label="Descricao completa" className="md:col-span-2"><Textarea value={form.description ?? ""} onChange={(event) => setForm({ ...form, description: event.target.value })} /></Field>
         </div>
         <Button onClick={() => void saveCourse(form, userId ?? "").then(() => { toast.success("Curso salvo."); onSaved(); onClose(); }).catch((error) => toast.error(error.message))}>Salvar curso</Button>
@@ -578,6 +622,10 @@ function MiniMetric({ label, value }: { label: string; value: string | number })
   return <Card className="bg-white/90"><CardHeader><CardDescription>{label}</CardDescription><CardTitle>{value}</CardTitle></CardHeader></Card>;
 }
 
+function VisibilityBadge({ visible }: { visible: boolean }) {
+  return visible ? <Badge className="bg-emerald-600">Visível no site</Badge> : <Badge variant="secondary">Oculto no site</Badge>;
+}
+
 function SelectedCourseHeader({ course }: { course: Course | null }) {
   return course ? <div><h3 className="font-display text-xl font-semibold">{course.title}</h3><p className="text-sm text-muted-foreground">{course.short_description || course.slug}</p></div> : null;
 }
@@ -591,7 +639,10 @@ function CourseContentSummary({ course, modules, lessons, materials }: { course:
             <CardTitle>{course.title}</CardTitle>
             <CardDescription>{course.short_description || course.slug}</CardDescription>
           </div>
-          <Badge variant="outline">{statusLabel(course.status)}</Badge>
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="outline">{statusLabel(course.status)}</Badge>
+            <VisibilityBadge visible={course.is_public_visible} />
+          </div>
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
           <MiniMetric label="Blocos" value={modules.length} />

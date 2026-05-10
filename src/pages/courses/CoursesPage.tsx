@@ -25,7 +25,8 @@ function CoursesContent({ user }: { user: User }) {
   useEffect(() => {
     Promise.all([getPublishedCourses(), getUserCourses(user.id)])
       .then(async ([available, owned]) => {
-        setCourses(available);
+        const ownedCourses = owned.map((enrollment) => enrollment.course).filter(Boolean) as Course[];
+        setCourses(mergeCoursesById([...ownedCourses, ...available]));
         setEnrollments(owned);
         setProgressByCourse(await getUserCourseProgressByCourse(user.id, owned.map((item) => item.course_id)));
       })
@@ -66,6 +67,10 @@ function CoursesContent({ user }: { user: User }) {
       <CourseSection title="Conheca novos cursos" empty="Nenhum curso disponivel no momento." courses={availableCourses} enrollmentByCourse={enrollmentByCourse} progressByCourse={progressByCourse} />
     </div>
   );
+}
+
+function mergeCoursesById(courses: Course[]) {
+  return Array.from(new Map(courses.map((course) => [course.id, course])).values());
 }
 
 function CourseSection({

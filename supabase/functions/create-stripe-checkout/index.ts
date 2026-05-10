@@ -108,6 +108,7 @@ Deno.serve(async (request) => {
     .select("id, slug, name, stripe_price_id")
     .eq("slug", "gestor-dre")
     .eq("status", "active")
+    .eq("is_public_visible", true)
     .maybeSingle();
 
   if (productError || !product?.stripe_price_id) {
