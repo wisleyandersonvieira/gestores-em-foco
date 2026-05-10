@@ -1737,10 +1737,49 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: undefined
       }
+      create_default_dre_structure: {
+        Args: never
+        Returns: {
+          created: boolean
+          model_id: string
+        }[]
+      }
+      default_dre_subcategory_id: {
+        Args: { p_category_id: string; p_name: string; p_user_id: string }
+        Returns: string
+      }
+      get_diagnostic_link_by_token: {
+        Args: { p_token: string }
+        Returns: {
+          assigned_user_id: string | null
+          created_at: string
+          created_by: string
+          expires_at: string | null
+          id: string
+          max_uses: number | null
+          notes: string | null
+          status: Database["public"]["Enums"]["link_status"]
+          template_id: string
+          title: string | null
+          token: string
+          updated_at: string
+          uses_count: number
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "diagnostic_links"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       has_course_access: { Args: { p_course_id: string }; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
       mark_diagnostic_link_used: {
         Args: { p_link_id: string; p_user_id: string }
+        Returns: undefined
+      }
+      register_completed_diagnostic_product: {
+        Args: { p_session_id: string }
         Returns: undefined
       }
       user_can_access_template: {
