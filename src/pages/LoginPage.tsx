@@ -3,10 +3,13 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { getAdminAccessError } from "@/lib/admin-access";
 import { getAuthErrorMessage } from "@/lib/auth-errors";
+import { TurnstileCaptcha, type TurnstileCaptchaHandle } from "@/components/auth/turnstile-captcha";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+
+const CAPTCHA_ERROR_MESSAGE = "Não foi possível validar a verificação de segurança. Tente novamente.";
 
 export default function LoginPage() {
   const [searchParams] = useSearchParams();
@@ -17,11 +20,16 @@ export default function LoginPage() {
     searchParams.get("erro") === "admin_email" ? getAdminAccessError(searchParams.get("email")) : null;
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const submitLockRef = useRef(false);
+  const captchaRef = useRef<TurnstileCaptchaHandle>(null);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (submitLockRef.current) return;
+    if (submitLockRef.current || !captchaToken) {
+      if (!captchaToken) setError(CAPTCHA_ERROR_MESSAGE);
+      return;
+    }
     submitLockRef.current = true;
     setIsPending(true);
     setError(null);
@@ -30,15 +38,23 @@ export default function LoginPage() {
     const email = String(formData.get("email") ?? "");
     const password = String(formData.get("password") ?? "");
 
-    const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+      options: {
+        captchaToken,
+      },
+    });
 
     if (authError) {
       submitLockRef.current = false;
       setIsPending(false);
+      captchaRef.current?.reset();
       setError(getAuthErrorMessage(authError, "Email ou senha invalidos."));
       return;
     }
 
+    captchaRef.current?.reset();
     navigate(callbackUrl);
   }
 
@@ -93,7 +109,13 @@ export default function LoginPage() {
               </Link>
             </div>
 
-            <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isPending}>
+            <TurnstileCaptcha
+              ref={captchaRef}
+              onTokenChange={setCaptchaToken}
+              onError={(message) => setError(message)}
+            />
+
+            <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isPending || !captchaToken}>
               {isPending ? "Entrando..." : "Entrar"}
             </Button>
           </form>

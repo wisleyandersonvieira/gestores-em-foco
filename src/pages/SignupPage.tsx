@@ -2,20 +2,28 @@ import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { getAuthErrorMessage } from "@/lib/auth-errors";
+import { TurnstileCaptcha, type TurnstileCaptchaHandle } from "@/components/auth/turnstile-captcha";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+const CAPTCHA_ERROR_MESSAGE = "Não foi possível validar a verificação de segurança. Tente novamente.";
+
 export default function SignupPage() {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const submitLockRef = useRef(false);
+  const captchaRef = useRef<TurnstileCaptchaHandle>(null);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (submitLockRef.current) return;
+    if (submitLockRef.current || !captchaToken) {
+      if (!captchaToken) setError(CAPTCHA_ERROR_MESSAGE);
+      return;
+    }
     submitLockRef.current = true;
     setIsPending(true);
     setError(null);
@@ -32,6 +40,7 @@ export default function SignupPage() {
       email,
       password,
       options: {
+        captchaToken,
         emailRedirectTo: `${window.location.origin}/entrar?cadastro=sucesso`,
         data: {
           name,
@@ -45,10 +54,12 @@ export default function SignupPage() {
     if (authError) {
       submitLockRef.current = false;
       setIsPending(false);
+      captchaRef.current?.reset();
       setError(getAuthErrorMessage(authError, "Nao foi possivel criar sua conta. Confira os dados e tente novamente."));
       return;
     }
 
+    captchaRef.current?.reset();
     navigate("/entrar?cadastro=sucesso");
   }
 
@@ -105,7 +116,15 @@ export default function SignupPage() {
             </div>
 
             <div className="md:col-span-2">
-              <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" disabled={isPending}>
+              <TurnstileCaptcha
+                ref={captchaRef}
+                onTokenChange={setCaptchaToken}
+                onError={(message) => setError(message)}
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" disabled={isPending || !captchaToken}>
                 {isPending ? "Criando conta..." : "Criar conta"}
               </Button>
             </div>

@@ -7,9 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { getAuthErrorMessage, isRateLimitError } from "@/lib/auth-errors";
+import { TurnstileCaptcha, type TurnstileCaptchaHandle } from "@/components/auth/turnstile-captcha";
 
 const SUCCESS_MESSAGE = "Se o e-mail estiver cadastrado, enviaremos um link para redefinir sua senha.";
 const ERROR_MESSAGE = "Nao foi possivel enviar o link neste momento. Tente novamente.";
+const CAPTCHA_ERROR_MESSAGE = "Não foi possível validar a verificação de segurança. Tente novamente.";
 const RESET_EMAIL_COOLDOWN_SECONDS = 60;
 
 export default function ForgotPasswordPage() {
@@ -17,7 +19,9 @@ export default function ForgotPasswordPage() {
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const submitLockRef = useRef(false);
+  const captchaRef = useRef<TurnstileCaptchaHandle>(null);
 
   useEffect(() => {
     if (cooldownSeconds <= 0) return;
@@ -31,13 +35,17 @@ export default function ForgotPasswordPage() {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (submitLockRef.current || cooldownSeconds > 0) return;
+    if (submitLockRef.current || cooldownSeconds > 0 || !captchaToken) {
+      if (!captchaToken) setFeedback({ type: "error", message: CAPTCHA_ERROR_MESSAGE });
+      return;
+    }
     submitLockRef.current = true;
     setFeedback(null);
     setIsSending(true);
 
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: `${window.location.origin}/redefinir-senha`,
+      captchaToken,
     });
 
     setIsSending(false);
@@ -47,11 +55,13 @@ export default function ForgotPasswordPage() {
       if (isRateLimitError(error)) {
         setCooldownSeconds(RESET_EMAIL_COOLDOWN_SECONDS);
       }
+      captchaRef.current?.reset();
       setFeedback({ type: "error", message: getAuthErrorMessage(error, ERROR_MESSAGE) });
       return;
     }
 
     setCooldownSeconds(RESET_EMAIL_COOLDOWN_SECONDS);
+    captchaRef.current?.reset();
     setFeedback({ type: "success", message: SUCCESS_MESSAGE });
   }
 
@@ -100,7 +110,13 @@ export default function ForgotPasswordPage() {
               />
             </div>
 
-            <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isSending || cooldownSeconds > 0}>
+            <TurnstileCaptcha
+              ref={captchaRef}
+              onTokenChange={setCaptchaToken}
+              onError={(message) => setFeedback({ type: "error", message })}
+            />
+
+            <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isSending || cooldownSeconds > 0 || !captchaToken}>
               {isSending
                 ? "Enviando..."
                 : cooldownSeconds > 0
