@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { BarChart3, FilePlus2, Files, LayoutTemplate, ListTree, SearchCheck, UserCircle } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
+import { toast } from "sonner";
 
 import { ClientLayout } from "@/components/platform/client-layout";
 import { Badge } from "@/components/ui/badge";
 import { DRE_PRODUCT_KEY } from "@/lib/dre-calculations";
 import { checkProductAccess } from "@/lib/products";
-import { createDefaultDreCategories } from "@/lib/dre-service";
+import { ensureDefaultDreStructure } from "@/lib/dre-service";
 import { ProductAccessBlocked } from "@/components/platform/product-access";
 
 const dreNavigation = [
@@ -33,7 +34,7 @@ export function DreLayout({ children }: DreLayoutProps) {
 }
 
 function DreAccessGate({ user, children }: { user: User; children: (user: User) => React.ReactNode }) {
-  const [accessState, setAccessState] = useState<"loading" | "allowed" | "blocked">("loading");
+  const [accessState, setAccessState] = useState<"loading" | "preparing" | "allowed" | "blocked">("loading");
 
   useEffect(() => {
     let active = true;
@@ -43,7 +44,17 @@ function DreAccessGate({ user, children }: { user: User; children: (user: User) 
       if (!active) return;
 
       if (access) {
-        void createDefaultDreCategories(user.id).catch(() => undefined);
+        setAccessState("preparing");
+        try {
+          const result = await ensureDefaultDreStructure();
+          if (!active) return;
+          if (result.created) {
+            toast.success("Modelo padrão de DRE criado com sucesso.");
+          }
+        } catch (error) {
+          if (!active) return;
+          toast.error(error instanceof Error ? error.message : "Não foi possível preparar o modelo padrão. Tente novamente.");
+        }
       }
       setAccessState(access ? "allowed" : "blocked");
     }
@@ -56,6 +67,10 @@ function DreAccessGate({ user, children }: { user: User; children: (user: User) 
 
   if (accessState === "loading") {
     return <div className="text-sm text-muted-foreground">Verificando acesso ao Gestor de DRE...</div>;
+  }
+
+  if (accessState === "preparing") {
+    return <div className="text-sm text-muted-foreground">Preparando seu modelo de DRE...</div>;
   }
 
   if (accessState === "blocked") {

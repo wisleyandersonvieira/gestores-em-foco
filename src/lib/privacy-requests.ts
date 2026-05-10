@@ -64,6 +64,18 @@ export async function cancelPrivacyRequest(userId: string, requestId: string) {
   return data;
 }
 
+export async function deleteOwnAccount() {
+  const { error } = await supabase.functions.invoke("delete-account", {
+    method: "POST",
+    body: {},
+  });
+
+  if (error) {
+    if (import.meta.env.DEV) console.error("Account deletion failed", error);
+    throw new Error("Não foi possível excluir sua conta. Tente novamente.");
+  }
+}
+
 export async function exportUserData(user: User) {
   const userId = user.id;
   const [

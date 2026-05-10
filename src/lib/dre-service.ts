@@ -14,11 +14,24 @@ import type {
   DreSubcategoryWithCategory,
 } from "@/types/dre";
 
-export async function createDefaultDreCategories(userId: string) {
-  const { error } = await supabase.rpc("create_default_dre_categories", { p_user_id: userId });
+type DefaultDreStructureResult = {
+  created: boolean;
+  model_id: string | null;
+};
+
+export async function ensureDefaultDreStructure() {
+  const { data, error } = await supabase.rpc("create_default_dre_structure" as any);
   if (error) {
-    throw new Error("Nao foi possivel preparar as categorias padrao.");
+    throw new Error("Não foi possível preparar o modelo padrão. Tente novamente.");
   }
+
+  const result = Array.isArray(data) ? data[0] : data;
+  return (result ?? { created: false, model_id: null }) as DefaultDreStructureResult;
+}
+
+export async function createDefaultDreCategories(userId: string) {
+  void userId;
+  await ensureDefaultDreStructure();
 }
 
 export async function listDreCategories(userId: string) {

@@ -48,14 +48,13 @@ import {
 } from "@/lib/account-settings";
 import { validatePassword } from "@/lib/password-security";
 import {
-  cancelPrivacyRequest,
   createPrivacyRequest,
+  deleteOwnAccount,
   exportAsExcel,
   exportAsJson,
   exportAsPdf,
   exportFormatLabel,
   getExportData,
-  getActiveDeletionRequest,
   getPrivacyRequests,
   type ExportFormat,
   type PrivacyRequest,
@@ -105,7 +104,6 @@ function SettingsContent({ user }: { user: User }) {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [exportingFormat, setExportingFormat] = useState<ExportFormat | null>(null);
   const [isRequestingDeletion, setIsRequestingDeletion] = useState(false);
-  const [isCancelingDeletion, setIsCancelingDeletion] = useState(false);
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
   const [currentUser, setCurrentUser] = useState<User>(user);
   const [support, setSupport] = useState({ subject: "", message: "", type: "duvida" });
@@ -116,6 +114,7 @@ function SettingsContent({ user }: { user: User }) {
   const passwordUpdateLockRef = useRef(false);
   const resetLinkLockRef = useRef(false);
   const supportLockRef = useRef(false);
+  const deleteAccountLockRef = useRef(false);
   const captchaRef = useRef<TurnstileCaptchaHandle>(null);
 
   useEffect(() => {
@@ -364,32 +363,23 @@ function SettingsContent({ user }: { user: User }) {
     }
   }
 
-  async function handleRequestAccountDeletion() {
+  async function handleDeleteAccount() {
+    if (deleteAccountLockRef.current || deleteConfirmation !== "EXCLUIR") return;
+
+    deleteAccountLockRef.current = true;
     setIsRequestingDeletion(true);
     try {
-      // A exclusao definitiva deve acontecer somente em backend seguro, Edge Function ou fluxo administrativo com service role protegida.
-      await createPrivacyRequest(user.id, "account_deletion", "pending");
-      await reloadPrivacyRequests();
+      await deleteOwnAccount();
+      await supabase.auth.signOut({ scope: "local" });
       setDeleteDialogOpen(false);
       setDeleteConfirmation("");
-      toast.success("Sua solicitação de exclusão foi registrada. Nossa equipe analisará o pedido.");
+      navigate("/", { replace: true });
+      toast.success("Sua conta foi excluída com sucesso.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Nao foi possivel registrar a solicitacao de exclusao.");
+      toast.error(error instanceof Error ? error.message : "Não foi possível excluir sua conta. Tente novamente.");
     } finally {
+      deleteAccountLockRef.current = false;
       setIsRequestingDeletion(false);
-    }
-  }
-
-  async function handleCancelDeletionRequest(requestId: string) {
-    setIsCancelingDeletion(true);
-    try {
-      await cancelPrivacyRequest(user.id, requestId);
-      await reloadPrivacyRequests();
-      toast.success("Solicitação cancelada com sucesso.");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Nao foi possivel cancelar a solicitacao.");
-    } finally {
-      setIsCancelingDeletion(false);
     }
   }
 
@@ -624,27 +614,10 @@ function SettingsContent({ user }: { user: User }) {
 
                 <div className="rounded-lg border border-[var(--danger-border)] bg-[var(--danger-bg)] p-4">
                   <p className="font-semibold text-[var(--danger-color)]">Zona de risco</p>
-                  <p className="mt-2 text-sm text-muted-foreground">A exclusao pode remover seu acesso aos produtos, dados cadastrados e historico da plataforma.</p>
-                  {getActiveDeletionRequest(privacyRequests) ? (
-                    <div className="mt-4 rounded-lg border border-[var(--danger-border)] bg-background/60 p-3 text-sm">
-                      <p className="font-medium text-[var(--danger-color)]">Voce possui uma solicitacao de exclusao em andamento.</p>
-                      <Button
-                        className="mt-3 w-full sm:w-fit"
-                        variant="outline"
-                        disabled={isCancelingDeletion}
-                        onClick={() => {
-                          const activeRequest = getActiveDeletionRequest(privacyRequests);
-                          if (activeRequest) void handleCancelDeletionRequest(activeRequest.id);
-                        }}
-                      >
-                        {isCancelingDeletion ? "Cancelando..." : "Cancelar solicitacao"}
-                      </Button>
-                    </div>
-                  ) : (
-                    <Button className="mt-4 w-full sm:w-fit" variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
-                      Solicitar exclusao da conta
-                    </Button>
-                  )}
+                  <p className="mt-2 text-sm text-muted-foreground">A exclusão da conta removerá seu acesso aos produtos, dados cadastrados e histórico da plataforma.</p>
+                  <Button className="mt-4 w-full sm:w-fit" variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
+                    Excluir minha conta
+                  </Button>
                 </div>
               </div>
 
@@ -701,22 +674,31 @@ function SettingsContent({ user }: { user: User }) {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <Dialog
+        open={deleteDialogOpen}
+        onOpenChange={(nextOpen) => {
+          if (isRequestingDeletion) return;
+          setDeleteDialogOpen(nextOpen);
+          if (!nextOpen) setDeleteConfirmation("");
+        }}
+      >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Solicitar exclusao da conta</DialogTitle>
+            <DialogTitle>Excluir conta</DialogTitle>
             <DialogDescription>
-              A exclusao da conta pode remover seu acesso aos produtos contratados, dados cadastrados, historico de uso e configuracoes da plataforma. Essa acao pode ser irreversivel apos processamento.
+              Esta ação removerá seu acesso à plataforma e excluirá os dados vinculados à sua conta. Essa ação não poderá ser desfeita.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">Por seguranca, sua solicitacao sera analisada antes da exclusao definitiva.</p>
-            <Label>Para continuar, digite: EXCLUIR<Input className="mt-2" value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} /></Label>
+            <p className="rounded-lg border border-[var(--danger-border)] bg-[var(--danger-bg)] p-3 text-sm font-medium text-[var(--danger-color)]">
+              Essa ação não poderá ser desfeita.
+            </p>
+            <Label>Digite EXCLUIR para confirmar.<Input className="mt-2" value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} disabled={isRequestingDeletion} /></Label>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancelar</Button>
-            <Button variant="destructive" disabled={deleteConfirmation !== "EXCLUIR" || isRequestingDeletion} onClick={() => void handleRequestAccountDeletion()}>
-              {isRequestingDeletion ? "Registrando..." : "Confirmar solicitacao"}
+            <Button variant="outline" disabled={isRequestingDeletion} onClick={() => setDeleteDialogOpen(false)}>Cancelar</Button>
+            <Button variant="destructive" disabled={deleteConfirmation !== "EXCLUIR" || isRequestingDeletion} onClick={() => void handleDeleteAccount()}>
+              {isRequestingDeletion ? "Excluindo conta..." : "Excluir definitivamente"}
             </Button>
           </DialogFooter>
         </DialogContent>

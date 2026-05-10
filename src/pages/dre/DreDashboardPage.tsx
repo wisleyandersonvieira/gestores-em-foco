@@ -3,6 +3,7 @@ import type React from "react";
 import { Bar, BarChart, CartesianGrid, LabelList, Line, LineChart, XAxis, YAxis } from "recharts";
 import { Download } from "lucide-react";
 import { toast } from "sonner";
+import { Link } from "react-router-dom";
 
 import { DreLayout } from "@/components/dre/dre-layout";
 import { CompetenceMultiFilter, IndicatorCard, formatCurrency } from "@/components/dre/dre-ui";
@@ -22,11 +23,14 @@ function DreDashboardContent({ userId }: { userId: string }) {
   const [selectedCompetences, setSelectedCompetences] = useState([currentCompetence()]);
   const [entries, setEntries] = useState<DreEntryWithModel[]>([]);
   const [entriesWithItems, setEntriesWithItems] = useState<DreEntryWithItems[]>([]);
+  const [isLoadingEntries, setIsLoadingEntries] = useState(true);
 
   useEffect(() => {
+    setIsLoadingEntries(true);
     void listDreEntries(userId)
       .then(setEntries)
-      .catch((error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel carregar dashboard."));
+      .catch((error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel carregar dashboard."))
+      .finally(() => setIsLoadingEntries(false));
   }, [userId]);
 
   const selectedEntries = useMemo(
@@ -136,6 +140,30 @@ function DreDashboardContent({ userId }: { userId: string }) {
           Exportar PDF
         </Button>
       </div>
+
+      {!isLoadingEntries && entries.length === 0 ? (
+        <Card className="border-primary/10 bg-white/90">
+          <CardContent className="flex flex-col gap-5 p-6 sm:items-start">
+            <div>
+              <h2 className="font-display text-2xl font-semibold">Seu modelo de DRE já está pronto</h2>
+              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+                Criamos uma estrutura gerencial padrão para você começar. Agora basta lançar os valores da competência desejada.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button asChild className="bg-accent text-accent-foreground hover:bg-accent/90">
+                <Link to="/dre-facil/cadastrar">Lançar primeira DRE</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link to="/dre-facil/modelos">Editar modelo</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link to="/dre-facil/categorias">Ver categorias</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card className="border-primary/10 bg-white/90">
         <CardContent className="grid gap-2 p-5 sm:max-w-sm">
