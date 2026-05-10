@@ -53,7 +53,7 @@ export async function getUserProducts(userId: string) {
     .from("user_product_subscriptions")
     .select("*, product:products(*)")
     .eq("user_id", userId)
-    .in("status", ["active", "trialing"])
+    .in("status", ["active", "trialing", "past_due"])
     .order("created_at", { ascending: false });
 
   if (error) throw new Error("Nao foi possivel carregar seus produtos.");
@@ -62,6 +62,7 @@ export async function getUserProducts(userId: string) {
   return ((data ?? []) as UserProductAccess[]).filter((item) => {
     if (!item.product || item.product.status !== "active") return false;
     if (item.canceled_at) return false;
+    if (item.status === "past_due" && !item.current_period_end) return false;
     if (!item.current_period_end) return true;
     return new Date(item.current_period_end).getTime() >= now;
   });
@@ -104,11 +105,45 @@ export async function activateProductSubscriptionForTest(productSlug: string) {
 }
 
 export async function createStripeCheckoutSession(_productSlug: string) {
-  throw new Error("Checkout Stripe ainda nao implementado.");
+  const { data, error } = await supabase.functions.invoke("create-stripe-checkout", {
+    body: { product_slug: _productSlug },
+  });
+
+  if (error) {
+    const message = typeof error.context === "object" && error.context && "error" in error.context
+      ? String((error.context as { error?: unknown }).error)
+      : error.message;
+
+    if (message.includes("already_has_access")) {
+      throw new Error("Você já possui acesso ao Gestor de DRE.");
+    }
+
+    throw new Error("Não foi possível iniciar o checkout. Tente novamente.");
+  }
+
+  const url = typeof data === "object" && data && "url" in data ? String((data as { url?: unknown }).url ?? "") : "";
+  if (!url) {
+    throw new Error("Não foi possível iniciar o checkout. Tente novamente.");
+  }
+
+  return url;
 }
 
 export async function redirectToCustomerPortal() {
-  throw new Error("Portal do cliente Stripe ainda nao implementado.");
+  const { data, error } = await supabase.functions.invoke("create-stripe-portal-session", {
+    body: {},
+  });
+
+  if (error) {
+    throw new Error("Não foi possível abrir o portal de assinatura. Tente novamente.");
+  }
+
+  const url = typeof data === "object" && data && "url" in data ? String((data as { url?: unknown }).url ?? "") : "";
+  if (!url) {
+    throw new Error("Não foi possível abrir o portal de assinatura. Tente novamente.");
+  }
+
+  window.location.assign(url);
 }
 
 export async function handleStripeWebhook() {

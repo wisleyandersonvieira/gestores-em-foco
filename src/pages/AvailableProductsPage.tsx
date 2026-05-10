@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { getAvailableProducts, getUserProducts, productBenefits, type Product, type UserProductAccess } from "@/lib/products";
+import { createStripeCheckoutSession, getAvailableProducts, getUserProducts, productBenefits, PRODUCT_SLUGS, type Product, type UserProductAccess } from "@/lib/products";
 
 const productIcons: Record<string, ComponentType<{ className?: string }>> = {
   diagnosticos: BarChart3,
@@ -29,6 +29,7 @@ function AvailableProductsContent({ userId }: { userId: string }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [userProducts, setUserProducts] = useState<UserProductAccess[]>([]);
   const [contractProduct, setContractProduct] = useState<Product | null>(null);
+  const [checkoutProductSlug, setCheckoutProductSlug] = useState<string | null>(null);
 
   async function reload() {
     await Promise.all([getAvailableProducts(), getUserProducts(userId)])
@@ -108,13 +109,28 @@ function AvailableProductsContent({ userId }: { userId: string }) {
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
             <Button variant="outline" onClick={() => setContractProduct(null)}>Cancelar</Button>
             <Button
-              disabled={!contractProduct}
-              onClick={() => {
-                toast.info("Checkout em preparacao. Solicite a liberacao ao suporte ou administrador.");
-                setContractProduct(null);
+              disabled={!contractProduct || checkoutProductSlug === contractProduct.slug}
+              onClick={async () => {
+                if (!contractProduct) return;
+
+                if (contractProduct.slug !== PRODUCT_SLUGS.dre) {
+                  toast.info("Checkout em preparação para este produto.");
+                  setContractProduct(null);
+                  return;
+                }
+
+                setCheckoutProductSlug(contractProduct.slug);
+                try {
+                  const checkoutUrl = await createStripeCheckoutSession(contractProduct.slug);
+                  window.location.assign(checkoutUrl);
+                } catch (error) {
+                  toast.error(error instanceof Error ? error.message : "Não foi possível iniciar o checkout. Tente novamente.");
+                } finally {
+                  setCheckoutProductSlug(null);
+                }
               }}
             >
-              Solicitar contratação
+              {checkoutProductSlug === contractProduct?.slug ? "Preparando checkout..." : "Contratar"}
             </Button>
           </div>
         </DialogContent>

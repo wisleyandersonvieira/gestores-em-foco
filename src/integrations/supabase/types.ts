@@ -65,6 +65,33 @@ export type Database = {
         }
         Relationships: []
       }
+      billing_customers: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          stripe_customer_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          stripe_customer_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          stripe_customer_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       course_lesson_materials: {
         Row: {
           course_id: string
@@ -1153,7 +1180,9 @@ export type Database = {
       }
       products: {
         Row: {
+          billing_interval: string | null
           created_at: string
+          currency: string | null
           display_order: number
           full_description: string | null
           highlight_color: string | null
@@ -1165,11 +1194,15 @@ export type Database = {
           short_description: string | null
           slug: string
           status: string
+          price_cents: number | null
+          stripe_price_id: string | null
           stripe_product_id: string | null
           updated_at: string
         }
         Insert: {
+          billing_interval?: string | null
           created_at?: string
+          currency?: string | null
           display_order?: number
           full_description?: string | null
           highlight_color?: string | null
@@ -1181,11 +1214,15 @@ export type Database = {
           short_description?: string | null
           slug: string
           status?: string
+          price_cents?: number | null
+          stripe_price_id?: string | null
           stripe_product_id?: string | null
           updated_at?: string
         }
         Update: {
+          billing_interval?: string | null
           created_at?: string
+          currency?: string | null
           display_order?: number
           full_description?: string | null
           highlight_color?: string | null
@@ -1197,6 +1234,8 @@ export type Database = {
           short_description?: string | null
           slug?: string
           status?: string
+          price_cents?: number | null
+          stripe_price_id?: string | null
           stripe_product_id?: string | null
           updated_at?: string
         }
@@ -1522,6 +1561,7 @@ export type Database = {
       user_product_subscriptions: {
         Row: {
           access_type: string
+          cancel_at_period_end: boolean
           canceled_at: string | null
           created_at: string
           current_period_end: string | null
@@ -1540,6 +1580,7 @@ export type Database = {
         }
         Insert: {
           access_type?: string
+          cancel_at_period_end?: boolean
           canceled_at?: string | null
           created_at?: string
           current_period_end?: string | null
@@ -1558,6 +1599,7 @@ export type Database = {
         }
         Update: {
           access_type?: string
+          cancel_at_period_end?: boolean
           canceled_at?: string | null
           created_at?: string
           current_period_end?: string | null
@@ -1583,6 +1625,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      stripe_webhook_events: {
+        Row: {
+          id: string
+          payload: Json
+          processed_at: string
+          type: string
+        }
+        Insert: {
+          id: string
+          payload: Json
+          processed_at?: string
+          type: string
+        }
+        Update: {
+          id?: string
+          payload?: Json
+          processed_at?: string
+          type?: string
+        }
+        Relationships: []
       }
       user_products: {
         Row: {

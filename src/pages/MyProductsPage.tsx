@@ -19,6 +19,7 @@ const productIcons: Record<string, ComponentType<{ className?: string }>> = {
 const statusLabels: Record<string, string> = {
   active: "Acesso ativo",
   trialing: "Teste ativo",
+  past_due: "Pagamento pendente",
 };
 
 export default function MyProductsPage() {

@@ -12,6 +12,8 @@ import ProfilePage from "@/pages/ProfilePage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import SettingsPage from "@/pages/SettingsPage";
 import AdminPage from "@/pages/AdminPage";
+import CheckoutCanceledPage from "@/pages/CheckoutCanceledPage";
+import CheckoutSuccessPage from "@/pages/CheckoutSuccessPage";
 import DiagnosticPage from "@/pages/DiagnosticPage";
 import DiagnosticReportPage from "@/pages/DiagnosticReportPage";
 import CoursesPage from "@/pages/courses/CoursesPage";
@@ -44,6 +46,8 @@ export default function App() {
       <Route path="/dashboard" element={<DashboardPage />} />
       <Route path="/meus-produtos" element={<MyProductsPage />} />
       <Route path="/produtos" element={<AvailableProductsPage />} />
+      <Route path="/checkout/sucesso" element={<CheckoutSuccessPage />} />
+      <Route path="/checkout/cancelado" element={<CheckoutCanceledPage />} />
       <Route path="/diagnosticos" element={<DiagnosticsWorkspacePage />} />
       <Route path="/solucoes" element={<SolucoesPage />} />
       <Route path="/cursos" element={<PublicCoursesPage />} />
