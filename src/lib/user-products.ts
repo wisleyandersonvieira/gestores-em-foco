@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { Json, Tables, TablesInsert } from "@/integrations/supabase/types";
+import type { Tables } from "@/integrations/supabase/types";
 
 export type UserProduct = Tables<"user_products">;
 export type ProductType = UserProduct["product_type"];
@@ -60,21 +60,14 @@ export async function ensureDiagnosticProduct(params: {
     return;
   }
 
-  const insertPayload: TablesInsert<"user_products"> = {
-    user_id: params.userId,
-    product_name: params.templateName || "Diagnostico Empresarial",
-    product_type: "diagnostico",
-    status: "concluido",
-    purchased_at: params.completedAt ?? new Date().toISOString(),
-    access_url: `/minha-conta/diagnostico/${params.sessionId}/resultado`,
-    metadata: {
-      diagnostic_session_id: params.sessionId,
-    } satisfies Json,
-  };
-
-  const { error } = await supabase.from("user_products").insert(insertPayload);
+  const { error } = await supabase.rpc("register_completed_diagnostic_product" as any, {
+    p_session_id: params.sessionId,
+  });
 
   if (error) {
     throw new Error("Nao foi possivel registrar o diagnostico em seus produtos.");
   }
+
+  void params.templateName;
+  void params.completedAt;
 }

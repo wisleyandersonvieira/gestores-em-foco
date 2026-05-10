@@ -164,9 +164,10 @@ export async function createSupportRequest(userId: string, data: Pick<SupportReq
   if (error) throw new Error("Nao foi possivel enviar sua solicitacao.");
 }
 
-export async function sendPasswordResetEmail(email: string) {
+export async function sendPasswordResetEmail(email: string, captchaToken: string) {
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${window.location.origin}/redefinir-senha`,
+    captchaToken,
   });
 
   if (error) {

@@ -61,6 +61,7 @@ export async function getUserProducts(userId: string) {
   const now = Date.now();
   return ((data ?? []) as UserProductAccess[]).filter((item) => {
     if (!item.product || item.product.status !== "active") return false;
+    if (item.canceled_at) return false;
     if (!item.current_period_end) return true;
     return new Date(item.current_period_end).getTime() >= now;
   });

@@ -417,11 +417,10 @@ export async function validateDiagnosticTokenForUser(token: string, userId: stri
     throw new Error("Digite um token ou link valido.");
   }
 
-  const { data: link, error } = await supabase
-    .from("diagnostic_links")
-    .select("id, token, assigned_user_id, expires_at, status")
-    .eq("token", cleanedToken)
-    .maybeSingle();
+  const { data, error } = await supabase.rpc("get_diagnostic_link_by_token" as any, {
+    p_token: cleanedToken,
+  });
+  const link = Array.isArray(data) ? data[0] : data;
 
   if (error || !link) {
     throw new Error("Nao encontramos um diagnostico com este token.");
@@ -443,11 +442,10 @@ export async function validateDiagnosticTokenForUser(token: string, userId: stri
 }
 
 export async function getDiagnosticRuntimeByToken(token: string, userId: string): Promise<DiagnosticSessionRuntime> {
-  const { data: link, error: linkError } = await supabase
-    .from("diagnostic_links")
-    .select("*")
-    .eq("token", token)
-    .single();
+  const { data: linkData, error: linkError } = await supabase.rpc("get_diagnostic_link_by_token" as any, {
+    p_token: token,
+  });
+  const link = Array.isArray(linkData) ? linkData[0] : linkData;
 
   if (linkError || !link) {
     throw new Error("invalid_link");

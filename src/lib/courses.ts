@@ -166,7 +166,7 @@ export async function getUserCourses(userId: string) {
 
   if (error) throw new Error("Nao foi possivel carregar seus cursos.");
   const now = Date.now();
-  return ((data ?? []) as UserCourseEnrollment[]).filter((item) => !item.expires_at || new Date(item.expires_at).getTime() > now);
+  return ((data ?? []) as UserCourseEnrollment[]).filter((item) => !item.canceled_at && (!item.expires_at || new Date(item.expires_at).getTime() > now));
 }
 
 export async function getUserCourseProgressByCourse(userId: string, courseIds: string[]) {

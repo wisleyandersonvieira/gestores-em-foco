@@ -4,6 +4,7 @@ import { Bell, CreditCard, Eye, EyeOff, HelpCircle, KeyRound, LogOut, MonitorCog
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
+import { TurnstileCaptcha, type TurnstileCaptchaHandle } from "@/components/auth/turnstile-captcha";
 import { ClientLayout } from "@/components/platform/client-layout";
 import {
   AlertDialog,
@@ -72,6 +73,7 @@ const settingsCards = [
   { value: "suporte", title: "Suporte", description: "Fale com nosso time.", icon: HelpCircle },
 ];
 const RESET_LINK_COOLDOWN_SECONDS = 60;
+const CAPTCHA_ERROR_MESSAGE = "Não foi possível validar a verificação de segurança. Tente novamente.";
 
 export default function SettingsPage() {
   return (
@@ -107,10 +109,14 @@ function SettingsContent({ user }: { user: User }) {
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
   const [currentUser, setCurrentUser] = useState<User>(user);
   const [support, setSupport] = useState({ subject: "", message: "", type: "duvida" });
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [isSendingSupport, setIsSendingSupport] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const passwordUpdateLockRef = useRef(false);
   const resetLinkLockRef = useRef(false);
+  const supportLockRef = useRef(false);
+  const captchaRef = useRef<TurnstileCaptchaHandle>(null);
 
   useEffect(() => {
     void Promise.all([
@@ -263,13 +269,20 @@ function SettingsContent({ user }: { user: User }) {
       return;
     }
 
+    if (!captchaToken) {
+      toast.error(CAPTCHA_ERROR_MESSAGE);
+      return;
+    }
+
     resetLinkLockRef.current = true;
     setIsSendingResetLink(true);
     try {
-      await sendPasswordResetEmail(currentUser.email);
+      await sendPasswordResetEmail(currentUser.email, captchaToken);
       toast.success("Enviamos um link de redefinição para o seu e-mail.");
       setResetLinkCooldownSeconds(RESET_LINK_COOLDOWN_SECONDS);
+      captchaRef.current?.reset();
     } catch (error) {
+      captchaRef.current?.reset();
       toast.error(error instanceof Error ? error.message : "Não foi possível enviar o link de redefinição. Tente novamente.");
     } finally {
       resetLinkLockRef.current = false;
@@ -310,9 +323,17 @@ function SettingsContent({ user }: { user: User }) {
   }
 
   async function handleSupportSubmit() {
-    await createSupportRequest(user.id, support);
-    setSupport({ subject: "", message: "", type: "duvida" });
-    toast.success("Sua solicitacao foi enviada com sucesso.");
+    if (supportLockRef.current) return;
+    supportLockRef.current = true;
+    setIsSendingSupport(true);
+    try {
+      await createSupportRequest(user.id, support);
+      setSupport({ subject: "", message: "", type: "duvida" });
+      toast.success("Sua solicitacao foi enviada com sucesso.");
+    } finally {
+      supportLockRef.current = false;
+      setIsSendingSupport(false);
+    }
   }
 
   async function reloadPrivacyRequests() {
@@ -485,10 +506,17 @@ function SettingsContent({ user }: { user: User }) {
                   >
                     {isUpdatingPassword ? "Alterando..." : "Alterar senha"}
                   </Button>
+                </div>
+                <TurnstileCaptcha
+                  ref={captchaRef}
+                  onTokenChange={setCaptchaToken}
+                  onError={(message) => toast.error(message)}
+                />
+                <div className="flex flex-col gap-3 sm:flex-row">
                   <Button
                     variant="outline"
                     className="sm:w-fit"
-                    disabled={isSendingResetLink || resetLinkCooldownSeconds > 0}
+                    disabled={isSendingResetLink || resetLinkCooldownSeconds > 0 || !captchaToken}
                     onClick={() => void handleSendPasswordResetEmail()}
                   >
                     {isSendingResetLink
@@ -664,7 +692,9 @@ function SettingsContent({ user }: { user: User }) {
                 <Field label="Assunto" value={support.subject} onChange={(value) => setSupport({ ...support, subject: value })} />
                 <SelectField label="Tipo" value={support.type} onChange={(value) => setSupport({ ...support, type: value })} options={[["duvida", "Duvida"], ["problema", "Problema"], ["sugestao", "Sugestao"], ["financeiro", "Financeiro"]]} />
                 <Label>Mensagem<Textarea className="mt-2" value={support.message} onChange={(event) => setSupport({ ...support, message: event.target.value })} /></Label>
-                <Button onClick={() => void handleSupportSubmit().catch((error) => toast.error(error.message))}>Enviar solicitacao</Button>
+                <Button disabled={isSendingSupport} onClick={() => void handleSupportSubmit().catch((error) => toast.error(error.message))}>
+                  {isSendingSupport ? "Enviando..." : "Enviar solicitacao"}
+                </Button>
               </div>
             </div>
           </SettingsCard>
