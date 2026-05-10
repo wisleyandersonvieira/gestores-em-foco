@@ -70,6 +70,16 @@ function AvailableProductsContent({ userId }: { userId: string }) {
                 </div>
                 <CardTitle className="text-xl">{product.name}</CardTitle>
                 <CardDescription>{product.short_description}</CardDescription>
+                {product.price_cents ? (
+                  <div className="mt-3 flex items-baseline gap-1">
+                    <span className="text-3xl font-bold text-primary">
+                      {new Intl.NumberFormat("pt-BR", { style: "currency", currency: product.currency ?? "BRL" }).format(product.price_cents / 100)}
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      /{product.billing_interval === "month" ? "mês" : product.billing_interval === "year" ? "ano" : product.billing_interval}
+                    </span>
+                  </div>
+                ) : null}
               </CardHeader>
               <CardContent className="mt-auto space-y-5">
                 <div className="grid gap-2 text-sm">

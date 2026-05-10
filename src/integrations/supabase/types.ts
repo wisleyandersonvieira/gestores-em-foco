@@ -1189,12 +1189,12 @@ export type Database = {
           icon: string | null
           id: string
           name: string
+          price_cents: number | null
           product_type: string
           route_path: string | null
           short_description: string | null
           slug: string
           status: string
-          price_cents: number | null
           stripe_price_id: string | null
           stripe_product_id: string | null
           updated_at: string
@@ -1209,12 +1209,12 @@ export type Database = {
           icon?: string | null
           id?: string
           name: string
+          price_cents?: number | null
           product_type?: string
           route_path?: string | null
           short_description?: string | null
           slug: string
           status?: string
-          price_cents?: number | null
           stripe_price_id?: string | null
           stripe_product_id?: string | null
           updated_at?: string
@@ -1229,12 +1229,12 @@ export type Database = {
           icon?: string | null
           id?: string
           name?: string
+          price_cents?: number | null
           product_type?: string
           route_path?: string | null
           short_description?: string | null
           slug?: string
           status?: string
-          price_cents?: number | null
           stripe_price_id?: string | null
           stripe_product_id?: string | null
           updated_at?: string
@@ -1319,6 +1319,27 @@ export type Database = {
           session_id?: string | null
           user_agent?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      stripe_webhook_events: {
+        Row: {
+          id: string
+          payload: Json
+          processed_at: string
+          type: string
+        }
+        Insert: {
+          id: string
+          payload: Json
+          processed_at?: string
+          type: string
+        }
+        Update: {
+          id?: string
+          payload?: Json
+          processed_at?: string
+          type?: string
         }
         Relationships: []
       }
@@ -1626,27 +1647,6 @@ export type Database = {
           },
         ]
       }
-      stripe_webhook_events: {
-        Row: {
-          id: string
-          payload: Json
-          processed_at: string
-          type: string
-        }
-        Insert: {
-          id: string
-          payload: Json
-          processed_at?: string
-          type: string
-        }
-        Update: {
-          id?: string
-          payload?: Json
-          processed_at?: string
-          type?: string
-        }
-        Relationships: []
-      }
       user_products: {
         Row: {
           access_url: string | null
@@ -1765,6 +1765,7 @@ export type Database = {
         Args: { p_product_slug: string }
         Returns: {
           access_type: string
+          cancel_at_period_end: boolean
           canceled_at: string | null
           created_at: string
           current_period_end: string | null
