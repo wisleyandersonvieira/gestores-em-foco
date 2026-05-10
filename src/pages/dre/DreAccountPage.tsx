@@ -5,7 +5,7 @@ import { ProductSubscriptionPanel } from "@/components/platform/product-subscrip
 import { DRE_PRODUCT_KEY } from "@/lib/dre-calculations";
 
 export default function DreAccountPage() {
-  return <DreLayout>{(user) => <DreAccountContent user={user} />}</DreLayout>;
+  return <DreLayout allowBlockedAccess>{(user) => <DreAccountContent user={user} />}</DreLayout>;
 }
 
 function DreAccountContent({ user }: { user: User }) {
@@ -13,7 +13,7 @@ function DreAccountContent({ user }: { user: User }) {
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-3xl font-semibold">Minha Conta</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Estrutura preparada para assinatura e futura integracao Stripe.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Acompanhe seu plano, renovação e status de acesso ao Gestor de DRE.</p>
       </div>
 
       <ProductSubscriptionPanel userId={user.id} productSlug={DRE_PRODUCT_KEY} />

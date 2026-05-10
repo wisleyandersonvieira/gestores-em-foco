@@ -4,15 +4,30 @@ import Stripe from "https://esm.sh/stripe@16.12.0?target=deno";
 const allowedOrigins = new Set([
   "https://gestoresemfoco.com.br",
   "https://www.gestoresemfoco.com.br",
+  "https://gestoresemfoco.lovable.app",
   "http://localhost:5173",
   "http://localhost:8080",
   "http://127.0.0.1:5173",
   "http://127.0.0.1:8080",
 ]);
 
+function isAllowedOrigin(origin: string) {
+  if (allowedOrigins.has(origin)) return true;
+  try {
+    const { hostname } = new URL(origin);
+    return (
+      hostname.endsWith(".lovable.app") ||
+      hostname.endsWith(".lovableproject.com") ||
+      hostname.endsWith(".lovable.dev")
+    );
+  } catch {
+    return false;
+  }
+}
+
 function corsHeaders(request: Request) {
   const origin = request.headers.get("origin") ?? "";
-  const allowOrigin = allowedOrigins.has(origin) ? origin : "https://gestoresemfoco.com.br";
+  const allowOrigin = isAllowedOrigin(origin) ? origin : "https://gestoresemfoco.com.br";
 
   return {
     "Access-Control-Allow-Origin": allowOrigin,
@@ -78,7 +93,10 @@ Deno.serve(async (request) => {
     .maybeSingle();
 
   if (billingCustomerError || !billingCustomer?.stripe_customer_id) {
-    return jsonResponse(request, 404, { error: "billing_customer_not_found" });
+    return jsonResponse(request, 404, {
+      error: "billing_customer_not_found",
+      message: "Cliente Stripe não encontrado.",
+    });
   }
 
   const stripe = new Stripe(stripeSecretKey, {
@@ -88,7 +106,7 @@ Deno.serve(async (request) => {
 
   const session = await stripe.billingPortal.sessions.create({
     customer: billingCustomer.stripe_customer_id,
-    return_url: `${appUrl}/meus-produtos`,
+    return_url: `${appUrl}/dre-facil/minha-conta`,
   });
 
   return jsonResponse(request, 200, { url: session.url });

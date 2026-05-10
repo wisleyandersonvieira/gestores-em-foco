@@ -23,17 +23,18 @@ const dreNavigation = [
 
 type DreLayoutProps = {
   children: (user: User) => React.ReactNode;
+  allowBlockedAccess?: boolean;
 };
 
-export function DreLayout({ children }: DreLayoutProps) {
+export function DreLayout({ children, allowBlockedAccess = false }: DreLayoutProps) {
   return (
     <ClientLayout>
-      {(user) => <DreAccessGate user={user}>{children}</DreAccessGate>}
+      {(user) => <DreAccessGate user={user} allowBlockedAccess={allowBlockedAccess}>{children}</DreAccessGate>}
     </ClientLayout>
   );
 }
 
-function DreAccessGate({ user, children }: { user: User; children: (user: User) => React.ReactNode }) {
+function DreAccessGate({ user, children, allowBlockedAccess }: { user: User; children: (user: User) => React.ReactNode; allowBlockedAccess: boolean }) {
   const [accessState, setAccessState] = useState<"loading" | "preparing" | "allowed" | "blocked">("loading");
 
   useEffect(() => {
@@ -74,6 +75,10 @@ function DreAccessGate({ user, children }: { user: User; children: (user: User) 
   }
 
   if (accessState === "blocked") {
+    if (allowBlockedAccess) {
+      return <div className="space-y-7">{children(user)}</div>;
+    }
+
     return <ProductAccessBlocked productName="Gestor de DRE" />;
   }
 

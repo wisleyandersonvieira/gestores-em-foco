@@ -43,14 +43,18 @@ export function ProductAccessGate({
 }
 
 export function ProductAccessBlocked({ productName }: { productName: string }) {
+  const isDre = productName === "Gestor de DRE";
+
   return (
     <Card className="border-primary/10 bg-white/90">
       <CardContent className="flex flex-col gap-5 p-8 text-center sm:items-center">
-        <Badge variant="outline" className="w-fit">Acesso ao produto nao disponivel</Badge>
+        <Badge variant="outline" className="w-fit">Acesso ao produto não disponível</Badge>
         <div>
-          <h1 className="font-display text-3xl font-semibold">Voce ainda nao possui acesso ao {productName}.</h1>
+          <h1 className="font-display text-3xl font-semibold">
+            {isDre ? "Sua assinatura do Gestor de DRE não está ativa." : `Você ainda não possui acesso ao ${productName}.`}
+          </h1>
           <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
-            Para utilizar este modulo, e necessario contratar ou ativar este produto em sua conta.
+            Para utilizar este módulo, é necessário contratar ou ativar este produto em sua conta.
           </p>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row">

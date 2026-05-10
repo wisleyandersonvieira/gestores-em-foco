@@ -53,7 +53,6 @@ export async function getUserProducts(userId: string) {
     .from("user_product_subscriptions")
     .select("*, product:products(*)")
     .eq("user_id", userId)
-    .in("status", ["active", "trialing", "past_due"])
     .order("created_at", { ascending: false });
 
   if (error) throw new Error("Nao foi possivel carregar seus produtos.");
@@ -61,11 +60,27 @@ export async function getUserProducts(userId: string) {
   const now = Date.now();
   return ((data ?? []) as UserProductAccess[]).filter((item) => {
     if (!item.product || item.product.status !== "active") return false;
-    if (item.canceled_at) return false;
-    if (item.status === "past_due" && !item.current_period_end) return false;
-    if (!item.current_period_end) return true;
-    return new Date(item.current_period_end).getTime() >= now;
+    return hasActiveProductAccess(item, now);
   });
+}
+
+export function hasActiveProductAccess(subscription: Pick<UserProductSubscription, "status" | "current_period_end" | "cancel_at_period_end">, now = Date.now()) {
+  const periodEnd = subscription.current_period_end ? new Date(subscription.current_period_end).getTime() : null;
+  const hasValidPeriod = periodEnd === null || periodEnd >= now;
+
+  if (subscription.status === "active" || subscription.status === "trialing") {
+    return hasValidPeriod;
+  }
+
+  if (subscription.status === "past_due") {
+    return periodEnd !== null && periodEnd >= now;
+  }
+
+  if (subscription.cancel_at_period_end) {
+    return periodEnd !== null && periodEnd >= now;
+  }
+
+  return false;
 }
 
 export async function checkProductAccess(userId: string, productSlug: string) {
@@ -135,6 +150,19 @@ export async function redirectToCustomerPortal() {
   });
 
   if (error) {
+    const context = error.context as unknown;
+    if (context instanceof Response) {
+      let payload: { error?: unknown } | null = null;
+      try {
+        payload = await context.clone().json();
+      } catch (_parseError) {
+        // Fall through to the generic portal error.
+      }
+      if (payload?.error === "billing_customer_not_found") {
+        throw new Error("Não encontramos sua assinatura no Stripe. Entre em contato com o suporte.");
+      }
+    }
+
     throw new Error("Não foi possível abrir o portal de assinatura. Tente novamente.");
   }
 

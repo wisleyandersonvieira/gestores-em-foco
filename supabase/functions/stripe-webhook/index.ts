@@ -199,12 +199,21 @@ async function handleSubscriptionEvent(
 }
 
 async function handleInvoiceEvent(
+  stripe: Stripe,
   supabaseAdmin: ReturnType<typeof createClient>,
   invoice: Stripe.Invoice,
   status: "active" | "past_due",
 ) {
   const stripeSubscriptionId = getObjectId(invoice.subscription as Stripe.Subscription | string | null);
   if (!stripeSubscriptionId) return;
+
+  try {
+    const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+    await handleSubscriptionEvent(supabaseAdmin, subscription);
+    return;
+  } catch (_error) {
+    // Fall back to the invoice payload when Stripe cannot return the subscription.
+  }
 
   const { data: existing } = await supabaseAdmin
     .from("user_product_subscriptions")
@@ -289,10 +298,10 @@ Deno.serve(async (request) => {
         await handleSubscriptionEvent(supabaseAdmin, event.data.object as Stripe.Subscription);
         break;
       case "invoice.paid":
-        await handleInvoiceEvent(supabaseAdmin, event.data.object as Stripe.Invoice, "active");
+        await handleInvoiceEvent(stripe, supabaseAdmin, event.data.object as Stripe.Invoice, "active");
         break;
       case "invoice.payment_failed":
-        await handleInvoiceEvent(supabaseAdmin, event.data.object as Stripe.Invoice, "past_due");
+        await handleInvoiceEvent(stripe, supabaseAdmin, event.data.object as Stripe.Invoice, "past_due");
         break;
       default:
         break;
