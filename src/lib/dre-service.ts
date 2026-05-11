@@ -158,30 +158,42 @@ export async function deleteOrDeactivateDreSubcategory(subcategory: DreSubcatego
 }
 
 export async function listDreModels(userId: string, status?: DreRecordStatus) {
-  let query = supabase.from("dre_models").select("*").eq("user_id", userId).order("created_at", { ascending: false });
-  if (status) query = query.eq("status", status);
-
-  const { data, error } = await query;
-  if (error) throw new Error("Nao foi possivel carregar modelos.");
-  return data ?? [];
+  try {
+    return await fetchAllPaginated((from, to) => {
+      let q = supabase
+        .from("dre_models")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .range(from, to);
+      if (status) q = q.eq("status", status);
+      return q;
+    });
+  } catch {
+    throw new Error("Nao foi possivel carregar modelos.");
+  }
 }
 
 export async function getDreModelWithLines(userId: string, modelId: string): Promise<DreModelWithLines> {
   const { data: model, error: modelError } = await supabase.from("dre_models").select("*").eq("user_id", userId).eq("id", modelId).single();
   if (modelError) throw new Error("Modelo nao encontrado.");
 
-  const { data: lines, error: linesError } = await supabase
-    .from("dre_model_lines")
-    .select("*, category:dre_categories!dre_model_lines_category_id_fkey(*), subcategory:dre_subcategories!dre_model_lines_subcategory_id_fkey(*)")
-    .eq("user_id", userId)
-    .eq("model_id", modelId)
-    .order("display_order", { ascending: true });
-
-  if (linesError) {
+  let lines: DreModelWithLines["lines"];
+  try {
+    lines = (await fetchAllPaginated((from, to) =>
+      supabase
+        .from("dre_model_lines")
+        .select("*, category:dre_categories!dre_model_lines_category_id_fkey(*), subcategory:dre_subcategories!dre_model_lines_subcategory_id_fkey(*)")
+        .eq("user_id", userId)
+        .eq("model_id", modelId)
+        .order("display_order", { ascending: true })
+        .range(from, to),
+    )) as DreModelWithLines["lines"];
+  } catch (linesError) {
     if (import.meta.env.DEV) console.error("Erro ao carregar estrutura do modelo DRE:", linesError);
     throw new Error("Nao foi possivel carregar a estrutura do modelo.");
   }
-  return { ...model, lines: (lines ?? []) as DreModelWithLines["lines"] };
+  return { ...model, lines };
 }
 
 export async function saveDreModel(params: {
