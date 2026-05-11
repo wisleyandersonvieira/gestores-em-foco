@@ -19,6 +19,36 @@ type DefaultDreStructureResult = {
   model_id: string | null;
 };
 
+/**
+ * O PostgREST do Supabase limita cada resposta a no máximo 1000 linhas.
+ * Este helper itera por páginas usando `.range(from, to)` até trazer todos
+ * os registros, garantindo que listagens grandes (DREs com muitos meses,
+ * itens, linhas de modelo etc.) nunca sejam truncadas silenciosamente.
+ *
+ * Use sempre encadeando filtros ANTES de chamar (incluindo `.eq("user_id", ...)`),
+ * para que cada página continue restrita ao usuário correto.
+ */
+const PAGE_SIZE = 1000;
+async function fetchAllRows<T>(
+  buildQuery: () => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  applyRange: (query: any, from: number, to: number) => any,
+): Promise<T[]> {
+  const all: T[] = [];
+  let from = 0;
+  // safety cap: 200k linhas por consulta
+  for (let page = 0; page < 200; page += 1) {
+    const to = from + PAGE_SIZE - 1;
+    const query = applyRange(buildQuery(), from, to);
+    const { data, error } = (await query) as { data: T[] | null; error: { message: string } | null };
+    if (error) throw error;
+    const rows = data ?? [];
+    all.push(...rows);
+    if (rows.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  return all;
+}
+
 export async function ensureDefaultDreStructure() {
   const { data, error } = await supabase.rpc("create_default_dre_structure" as any);
   if (error) {
