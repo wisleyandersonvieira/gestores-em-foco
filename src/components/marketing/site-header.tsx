@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import logo from "@/assets/logo-gestores-em-foco.png";
 
 const navigation = [
   { href: "/", label: "Início" },
@@ -14,14 +15,8 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-50 border-b border-white/60 bg-background/80 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-4">
-        <Link to="/" className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-sm font-bold text-primary-foreground">
-            GF
-          </div>
-          <div>
-            <p className="font-display text-base font-semibold uppercase tracking-wide">Gestores em Foco</p>
-            <p className="text-xs text-muted-foreground">Mentoria Empresarial</p>
-          </div>
+        <Link to="/" className="flex items-center gap-3" aria-label="Gestores em Foco">
+          <img src={logo} alt="Gestores em Foco - Mentoria Empresarial" className="h-12 w-auto" />
         </Link>
 
         <nav className="hidden items-center gap-6 text-sm font-medium text-muted-foreground lg:flex">

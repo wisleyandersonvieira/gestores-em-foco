@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useTheme } from "@/hooks/use-theme";
 import { getUserProductAccessMap, PRODUCT_SLUGS } from "@/lib/products";
+import logo from "@/assets/logo-gestores-em-foco.png";
 
 const generalNavigation = [
   { to: "/dashboard", label: "Início / Dashboard", icon: Home },
@@ -113,12 +114,8 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     <div className="min-h-screen bg-background md:grid md:grid-cols-[260px_1fr]">
       <aside className="hidden bg-sidebar text-sidebar-foreground md:block">
         <div className="sticky top-0 flex h-screen flex-col px-5 py-6">
-          <Link to="/dashboard" className="mb-8 flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-accent text-sm font-bold text-accent-foreground">GF</div>
-            <div>
-              <p className="font-display text-base font-semibold uppercase tracking-wide">Gestores em Foco</p>
-              <p className="text-xs text-sidebar-foreground/65">Área do cliente</p>
-            </div>
+          <Link to="/dashboard" className="mb-8 flex items-center gap-3 rounded-lg bg-white p-3" aria-label="Gestores em Foco">
+            <img src={logo} alt="Gestores em Foco" className="h-12 w-auto" />
           </Link>
           <NavItems productAccess={productAccess} />
           <Button variant="ghost" className="mt-auto justify-start gap-3 text-sidebar-foreground/78 hover:bg-white/10 hover:text-white" onClick={handleSignOut}>
