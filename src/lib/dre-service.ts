@@ -110,15 +110,19 @@ export async function deleteOrDeactivateDreCategory(category: DreCategory) {
 }
 
 export async function listDreSubcategories(userId: string) {
-  const { data, error } = await supabase
-    .from("dre_subcategories")
-    .select("*, category:dre_categories(id,name,type,status)")
-    .eq("user_id", userId)
-    .order("display_order", { ascending: true })
-    .order("name", { ascending: true });
-
-  if (error) throw new Error("Nao foi possivel carregar subcategorias.");
-  return (data ?? []) as DreSubcategoryWithCategory[];
+  try {
+    return (await fetchAllPaginated<DreSubcategoryWithCategory>((from, to) =>
+      supabase
+        .from("dre_subcategories")
+        .select("*, category:dre_categories(id,name,type,status)")
+        .eq("user_id", userId)
+        .order("display_order", { ascending: true })
+        .order("name", { ascending: true })
+        .range(from, to),
+    )) as DreSubcategoryWithCategory[];
+  } catch {
+    throw new Error("Nao foi possivel carregar subcategorias.");
+  }
 }
 
 export async function saveDreSubcategory(payload: TablesInsert<"dre_subcategories"> | TablesUpdate<"dre_subcategories">) {
