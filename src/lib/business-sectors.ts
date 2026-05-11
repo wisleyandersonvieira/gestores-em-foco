@@ -7,6 +7,8 @@ export type BusinessSectorWithSubsectors = BusinessSector & {
   subsectors: BusinessSubsector[];
 };
 
+const fromAny = (table: string) => (supabase.from as any)(table);
+
 export function normalizeSearchText(value: string) {
   return value
     .normalize("NFD")
@@ -186,4 +188,31 @@ export async function deleteSubsector(id: string) {
 
   const { error } = await supabase.from("business_subsectors").delete().eq("id", id);
   if (error) throw new Error("Não foi possível excluir o subsetor.");
+}
+
+export type UserCommunitySelections = {
+  sectorIds: string[];
+  subsectorIds: string[];
+};
+
+export async function getUserCommunitySelections(userId: string): Promise<UserCommunitySelections> {
+  const [{ data: sectors, error: sectorsError }, { data: subsectors, error: subsectorsError }] = await Promise.all([
+    fromAny("user_sectors").select("sector_id").eq("user_id", userId),
+    fromAny("user_subsectors").select("subsector_id").eq("user_id", userId),
+  ]);
+
+  if (sectorsError || subsectorsError) throw new Error("Não foi possível carregar suas comunidades.");
+  return {
+    sectorIds: (sectors ?? []).map((item: any) => item.sector_id).filter(Boolean),
+    subsectorIds: (subsectors ?? []).map((item: any) => item.subsector_id).filter(Boolean),
+  };
+}
+
+export async function syncUserCommunityMemberships(sectorIds: string[], subsectorIds: string[]) {
+  const { error } = await supabase.rpc("sync_user_community_memberships" as any, {
+    p_sector_ids: sectorIds,
+    p_subsector_ids: subsectorIds,
+  });
+
+  if (error) throw new Error("Não foi possível atualizar suas comunidades.");
 }

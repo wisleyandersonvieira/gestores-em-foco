@@ -18,6 +18,16 @@ type SectorSubsectorFieldsProps = {
   className?: string;
 };
 
+type MultiSectorSubsectorFieldsProps = {
+  sectors: BusinessSectorWithSubsectors[];
+  sectorIds: string[];
+  subsectorIds: string[];
+  onSectorIdsChange: (sectorIds: string[]) => void;
+  onSubsectorIdsChange: (subsectorIds: string[]) => void;
+  disabled?: boolean;
+  className?: string;
+};
+
 export function SectorSubsectorFields({ sectors, sectorId, subsectorId, onSectorChange, onSubsectorChange, disabled, className }: SectorSubsectorFieldsProps) {
   const selectedSector = sectors.find((sector) => sector.id === sectorId) ?? null;
   const subsectors = selectedSector?.subsectors ?? [];
@@ -53,6 +63,56 @@ export function SectorSubsectorFields({ sectors, sectorId, subsectorId, onSector
           disabled={disabled || !sectorId}
           selectedLabel={selectedSubsector?.name}
           onChange={onSubsectorChange}
+        />
+      </div>
+    </div>
+  );
+}
+
+export function MultiSectorSubsectorFields({ sectors, sectorIds, subsectorIds, onSectorIdsChange, onSubsectorIdsChange, disabled, className }: MultiSectorSubsectorFieldsProps) {
+  const selectedSectorSet = new Set(sectorIds);
+  const selectedSectors = sectors.filter((sector) => selectedSectorSet.has(sector.id));
+  const availableSubsectors = selectedSectors.flatMap((sector) => sector.subsectors.map((subsector) => ({ ...subsector, sectorName: sector.name })));
+  const availableSubsectorIds = new Set(availableSubsectors.map((subsector) => subsector.id));
+  const safeSubsectorIds = subsectorIds.filter((id) => availableSubsectorIds.has(id));
+
+  function toggleSector(id: string) {
+    const nextSectorIds = selectedSectorSet.has(id) ? sectorIds.filter((sectorId) => sectorId !== id) : [...sectorIds, id];
+    const nextSectorSet = new Set(nextSectorIds);
+    const nextAllowedSubsectorIds = new Set(sectors.filter((sector) => nextSectorSet.has(sector.id)).flatMap((sector) => sector.subsectors.map((subsector) => subsector.id)));
+    onSectorIdsChange(nextSectorIds);
+    onSubsectorIdsChange(subsectorIds.filter((subsectorId) => nextAllowedSubsectorIds.has(subsectorId)));
+  }
+
+  function toggleSubsector(id: string) {
+    onSubsectorIdsChange(safeSubsectorIds.includes(id) ? safeSubsectorIds.filter((subsectorId) => subsectorId !== id) : [...safeSubsectorIds, id]);
+  }
+
+  return (
+    <div className={cn("grid gap-4 md:grid-cols-2", className)}>
+      <div className="space-y-2">
+        <Label>Setores de atuação</Label>
+        <MultiSearchablePicker
+          items={sectors}
+          values={sectorIds}
+          placeholder="Selecione os setores"
+          searchPlaceholder="Buscar setor..."
+          emptyText="Nenhum setor encontrado."
+          disabled={disabled}
+          onToggle={toggleSector}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label>Subsetores de atuação</Label>
+        <MultiSearchablePicker
+          items={availableSubsectors}
+          values={safeSubsectorIds}
+          placeholder={sectorIds.length ? "Selecione os subsetores" : "Selecione primeiro um setor"}
+          searchPlaceholder="Buscar subsetor..."
+          emptyText="Nenhum subsetor encontrado para os setores selecionados."
+          disabled={disabled || !sectorIds.length}
+          onToggle={toggleSubsector}
+          getDescription={(item) => "sectorName" in item ? String(item.sectorName) : undefined}
         />
       </div>
     </div>
@@ -105,6 +165,56 @@ function SearchablePicker({ items, value, placeholder, searchPlaceholder, emptyT
                   {item.name}
                 </CommandItem>
               ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+type MultiSearchablePickerProps<T extends SearchablePickerItem> = {
+  items: T[];
+  values: string[];
+  placeholder: string;
+  searchPlaceholder: string;
+  emptyText: string;
+  disabled?: boolean;
+  onToggle: (value: string) => void;
+  getDescription?: (item: T) => string | undefined;
+};
+
+function MultiSearchablePicker<T extends SearchablePickerItem>({ items, values, placeholder, searchPlaceholder, emptyText, disabled, onToggle, getDescription }: MultiSearchablePickerProps<T>) {
+  const selectedItems = items.filter((item) => values.includes(item.id));
+  const label = selectedItems.length ? selectedItems.map((item) => item.name).join(", ") : placeholder;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button type="button" variant="outline" role="combobox" disabled={disabled} className="h-auto min-h-10 w-full justify-between text-left">
+          <span className={cn("line-clamp-2", !selectedItems.length && "text-muted-foreground")}>{label}</span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command>
+          <CommandInput placeholder={searchPlaceholder} />
+          <CommandList>
+            <CommandEmpty>{emptyText}</CommandEmpty>
+            <CommandGroup>
+              {items.map((item) => {
+                const checked = values.includes(item.id);
+                const description = getDescription?.(item);
+                return (
+                  <CommandItem key={item.id} value={`${item.name} ${normalizeSearchText(item.name)} ${description ?? ""}`} onSelect={() => onToggle(item.id)}>
+                    <Check className={cn("mr-2 h-4 w-4", checked ? "opacity-100" : "opacity-0")} />
+                    <span>
+                      {item.name}
+                      {description ? <span className="block text-xs text-muted-foreground">{description}</span> : null}
+                    </span>
+                  </CommandItem>
+                );
+              })}
             </CommandGroup>
           </CommandList>
         </Command>

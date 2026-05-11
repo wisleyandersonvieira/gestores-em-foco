@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Activity, Box, Eye, EyeOff, Headphones, LayoutDashboard, Plus, Settings, Users } from "lucide-react";
+import { Activity, Box, CalendarDays, Eye, EyeOff, Headphones, LayoutDashboard, Plus, Settings, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { DiagnosticFlowBuilder } from "@/components/admin/diagnostic-flow-builder";
@@ -25,6 +25,7 @@ import {
   type BusinessSector,
   type BusinessSubsector,
 } from "@/lib/business-sectors";
+import { deleteAdminCommunityEvent, getAdminCommunityEvents, saveAdminCommunityEvent } from "@/lib/community";
 import {
   archiveTemplate,
   createTemplate,
@@ -282,6 +283,7 @@ export default function AdminPage() {
           ) : null}
           {section === "users" ? <UsersPanel data={adminData} search={userSearch} onSearch={setUserSearch} /> : null}
           {section === "access" ? <AccessPanel data={adminData} period={period} onPeriodChange={setPeriod} /> : null}
+          {section === "events" ? <AdminEventsPanel /> : null}
           {section === "support" ? (
             <SupportPanel
               data={adminData}
@@ -327,6 +329,7 @@ function AdminNav({ section, onSectionChange }: { section: string; onSectionChan
     ["products", "Produtos", Box],
     ["users", "Usuarios", Users],
     ["access", "Acessos", Activity],
+    ["events", "Eventos", CalendarDays],
     ["support", "Suporte", Headphones],
     ["settings", "Configuracoes", Settings],
   ] as const;
@@ -567,6 +570,88 @@ function SupportPanel({ data, filter, onFilterChange, onView, onStatusChange }: 
       <Card className="bg-white/90"><CardContent className="p-0"><Table><TableHeader><TableRow><TableHead>Data</TableHead><TableHead>Usuario</TableHead><TableHead>Assunto</TableHead><TableHead>Status</TableHead><TableHead>Prioridade</TableHead><TableHead>Acoes</TableHead></TableRow></TableHeader><TableBody>{requests.length ? requests.map((request: any) => <TableRow key={request.id}><TableCell>{formatDateTime(request.created_at)}</TableCell><TableCell>{displayName(request)}<p className="text-xs text-muted-foreground">{request.profile?.email}</p></TableCell><TableCell>{request.subject}<p className="line-clamp-1 text-xs text-muted-foreground">{request.message}</p></TableCell><TableCell><Badge variant="outline">{supportStatusLabel(request.status)}</Badge></TableCell><TableCell>{priorityLabel(request.priority)}</TableCell><TableCell><div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => onView(request)}>Ver detalhes</Button>{request.status === "open" ? <Button size="sm" variant="outline" onClick={() => onStatusChange(request, "in_progress")}>Em andamento</Button> : null}{request.status !== "solved" ? <Button size="sm" onClick={() => onStatusChange(request, "solved")}>Solucionar</Button> : null}</div></TableCell></TableRow>) : <TableRow><TableCell colSpan={6} className="text-muted-foreground">Nenhum chamado encontrado.</TableCell></TableRow>}</TableBody></Table></CardContent></Card>
     </div>
   );
+}
+
+const emptyEventForm = { id: "", title: "", description: "", event_type: "online", start_at: "", end_at: "", location: "", meeting_url: "", image_url: "", status: "published", visibility_type: "all", sector_ids: [] as string[], subsector_ids: [] as string[] };
+
+function AdminEventsPanel() {
+  const [events, setEvents] = useState<any[]>([]);
+  const [sectors, setSectors] = useState<BusinessSector[]>([]);
+  const [subsectors, setSubsectors] = useState<BusinessSubsector[]>([]);
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("all");
+  const [form, setForm] = useState<any | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function load() {
+    const nextSectors = await getAdminSectors();
+    const [nextEvents, ...groups] = await Promise.all([getAdminCommunityEvents(), ...nextSectors.map((sector) => getAdminSubsectors(sector.id))]);
+    setSectors(nextSectors);
+    setSubsectors(groups.flat());
+    setEvents(nextEvents);
+  }
+
+  useEffect(() => {
+    load().catch((error) => toast.error(error instanceof Error ? error.message : "Não foi possível carregar eventos."));
+  }, []);
+
+  const filteredEvents = events.filter((event) => (!search || normalizeSearchText(event.title).includes(normalizeSearchText(search))) && (status === "all" || event.status === status));
+
+  function openEvent(event?: any) {
+    if (!event) return setForm(emptyEventForm);
+    const targets = event.targets ?? [];
+    setForm({ ...emptyEventForm, ...event, start_at: toDatetimeLocal(event.start_at), end_at: toDatetimeLocal(event.end_at), sector_ids: targets.filter((target: any) => target.target_type === "sector").map((target: any) => target.sector_id), subsector_ids: targets.filter((target: any) => target.target_type === "subsector").map((target: any) => target.subsector_id) });
+  }
+
+  async function saveEvent() {
+    if (!form) return;
+    setBusy(true);
+    try {
+      const targets = [
+        ...form.sector_ids.map((sectorId: string) => ({ target_type: "sector", sector_id: sectorId, subsector_id: null })),
+        ...form.subsector_ids.map((subsectorId: string) => {
+          const subsector = subsectors.find((item) => item.id === subsectorId);
+          return { target_type: "subsector", sector_id: subsector?.sector_id ?? null, subsector_id: subsectorId };
+        }).filter((target: any) => target.sector_id),
+      ];
+      await saveAdminCommunityEvent({ id: form.id || undefined, title: form.title, description: form.description || null, event_type: form.event_type, start_at: new Date(form.start_at).toISOString(), end_at: form.end_at ? new Date(form.end_at).toISOString() : null, location: form.location || null, meeting_url: form.meeting_url || null, image_url: form.image_url || null, status: form.status, visibility_type: form.visibility_type, targets });
+      toast.success("Evento salvo com sucesso.");
+      setForm(null);
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível salvar o evento.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeEvent(event: any) {
+    if (!window.confirm(`Excluir o evento "${event.title}"?`)) return;
+    try {
+      await deleteAdminCommunityEvent(event.id);
+      toast.success("Evento excluído com sucesso.");
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível excluir o evento.");
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h1 className="font-display text-3xl font-semibold">Eventos</h1><p className="text-sm text-muted-foreground">Cadastre eventos gerais ou segmentados por setor e subsetor.</p></div><Button onClick={() => openEvent()}><Plus className="h-4 w-4" /> Novo evento</Button></div>
+      <div className="grid gap-3 md:grid-cols-[1fr_220px]"><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por título" /><Select value={status} onValueChange={setStatus}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todos</SelectItem><SelectItem value="draft">Rascunho</SelectItem><SelectItem value="published">Publicado</SelectItem><SelectItem value="canceled">Cancelado</SelectItem><SelectItem value="archived">Arquivado</SelectItem></SelectContent></Select></div>
+      <Card className="bg-white/90"><CardContent className="p-0"><Table><TableHeader><TableRow><TableHead>Evento</TableHead><TableHead>Data</TableHead><TableHead>Tipo</TableHead><TableHead>Status</TableHead><TableHead>Visibilidade</TableHead><TableHead>Ações</TableHead></TableRow></TableHeader><TableBody>{filteredEvents.length ? filteredEvents.map((event) => <TableRow key={event.id}><TableCell>{event.title}</TableCell><TableCell>{formatDateTime(event.start_at)}</TableCell><TableCell>{eventTypeLabel(event.event_type)}</TableCell><TableCell><Badge variant="outline">{eventStatusLabel(event.status)}</Badge></TableCell><TableCell>{eventVisibilityLabel(event.visibility_type)}</TableCell><TableCell><div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => openEvent(event)}>Editar</Button><Button size="sm" variant="outline" className="border-destructive/35 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => void removeEvent(event)}>Excluir</Button></div></TableCell></TableRow>) : <TableRow><TableCell colSpan={6} className="text-muted-foreground">Nenhum evento encontrado.</TableCell></TableRow>}</TableBody></Table></CardContent></Card>
+      <Dialog open={Boolean(form)} onOpenChange={(open) => !open && setForm(null)}><DialogContent className="max-w-3xl"><DialogHeader><DialogTitle>{form?.id ? "Editar evento" : "Novo evento"}</DialogTitle></DialogHeader>{form ? <EventForm form={form} sectors={sectors} subsectors={subsectors} onChange={setForm} /> : null}<DialogFooter><Button variant="outline" onClick={() => setForm(null)}>Cancelar</Button><Button disabled={busy} onClick={() => void saveEvent()}>{busy ? "Salvando..." : "Salvar evento"}</Button></DialogFooter></DialogContent></Dialog>
+    </div>
+  );
+}
+
+function EventForm({ form, sectors, subsectors, onChange }: { form: any; sectors: BusinessSector[]; subsectors: BusinessSubsector[]; onChange: (form: any) => void }) {
+  return <div className="grid gap-4 md:grid-cols-2"><FieldBlock label="Título"><Input value={form.title} onChange={(event) => onChange({ ...form, title: event.target.value })} maxLength={160} /></FieldBlock><FieldBlock label="Tipo"><Select value={form.event_type} onValueChange={(value) => onChange({ ...form, event_type: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="online">Online</SelectItem><SelectItem value="presencial">Presencial</SelectItem><SelectItem value="hibrido">Híbrido</SelectItem></SelectContent></Select></FieldBlock><FieldBlock label="Início"><Input type="datetime-local" value={form.start_at} onChange={(event) => onChange({ ...form, start_at: event.target.value })} /></FieldBlock><FieldBlock label="Término"><Input type="datetime-local" value={form.end_at ?? ""} onChange={(event) => onChange({ ...form, end_at: event.target.value })} /></FieldBlock><FieldBlock label="Local"><Input value={form.location ?? ""} onChange={(event) => onChange({ ...form, location: event.target.value })} /></FieldBlock><FieldBlock label="Link da reunião"><Input value={form.meeting_url ?? ""} onChange={(event) => onChange({ ...form, meeting_url: event.target.value })} /></FieldBlock><FieldBlock label="Status"><Select value={form.status} onValueChange={(value) => onChange({ ...form, status: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="draft">Rascunho</SelectItem><SelectItem value="published">Publicado</SelectItem><SelectItem value="canceled">Cancelado</SelectItem><SelectItem value="archived">Arquivado</SelectItem></SelectContent></Select></FieldBlock><FieldBlock label="Visibilidade"><Select value={form.visibility_type} onValueChange={(value) => onChange({ ...form, visibility_type: value, sector_ids: [], subsector_ids: [] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todos os usuários</SelectItem><SelectItem value="sector">Setor específico</SelectItem><SelectItem value="subsector">Subsetor específico</SelectItem><SelectItem value="custom">Seleção personalizada</SelectItem></SelectContent></Select></FieldBlock><div className="md:col-span-2"><FieldBlock label="Descrição"><Textarea value={form.description ?? ""} onChange={(event) => onChange({ ...form, description: event.target.value })} /></FieldBlock></div>{["sector", "custom"].includes(form.visibility_type) ? <Checklist title="Setores" items={sectors} values={form.sector_ids} onChange={(sector_ids) => onChange({ ...form, sector_ids })} /> : null}{["subsector", "custom"].includes(form.visibility_type) ? <Checklist title="Subsetores" items={subsectors} values={form.subsector_ids} onChange={(subsector_ids) => onChange({ ...form, subsector_ids })} getDescription={(item: any) => sectors.find((sector) => sector.id === item.sector_id)?.name} /> : null}</div>;
+}
+
+function Checklist({ title, items, values, onChange, getDescription }: { title: string; items: any[]; values: string[]; onChange: (values: string[]) => void; getDescription?: (item: any) => string | undefined }) {
+  return <div className="space-y-2 rounded-lg border p-3"><p className="font-medium">{title}</p><div className="grid max-h-48 gap-2 overflow-y-auto text-sm md:grid-cols-2">{items.map((item) => <label key={item.id} className="flex items-start gap-2"><input type="checkbox" checked={values.includes(item.id)} onChange={(event) => onChange(event.target.checked ? [...values, item.id] : values.filter((id) => id !== item.id))} /><span>{item.name}{getDescription?.(item) ? <span className="block text-xs text-muted-foreground">{getDescription?.(item)}</span> : null}</span></label>)}</div></div>;
 }
 
 type SectorFormState = {
@@ -887,6 +972,28 @@ function priorityLabel(value?: string) {
   return value ? labels[value] ?? value : "Normal";
 }
 
+function eventTypeLabel(value?: string) {
+  const labels: Record<string, string> = { online: "Online", presencial: "Presencial", hibrido: "Híbrido" };
+  return value ? labels[value] ?? value : "-";
+}
+
+function eventStatusLabel(value?: string) {
+  const labels: Record<string, string> = { draft: "Rascunho", published: "Publicado", canceled: "Cancelado", archived: "Arquivado" };
+  return value ? labels[value] ?? value : "-";
+}
+
+function eventVisibilityLabel(value?: string) {
+  const labels: Record<string, string> = { all: "Todos", sector: "Setor", subsector: "Subsetor", custom: "Personalizado" };
+  return value ? labels[value] ?? value : "-";
+}
+
+function toDatetimeLocal(value?: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return offsetDate.toISOString().slice(0, 16);
+}
+
 function subscriptionStatusLabel(value?: string) {
   const labels: Record<string, string> = { active: "Ativo", trialing: "Trial", canceled: "Cancelado", inactive: "Inativo", expired: "Expirado", test: "Teste" };
   return value ? labels[value] ?? value : "-";
@@ -899,6 +1006,7 @@ function getAdminRouteState(pathname: string): { section: string; productSection
   if (pathname.includes("/admin/produtos")) return { section: "products", productSection: "all" };
   if (pathname.includes("/admin/usuarios")) return { section: "users", productSection: "all" };
   if (pathname.includes("/admin/acessos")) return { section: "access", productSection: "all" };
+  if (pathname.includes("/admin/eventos")) return { section: "events", productSection: "all" };
   if (pathname.includes("/admin/suporte")) return { section: "support", productSection: "all" };
   if (pathname.includes("/admin/configuracoes")) return { section: "settings", productSection: "all" };
   return { section: "overview", productSection: "all" };

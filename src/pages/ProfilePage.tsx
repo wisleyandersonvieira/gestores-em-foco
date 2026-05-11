@@ -4,7 +4,7 @@ import { ClientLayout } from "@/components/platform/client-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getUserProfile, type UserProfile } from "@/lib/account-settings";
-import { getActiveSectorsWithSubsectors, type BusinessSectorWithSubsectors } from "@/lib/business-sectors";
+import { getActiveSectorsWithSubsectors, getUserCommunitySelections, type BusinessSectorWithSubsectors, type UserCommunitySelections } from "@/lib/business-sectors";
 
 export default function ProfilePage() {
   return (
@@ -17,16 +17,18 @@ export default function ProfilePage() {
 function ProfileContent({ userId, email, metadata }: { userId: string; email: string; metadata: Record<string, any> }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [sectors, setSectors] = useState<BusinessSectorWithSubsectors[]>([]);
+  const [selections, setSelections] = useState<UserCommunitySelections>({ sectorIds: [], subsectorIds: [] });
 
   useEffect(() => {
-    void Promise.all([getUserProfile(userId), getActiveSectorsWithSubsectors()]).then(([nextProfile, nextSectors]) => {
+    void Promise.all([getUserProfile(userId), getActiveSectorsWithSubsectors(), getUserCommunitySelections(userId)]).then(([nextProfile, nextSectors, nextSelections]) => {
       setProfile(nextProfile);
       setSectors(nextSectors);
+      setSelections(nextSelections);
     });
   }, [userId]);
 
-  const sector = useMemo(() => sectors.find((item) => item.id === profile?.sector_id) ?? null, [sectors, profile?.sector_id]);
-  const subsector = useMemo(() => sector?.subsectors.find((item) => item.id === profile?.subsector_id) ?? null, [sector, profile?.subsector_id]);
+  const selectedSectors = useMemo(() => sectors.filter((item) => selections.sectorIds.includes(item.id)), [sectors, selections.sectorIds]);
+  const selectedSubsectors = useMemo(() => selectedSectors.flatMap((sector) => sector.subsectors.map((subsector) => ({ ...subsector, sectorName: sector.name }))).filter((item) => selections.subsectorIds.includes(item.id)), [selectedSectors, selections.subsectorIds]);
 
   return (
     <div className="space-y-8">
@@ -46,8 +48,8 @@ function ProfileContent({ userId, email, metadata }: { userId: string; email: st
           <Info label="Nome" value={profile?.full_name || metadata?.name || metadata?.full_name || "Não informado"} />
           <Info label="Email" value={email} />
           <Info label="Empresa" value={profile?.company_name || metadata?.company_name || "Não informada"} />
-          <Info label="Setor" value={sector?.name ?? "Não informado"} />
-          <Info label="Subsetor" value={subsector?.name ?? "Não informado"} />
+          <Info label="Setores de atuação" value={selectedSectors.length ? selectedSectors.map((sector) => sector.name).join(", ") : "Não informado"} />
+          <Info label="Subsetores de atuação" value={selectedSubsectors.length ? selectedSubsectors.map((subsector) => `${subsector.sectorName}: ${subsector.name}`).join(", ") : "Não informado"} />
           <Info label="Cargo" value={profile?.role || metadata?.role_title || "Não informado"} />
         </CardContent>
       </Card>

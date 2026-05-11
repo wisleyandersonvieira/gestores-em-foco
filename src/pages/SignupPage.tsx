@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { getAuthErrorMessage } from "@/lib/auth-errors";
 import { TurnstileCaptcha, type TurnstileCaptchaHandle } from "@/components/auth/turnstile-captcha";
-import { SectorSubsectorFields } from "@/components/platform/sector-subsector-fields";
+import { MultiSectorSubsectorFields } from "@/components/platform/sector-subsector-fields";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,12 +18,12 @@ export default function SignupPage() {
   const [isPending, setIsPending] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [sectors, setSectors] = useState<BusinessSectorWithSubsectors[]>([]);
-  const [sectorId, setSectorId] = useState("");
-  const [subsectorId, setSubsectorId] = useState("");
+  const [sectorIds, setSectorIds] = useState<string[]>([]);
+  const [subsectorIds, setSubsectorIds] = useState<string[]>([]);
   const submitLockRef = useRef(false);
   const captchaRef = useRef<TurnstileCaptchaHandle>(null);
-  const selectedSector = useMemo(() => sectors.find((sector) => sector.id === sectorId) ?? null, [sectors, sectorId]);
-  const selectedSubsector = useMemo(() => selectedSector?.subsectors.find((subsector) => subsector.id === subsectorId) ?? null, [selectedSector, subsectorId]);
+  const selectedSectors = useMemo(() => sectors.filter((sector) => sectorIds.includes(sector.id)), [sectors, sectorIds]);
+  const selectedSubsectors = useMemo(() => selectedSectors.flatMap((sector) => sector.subsectors).filter((subsector) => subsectorIds.includes(subsector.id)), [selectedSectors, subsectorIds]);
 
   useEffect(() => {
     getActiveSectorsWithSubsectors()
@@ -47,16 +47,16 @@ export default function SignupPage() {
     const password = String(formData.get("password") ?? "");
     const companyName = String(formData.get("companyName") ?? "").trim();
     const employeesCount = Number(formData.get("employeesCount") ?? 0);
-    const segment = selectedSector && selectedSubsector ? `${selectedSector.name} - ${selectedSubsector.name}` : "";
+    const segment = selectedSectors.length && selectedSubsectors.length ? `${selectedSectors[0].name} - ${selectedSubsectors[0].name}` : "";
 
-    if (!sectorId) {
+    if (!sectorIds.length) {
       submitLockRef.current = false;
       setIsPending(false);
       setError("Selecione um setor.");
       return;
     }
 
-    if (!subsectorId) {
+    if (!subsectorIds.length) {
       submitLockRef.current = false;
       setIsPending(false);
       setError("Selecione um subsetor.");
@@ -72,8 +72,10 @@ export default function SignupPage() {
         data: {
           name,
           company_name: companyName || null,
-          sector_id: sectorId,
-          subsector_id: subsectorId,
+          sector_id: sectorIds[0],
+          subsector_id: subsectorIds[0],
+          sector_ids: sectorIds,
+          subsector_ids: subsectorIds,
           segment,
           employees_count: employeesCount,
         },
@@ -134,12 +136,12 @@ export default function SignupPage() {
               <Input id="companyName" name="companyName" placeholder="Nome da empresa, se houver" />
             </div>
 
-            <SectorSubsectorFields
+            <MultiSectorSubsectorFields
               sectors={sectors}
-              sectorId={sectorId}
-              subsectorId={subsectorId}
-              onSectorChange={setSectorId}
-              onSubsectorChange={setSubsectorId}
+              sectorIds={sectorIds}
+              subsectorIds={subsectorIds}
+              onSectorIdsChange={setSectorIds}
+              onSubsectorIdsChange={setSubsectorIds}
               disabled={isPending}
               className="md:col-span-2"
             />

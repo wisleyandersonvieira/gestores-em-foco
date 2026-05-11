@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 import { TurnstileCaptcha, type TurnstileCaptchaHandle } from "@/components/auth/turnstile-captcha";
 import { ClientLayout } from "@/components/platform/client-layout";
-import { SectorSubsectorFields } from "@/components/platform/sector-subsector-fields";
+import { MultiSectorSubsectorFields } from "@/components/platform/sector-subsector-fields";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,7 +48,7 @@ import {
   type UserProfile,
 } from "@/lib/account-settings";
 import { validatePassword } from "@/lib/password-security";
-import { getActiveSectorsWithSubsectors, type BusinessSectorWithSubsectors } from "@/lib/business-sectors";
+import { getActiveSectorsWithSubsectors, getUserCommunitySelections, syncUserCommunityMemberships, type BusinessSectorWithSubsectors } from "@/lib/business-sectors";
 import {
   createPrivacyRequest,
   deleteOwnAccount,
@@ -89,6 +89,8 @@ function SettingsContent({ user }: { user: User }) {
   const [tab, setTab] = useState("perfil");
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [sectors, setSectors] = useState<BusinessSectorWithSubsectors[]>([]);
+  const [sectorIds, setSectorIds] = useState<string[]>([]);
+  const [subsectorIds, setSubsectorIds] = useState<string[]>([]);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
   const [notifications, setNotifications] = useState<UserNotificationPreferences | null>(null);
@@ -128,8 +130,9 @@ function SettingsContent({ user }: { user: User }) {
       getUserSubscriptions(user.id),
       getPrivacyRequests(user.id),
       getActiveSectorsWithSubsectors(),
+      getUserCommunitySelections(user.id),
     ])
-      .then(([nextProfile, nextPreferences, nextNotifications, nextSubscriptions, nextPrivacyRequests, nextSectors]) => {
+      .then(([nextProfile, nextPreferences, nextNotifications, nextSubscriptions, nextPrivacyRequests, nextSectors, nextSelections]) => {
         setProfile({
           ...nextProfile,
           full_name: nextProfile.full_name || String(user.user_metadata?.name ?? user.user_metadata?.full_name ?? ""),
@@ -137,6 +140,8 @@ function SettingsContent({ user }: { user: User }) {
           role: nextProfile.role || String(user.user_metadata?.role_title ?? ""),
         });
         setSectors(nextSectors);
+        setSectorIds(nextSelections.sectorIds.length ? nextSelections.sectorIds : nextProfile.sector_id ? [nextProfile.sector_id] : []);
+        setSubsectorIds(nextSelections.subsectorIds.length ? nextSelections.subsectorIds : nextProfile.subsector_id ? [nextProfile.subsector_id] : []);
         setPreferences(nextPreferences);
         setNotifications(nextNotifications);
         setSubscriptions(nextSubscriptions);
@@ -161,8 +166,10 @@ function SettingsContent({ user }: { user: User }) {
 
   async function saveProfile() {
     if (!profile) return;
-    if (profile.sector_id && !profile.subsector_id) throw new Error("Selecione um subsetor.");
-    const saved = await updateUserProfile(user.id, profile);
+    if (!sectorIds.length) throw new Error("Selecione um setor.");
+    if (!subsectorIds.length) throw new Error("Selecione um subsetor.");
+    const saved = await updateUserProfile(user.id, { ...profile, sector_id: sectorIds[0] ?? null, subsector_id: subsectorIds[0] ?? null });
+    await syncUserCommunityMemberships(sectorIds, subsectorIds);
     setProfile(saved);
     toast.success("Perfil salvo com sucesso.");
   }
@@ -467,17 +474,21 @@ function SettingsContent({ user }: { user: User }) {
                 <Field label="Nome da empresa, opcional" value={profile?.company_name ?? ""} onChange={(value) => setProfile((current) => current && { ...current, company_name: value })} />
                 <Field label="Cargo / funcao" value={profile?.role ?? ""} onChange={(value) => setProfile((current) => current && { ...current, role: value })} />
               </div>
-              {!profile?.sector_id && user.user_metadata?.segment ? (
+              {!sectorIds.length && user.user_metadata?.segment ? (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                   Complete seu setor e subsetor para manter seu perfil atualizado.
                 </div>
               ) : null}
-              <SectorSubsectorFields
+              <div className="rounded-lg border bg-muted/30 p-4">
+                <p className="font-semibold">Comunidades</p>
+                <p className="mt-1 text-sm text-muted-foreground">Essas informações definem as comunidades, fóruns e eventos que ficarão disponíveis para você.</p>
+              </div>
+              <MultiSectorSubsectorFields
                 sectors={sectors}
-                sectorId={profile?.sector_id ?? ""}
-                subsectorId={profile?.subsector_id ?? ""}
-                onSectorChange={(value) => setProfile((current) => current && { ...current, sector_id: value || null, subsector_id: null })}
-                onSubsectorChange={(value) => setProfile((current) => current && { ...current, subsector_id: value || null })}
+                sectorIds={sectorIds}
+                subsectorIds={subsectorIds}
+                onSectorIdsChange={setSectorIds}
+                onSubsectorIdsChange={setSubsectorIds}
                 disabled={!profile}
               />
               <Button onClick={() => void saveProfile().catch((error) => toast.error(error.message))}>Salvar perfil</Button>

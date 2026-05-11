@@ -31,6 +31,7 @@ import DreModelsPage from "@/pages/dre/DreModelsPage";
 import NotFound from "@/pages/NotFound";
 import PlaceholderLegalPage from "@/pages/PlaceholderLegalPage";
 import SolucoesPage from "@/pages/SolucoesPage";
+import CommunityPage from "@/pages/CommunityPage";
 
 export default function App() {
   return (
@@ -67,6 +68,7 @@ export default function App() {
       <Route path="/dre-facil/minha-conta" element={<DreAccountPage />} />
       <Route path="/meu-perfil" element={<ProfilePage />} />
       <Route path="/configuracoes" element={<SettingsPage />} />
+      <Route path="/comunidade" element={<CommunityPage />} />
       <Route path="/minha-conta" element={<AccountPage />} />
       <Route path="/minha-conta/diagnostico/:sessionId/resultado" element={<DiagnosticReportPage />} />
       <Route path="/admin" element={<AdminPage />} />
@@ -77,6 +79,7 @@ export default function App() {
       <Route path="/admin/produtos/cursos/:courseId" element={<AdminPage />} />
       <Route path="/admin/usuarios" element={<AdminPage />} />
       <Route path="/admin/acessos" element={<AdminPage />} />
+      <Route path="/admin/eventos" element={<AdminPage />} />
       <Route path="/admin/suporte" element={<AdminPage />} />
       <Route path="/admin/configuracoes" element={<AdminPage />} />
       <Route path="/diagnostico/:token" element={<DiagnosticPage />} />
