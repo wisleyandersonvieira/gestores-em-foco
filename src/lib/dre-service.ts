@@ -62,15 +62,19 @@ export async function createDefaultDreCategories(userId: string) {
 }
 
 export async function listDreCategories(userId: string) {
-  const { data, error } = await supabase
-    .from("dre_categories")
-    .select("*")
-    .eq("user_id", userId)
-    .order("display_order", { ascending: true })
-    .order("name", { ascending: true });
-
-  if (error) throw new Error("Nao foi possivel carregar categorias.");
-  return data ?? [];
+  try {
+    return await fetchAllPaginated<DreCategory>((from, to) =>
+      supabase
+        .from("dre_categories")
+        .select("*")
+        .eq("user_id", userId)
+        .order("display_order", { ascending: true })
+        .order("name", { ascending: true })
+        .range(from, to),
+    );
+  } catch {
+    throw new Error("Nao foi possivel carregar categorias.");
+  }
 }
 
 export async function saveDreCategory(payload: TablesInsert<"dre_categories"> | TablesUpdate<"dre_categories">) {
