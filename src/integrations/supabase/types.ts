@@ -1290,8 +1290,10 @@ export type Database = {
         Row: {
           access_type: string
           created_at: string
+          event_type: string
           id: string
           ip_hash: string | null
+          metadata: Json
           page_title: string | null
           path: string | null
           product_slug: string | null
@@ -1303,8 +1305,10 @@ export type Database = {
         Insert: {
           access_type?: string
           created_at?: string
+          event_type?: string
           id?: string
           ip_hash?: string | null
+          metadata?: Json
           page_title?: string | null
           path?: string | null
           product_slug?: string | null
@@ -1316,8 +1320,10 @@ export type Database = {
         Update: {
           access_type?: string
           created_at?: string
+          event_type?: string
           id?: string
           ip_hash?: string | null
+          metadata?: Json
           page_title?: string | null
           path?: string | null
           product_slug?: string | null
@@ -1802,6 +1808,18 @@ export type Database = {
       check_product_access_v2: {
         Args: { p_product_slug: string; p_user_id: string }
         Returns: boolean
+      }
+      log_user_access: {
+        Args: {
+          p_event_type: string
+          p_page?: string | null
+          p_page_title?: string | null
+          p_product_slug?: string | null
+          p_referrer?: string | null
+          p_session_id?: string | null
+          p_user_agent?: string | null
+        }
+        Returns: string
       }
       create_default_dre_categories: {
         Args: { p_user_id: string }

@@ -20,7 +20,7 @@ export async function getAdminData(period: AdminPeriod) {
     safeSelect("user_profiles", "*"),
     safeSelect("products", "*"),
     safeSelect("user_product_subscriptions", "*, product:products(*)"),
-    safeSelect("site_access_logs", "*", (query) => query.gte("created_at", since).order("created_at", { ascending: false }).limit(250)),
+    safeSelect("site_access_logs", "*", (query) => query.gte("created_at", since).in("event_type", ["user_panel_access", "product_access"]).order("created_at", { ascending: false }).limit(5000)),
     safeSelect("support_requests", "*", (query) => query.order("created_at", { ascending: false }).limit(250)),
     getDreMetrics(),
     getDiagnosticMetrics(),
@@ -49,7 +49,14 @@ export async function getAdminData(period: AdminPeriod) {
       inactiveSubscriptions: productSubscriptions.filter((item) => !["active", "trialing"].includes(item.status)).length,
     };
   });
-  const productAccessCounts = countBy(accessLogs as AnyRecord[], "product_slug");
+  const accessLogsWithUsers = (accessLogs as AnyRecord[]).map((log) => ({
+    ...log,
+    profile: log.user_id ? profilesById.get(log.user_id) ?? null : null,
+    global_profile: log.user_id ? userProfilesById.get(log.user_id) ?? null : null,
+  }));
+  const panelAccessLogs = accessLogsWithUsers.filter((item) => getAccessEventType(item) === "user_panel_access");
+  const productAccessLogs = accessLogsWithUsers.filter((item) => getAccessEventType(item) === "product_access" && item.product_slug);
+  const productAccessCounts = countBy(productAccessLogs, "product_slug");
   const mostAccessedProduct = Object.entries(productAccessCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "Sem dados";
 
   return {
@@ -58,14 +65,14 @@ export async function getAdminData(period: AdminPeriod) {
       activeUsers: new Set((subscriptions as AnyRecord[]).filter((item) => ["active", "trialing"].includes(item.status)).map((item) => item.user_id)).size,
       activeProducts: (products as AnyRecord[]).filter((item) => item.status === "active").length,
       activeSubscriptions: (subscriptions as AnyRecord[]).filter((item) => item.status === "active").length,
-      accessCount: (accessLogs as AnyRecord[]).length,
+      accessCount: panelAccessLogs.length,
       openSupport: supportWithUsers.filter((item) => item.status === "open").length,
       solvedSupport: supportWithUsers.filter((item) => item.status === "solved").length,
       mostAccessedProduct,
     },
     products: productStats,
     users,
-    accessLogs: accessLogs as AnyRecord[],
+    accessLogs: accessLogsWithUsers,
     supportRequests: supportWithUsers,
     dreMetrics,
     diagnosticMetrics,
@@ -125,10 +132,15 @@ async function safeSelect(table: any, columns = "*", transform?: (query: any) =>
 
 function countBy(rows: AnyRecord[], key: string) {
   return rows.reduce<Record<string, number>>((acc, row) => {
-    const value = row[key] || "global";
+    const value = row[key];
+    if (!value) return acc;
     acc[value] = (acc[value] ?? 0) + 1;
     return acc;
   }, {});
+}
+
+function getAccessEventType(row: AnyRecord) {
+  return row.event_type ?? row.access_type ?? "page_view";
 }
 
 type AnyRecord = Record<string, any>;

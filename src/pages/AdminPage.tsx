@@ -334,7 +334,7 @@ function OverviewPanel({ data, period, onPeriodChange, onOpenSupport }: { data: 
     ["Usuarios ativos", stats.activeUsers ?? 0],
     ["Produtos ativos", stats.activeProducts ?? 0],
     ["Assinaturas ativas", stats.activeSubscriptions ?? 0],
-    ["Acessos ao site", stats.accessCount ?? 0],
+    ["Acessos ao painel", stats.accessCount ?? 0],
     ["Chamados abertos", stats.openSupport ?? 0],
     ["Chamados resolvidos", stats.solvedSupport ?? 0],
     ["Produto mais acessado", productLabel(stats.mostAccessedProduct)],
@@ -527,14 +527,16 @@ function UsersPanel({ data, search, onSearch }: { data: any; search: string; onS
 
 function AccessPanel({ data, period, onPeriodChange }: { data: any; period: AdminPeriod; onPeriodChange: (period: AdminPeriod) => void }) {
   const logs = data?.accessLogs ?? [];
-  const uniqueUsers = new Set(logs.map((item: any) => item.user_id || item.session_id).filter(Boolean)).size;
-  const byProduct = Object.entries(logs.reduce((acc: Record<string, number>, item: any) => { const key = productLabel(item.product_slug); acc[key] = (acc[key] ?? 0) + 1; return acc; }, {}));
+  const panelAccessLogs = logs.filter((item: any) => accessEventType(item) === "user_panel_access");
+  const productAccessLogs = logs.filter((item: any) => accessEventType(item) === "product_access" && item.product_slug);
+  const uniqueUsers = new Set(panelAccessLogs.map((item: any) => item.user_id).filter(Boolean)).size;
+  const byProduct = Object.entries(productAccessLogs.reduce((acc: Record<string, number>, item: any) => { const key = productLabel(item.product_slug); acc[key] = (acc[key] ?? 0) + 1; return acc; }, {}));
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h1 className="font-display text-3xl font-semibold">Acessos</h1><p className="text-sm text-muted-foreground">Monitoramento inicial de paginas e produtos acessados.</p></div><PeriodSelect value={period} onChange={onPeriodChange} /></div>
-      <div className="grid gap-4 md:grid-cols-3"><StatCard label="Total de acessos" value={logs.length} /><StatCard label="Usuarios/sessoes unicas" value={uniqueUsers} /><StatCard label="Produtos acessados" value={byProduct.length} /></div>
-      <Card className="bg-white/90"><CardHeader><CardTitle>Acessos por produto</CardTitle></CardHeader><CardContent><SimpleTable columns={["Produto", "Acessos"]} rows={byProduct.map(([product, count]) => [product, count])} empty="Nenhum acesso registrado no periodo." /></CardContent></Card>
-      <Card className="bg-white/90"><CardHeader><CardTitle>Ultimos acessos</CardTitle></CardHeader><CardContent><SimpleTable columns={["Data/hora", "Pagina", "Produto", "Tipo"]} rows={logs.slice(0, 50).map((item: any) => [formatDateTime(item.created_at), item.path ?? "-", productLabel(item.product_slug), item.access_type ?? "-"])} empty="Nenhum acesso registrado no periodo." /></CardContent></Card>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h1 className="font-display text-3xl font-semibold">Acessos</h1><p className="text-sm text-muted-foreground">Monitore acessos ao painel do usuário e aos produtos da plataforma.</p></div><PeriodSelect value={period} onChange={onPeriodChange} /></div>
+      <div className="grid gap-4 md:grid-cols-3"><StatCard label="Total de acessos ao painel" value={panelAccessLogs.length} /><StatCard label="Usuários únicos" value={uniqueUsers} /><StatCard label="Produtos acessados" value={byProduct.length} /></div>
+      <Card className="bg-white/90"><CardHeader><CardTitle>Acessos por produto</CardTitle></CardHeader><CardContent><SimpleTable columns={["Produto", "Acessos"]} rows={byProduct.map(([product, count]) => [product, count])} empty="Nenhum acesso a produto registrado no período." /></CardContent></Card>
+      <Card className="bg-white/90"><CardHeader><CardTitle>Últimos acessos</CardTitle></CardHeader><CardContent><SimpleTable columns={["Data/hora", "Usuário"]} rows={panelAccessLogs.slice(0, 50).map((item: any) => [formatDateTime(item.created_at), displayAccessUser(item)])} empty="Nenhum acesso registrado no período." /></CardContent></Card>
     </div>
   );
 }
@@ -599,8 +601,16 @@ function displayName(item: any) {
 }
 
 function productLabel(value?: string | null) {
-  const labels: Record<string, string> = { diagnosticos: "Diagnostico", "gestor-dre": "Gestor de DRE", cursos: "Cursos", global: "Global" };
+  const labels: Record<string, string> = { diagnosticos: "Diagnóstico", "gestor-dre": "Gestor de DRE", cursos: "Cursos" };
   return value ? labels[value] ?? value : "-";
+}
+
+function accessEventType(item: any) {
+  return item?.event_type ?? item?.access_type ?? "page_view";
+}
+
+function displayAccessUser(item: any) {
+  return item?.profile?.full_name ?? item?.global_profile?.full_name ?? item?.profile?.email ?? "Usuário não identificado";
 }
 
 function supportStatusLabel(value?: string) {
