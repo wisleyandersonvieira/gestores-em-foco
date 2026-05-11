@@ -11,6 +11,21 @@ import { getAdminAccessError, isCurrentUserAdmin } from "@/lib/admin-access";
 import { getAdminData, updateSupportRequest, type AdminPeriod } from "@/lib/admin-dashboard";
 import { updateProductVisibility } from "@/lib/products";
 import {
+  createSector,
+  createSubsector,
+  deleteSector,
+  deleteSubsector,
+  getAdminSectors,
+  getAdminSubsectors,
+  normalizeSearchText,
+  toggleSectorActive,
+  toggleSubsectorActive,
+  updateSector,
+  updateSubsector,
+  type BusinessSector,
+  type BusinessSubsector,
+} from "@/lib/business-sectors";
+import {
   archiveTemplate,
   createTemplate,
   getAdminProfile,
@@ -554,8 +569,257 @@ function SupportPanel({ data, filter, onFilterChange, onView, onStatusChange }: 
   );
 }
 
+type SectorFormState = {
+  id?: string;
+  name: string;
+  description: string;
+  display_order: number;
+  is_active: boolean;
+};
+
+type SubsectorFormState = SectorFormState & {
+  sector_id: string;
+};
+
+const emptySectorForm: SectorFormState = { name: "", description: "", display_order: 0, is_active: true };
+const emptySubsectorForm: SubsectorFormState = { ...emptySectorForm, sector_id: "" };
+
 function AdminSettingsPanel() {
-  return <EmptyCard text="Configuracoes administrativas globais serao adicionadas em uma proxima etapa." />;
+  const [sectors, setSectors] = useState<BusinessSector[]>([]);
+  const [subsectors, setSubsectors] = useState<BusinessSubsector[]>([]);
+  const [selectedSectorId, setSelectedSectorId] = useState("");
+  const [sectorSearch, setSectorSearch] = useState("");
+  const [subsectorSearch, setSubsectorSearch] = useState("");
+  const [sectorForm, setSectorForm] = useState<SectorFormState | null>(null);
+  const [subsectorForm, setSubsectorForm] = useState<SubsectorFormState | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const selectedSector = sectors.find((sector) => sector.id === selectedSectorId) ?? null;
+  const filteredSectors = sectors.filter((sector) => normalizeSearchText(sector.name).includes(normalizeSearchText(sectorSearch)));
+  const filteredSubsectors = subsectors.filter((subsector) => normalizeSearchText(subsector.name).includes(normalizeSearchText(subsectorSearch)));
+
+  async function loadSectors() {
+    const nextSectors = await getAdminSectors();
+    setSectors(nextSectors);
+    setSelectedSectorId((current) => current || nextSectors[0]?.id || "");
+  }
+
+  async function loadSubsectors(sectorId = selectedSectorId) {
+    if (!sectorId) {
+      setSubsectors([]);
+      return;
+    }
+    setSubsectors(await getAdminSubsectors(sectorId));
+  }
+
+  useEffect(() => {
+    loadSectors().catch((error) => toast.error(error instanceof Error ? error.message : "Não foi possível carregar setores."));
+  }, []);
+
+  useEffect(() => {
+    loadSubsectors().catch((error) => toast.error(error instanceof Error ? error.message : "Não foi possível carregar subsetores."));
+  }, [selectedSectorId]);
+
+  async function saveSector() {
+    if (!sectorForm) return;
+    setBusy(true);
+    try {
+      if (sectorForm.id) {
+        await updateSector(sectorForm.id, sectorForm);
+        toast.success("Setor atualizado com sucesso.");
+      } else {
+        await createSector(sectorForm);
+        toast.success("Setor criado com sucesso.");
+      }
+      setSectorForm(null);
+      await loadSectors();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível salvar o setor.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveSubsector() {
+    if (!subsectorForm) return;
+    setBusy(true);
+    try {
+      if (subsectorForm.id) {
+        await updateSubsector(subsectorForm.id, subsectorForm);
+        toast.success("Subsetor atualizado com sucesso.");
+      } else {
+        await createSubsector(subsectorForm);
+        toast.success("Subsetor criado com sucesso.");
+      }
+      setSubsectorForm(null);
+      await loadSubsectors(subsectorForm.sector_id);
+      if (selectedSectorId !== subsectorForm.sector_id) setSelectedSectorId(subsectorForm.sector_id);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível salvar o subsetor.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleToggleSector(sector: BusinessSector) {
+    try {
+      await toggleSectorActive(sector.id, !sector.is_active);
+      toast.success(sector.is_active ? "Setor desativado com sucesso." : "Setor habilitado com sucesso.");
+      await loadSectors();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível atualizar o setor.");
+    }
+  }
+
+  async function handleToggleSubsector(subsector: BusinessSubsector) {
+    try {
+      await toggleSubsectorActive(subsector.id, !subsector.is_active);
+      toast.success(subsector.is_active ? "Subsetor desativado com sucesso." : "Subsetor habilitado com sucesso.");
+      await loadSubsectors();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível atualizar o subsetor.");
+    }
+  }
+
+  async function handleDeleteSector(sector: BusinessSector) {
+    if (!window.confirm(`Excluir o setor "${sector.name}"?`)) return;
+    try {
+      await deleteSector(sector.id);
+      toast.success("Setor excluído com sucesso.");
+      await loadSectors();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível excluir o setor.");
+    }
+  }
+
+  async function handleDeleteSubsector(subsector: BusinessSubsector) {
+    if (!window.confirm(`Excluir o subsetor "${subsector.name}"?`)) return;
+    try {
+      await deleteSubsector(subsector.id);
+      toast.success("Subsetor excluído com sucesso.");
+      await loadSubsectors();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível excluir o subsetor.");
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="font-display text-3xl font-semibold">Configurações</h1>
+        <p className="text-sm text-muted-foreground">Gerencie setores e subsetores usados no cadastro e no perfil dos usuários.</p>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
+        <Card className="bg-white/90">
+          <CardHeader>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle>Setores</CardTitle>
+                <CardDescription>Catálogo principal de setores de atuação.</CardDescription>
+              </div>
+              <Button onClick={() => setSectorForm(emptySectorForm)}>Novo setor</Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Input value={sectorSearch} onChange={(event) => setSectorSearch(event.target.value)} placeholder="Buscar setor" />
+            <div className="space-y-2">
+              {filteredSectors.length ? filteredSectors.map((sector) => (
+                <button key={sector.id} type="button" onClick={() => setSelectedSectorId(sector.id)} className={`w-full rounded-lg border p-3 text-left transition ${selectedSectorId === sector.id ? "border-primary bg-primary/5" : "bg-card hover:border-primary/30"}`}>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="font-semibold">{sector.name}</p>
+                      {sector.description ? <p className="mt-1 text-sm text-muted-foreground">{sector.description}</p> : null}
+                      <p className="mt-1 text-xs text-muted-foreground">Ordem: {sector.display_order ?? 0}</p>
+                    </div>
+                    <Badge variant={sector.is_active ? "default" : "secondary"}>{sector.is_active ? "Ativo" : "Inativo"}</Badge>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); setSectorForm({ id: sector.id, name: sector.name, description: sector.description ?? "", display_order: sector.display_order ?? 0, is_active: sector.is_active }); }}>Editar</Button>
+                    <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); void handleToggleSector(sector); }}>{sector.is_active ? "Desativar" : "Habilitar"}</Button>
+                    <Button size="sm" variant="outline" className="border-destructive/35 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={(event) => { event.stopPropagation(); void handleDeleteSector(sector); }}>Excluir</Button>
+                  </div>
+                </button>
+              )) : <p className="text-sm text-muted-foreground">Nenhum setor encontrado.</p>}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white/90">
+          <CardHeader>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle>{selectedSector ? `Subsetores de ${selectedSector.name}` : "Subsetores"}</CardTitle>
+                <CardDescription>Subsetores vinculados ao setor selecionado.</CardDescription>
+              </div>
+              <Button disabled={!selectedSectorId} onClick={() => setSubsectorForm({ ...emptySubsectorForm, sector_id: selectedSectorId })}>Novo subsetor</Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Input value={subsectorSearch} onChange={(event) => setSubsectorSearch(event.target.value)} placeholder="Buscar subsetor" disabled={!selectedSectorId} />
+            <SimpleTable
+              columns={["Subsetor", "Ordem", "Status", "Ações"]}
+              rows={filteredSubsectors.map((subsector) => [
+                <div><p className="font-medium">{subsector.name}</p>{subsector.description ? <p className="text-xs text-muted-foreground">{subsector.description}</p> : null}</div>,
+                subsector.display_order ?? 0,
+                <Badge variant={subsector.is_active ? "default" : "secondary"}>{subsector.is_active ? "Ativo" : "Inativo"}</Badge>,
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setSubsectorForm({ id: subsector.id, sector_id: subsector.sector_id, name: subsector.name, description: subsector.description ?? "", display_order: subsector.display_order ?? 0, is_active: subsector.is_active })}>Editar</Button>
+                  <Button size="sm" variant="outline" onClick={() => void handleToggleSubsector(subsector)}>{subsector.is_active ? "Desativar" : "Habilitar"}</Button>
+                  <Button size="sm" variant="outline" className="border-destructive/35 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => void handleDeleteSubsector(subsector)}>Excluir</Button>
+                </div>,
+              ])}
+              empty={selectedSectorId ? "Nenhum subsetor encontrado." : "Selecione um setor para gerenciar subsetores."}
+            />
+          </CardContent>
+        </Card>
+      </div>
+
+      <Dialog open={Boolean(sectorForm)} onOpenChange={(open) => !open && setSectorForm(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{sectorForm?.id ? "Editar setor" : "Novo setor"}</DialogTitle></DialogHeader>
+          {sectorForm ? <SectorForm form={sectorForm} onChange={setSectorForm} /> : null}
+          <DialogFooter><Button variant="outline" onClick={() => setSectorForm(null)}>Cancelar</Button><Button disabled={busy} onClick={() => void saveSector()}>{busy ? "Salvando..." : "Salvar setor"}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(subsectorForm)} onOpenChange={(open) => !open && setSubsectorForm(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{subsectorForm?.id ? "Editar subsetor" : "Novo subsetor"}</DialogTitle></DialogHeader>
+          {subsectorForm ? <SubsectorForm form={subsectorForm} sectors={sectors} onChange={setSubsectorForm} /> : null}
+          <DialogFooter><Button variant="outline" onClick={() => setSubsectorForm(null)}>Cancelar</Button><Button disabled={busy} onClick={() => void saveSubsector()}>{busy ? "Salvando..." : "Salvar subsetor"}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function SectorForm({ form, onChange }: { form: SectorFormState; onChange: (form: SectorFormState) => void }) {
+  return (
+    <div className="space-y-4">
+      <FieldBlock label="Nome do setor"><Input value={form.name} onChange={(event) => onChange({ ...form, name: event.target.value })} /></FieldBlock>
+      <FieldBlock label="Descrição"><Textarea value={form.description} onChange={(event) => onChange({ ...form, description: event.target.value })} /></FieldBlock>
+      <FieldBlock label="Ordem"><Input type="number" value={form.display_order} onChange={(event) => onChange({ ...form, display_order: Number(event.target.value) || 0 })} /></FieldBlock>
+      <label className="flex items-center justify-between rounded-lg border p-3 text-sm font-medium">Ativo<Switch checked={form.is_active} onCheckedChange={(checked) => onChange({ ...form, is_active: checked })} /></label>
+    </div>
+  );
+}
+
+function SubsectorForm({ form, sectors, onChange }: { form: SubsectorFormState; sectors: BusinessSector[]; onChange: (form: SubsectorFormState) => void }) {
+  return (
+    <div className="space-y-4">
+      <FieldBlock label="Setor">
+        <Select value={form.sector_id} onValueChange={(value) => onChange({ ...form, sector_id: value })}>
+          <SelectTrigger><SelectValue placeholder="Selecione o setor" /></SelectTrigger>
+          <SelectContent>{sectors.map((sector) => <SelectItem key={sector.id} value={sector.id}>{sector.name}</SelectItem>)}</SelectContent>
+        </Select>
+      </FieldBlock>
+      <FieldBlock label="Nome do subsetor"><Input value={form.name} onChange={(event) => onChange({ ...form, name: event.target.value })} /></FieldBlock>
+      <FieldBlock label="Descrição"><Textarea value={form.description} onChange={(event) => onChange({ ...form, description: event.target.value })} /></FieldBlock>
+      <FieldBlock label="Ordem"><Input type="number" value={form.display_order} onChange={(event) => onChange({ ...form, display_order: Number(event.target.value) || 0 })} /></FieldBlock>
+      <label className="flex items-center justify-between rounded-lg border p-3 text-sm font-medium">Ativo<Switch checked={form.is_active} onCheckedChange={(checked) => onChange({ ...form, is_active: checked })} /></label>
+    </div>
+  );
 }
 
 function SubscribersTable({ subscriptions, users }: { subscriptions: any[]; users: any[] }) {
@@ -636,5 +900,6 @@ function getAdminRouteState(pathname: string): { section: string; productSection
   if (pathname.includes("/admin/usuarios")) return { section: "users", productSection: "all" };
   if (pathname.includes("/admin/acessos")) return { section: "access", productSection: "all" };
   if (pathname.includes("/admin/suporte")) return { section: "support", productSection: "all" };
+  if (pathname.includes("/admin/configuracoes")) return { section: "settings", productSection: "all" };
   return { section: "overview", productSection: "all" };
 }

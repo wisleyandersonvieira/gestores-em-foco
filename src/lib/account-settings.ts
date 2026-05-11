@@ -17,18 +17,34 @@ const SUPPORT_SUBJECT_MAX_LENGTH = 120;
 const SUPPORT_MESSAGE_MAX_LENGTH = 5000;
 
 export async function getUserProfile(userId: string) {
-  const { data, error } = await supabase
+  const [{ data, error }, { data: legacyProfile }] = await Promise.all([
+    supabase
     .from("user_profiles")
     .select("*")
     .eq("user_id", userId)
-    .maybeSingle();
+      .maybeSingle(),
+    supabase
+      .from("profiles")
+      .select("full_name, company_name, sector_id, subsector_id")
+      .eq("id", userId)
+      .maybeSingle(),
+  ]);
 
   if (error) throw new Error("Nao foi possivel carregar o perfil.");
-  return data ?? createDefaultProfile(userId);
+  const defaultProfile = createDefaultProfile(userId);
+  return {
+    ...defaultProfile,
+    ...(data ?? {}),
+    full_name: data?.full_name ?? legacyProfile?.full_name ?? defaultProfile.full_name,
+    company_name: data?.company_name ?? legacyProfile?.company_name ?? defaultProfile.company_name,
+    sector_id: data?.sector_id ?? legacyProfile?.sector_id ?? defaultProfile.sector_id,
+    subsector_id: data?.subsector_id ?? legacyProfile?.subsector_id ?? defaultProfile.subsector_id,
+  };
 }
 
 export async function updateUserProfile(userId: string, data: TablesUpdate<"user_profiles">) {
   if ("full_name" in data && !String(data.full_name ?? "").trim()) throw new Error("Informe o nome completo.");
+  if (data.sector_id && !data.subsector_id) throw new Error("Selecione um subsetor.");
 
   const payload = sanitizeUserProfilePayload(sanitizeUpsertPayload(data));
   const { data: saved, error } = await supabase
@@ -198,6 +214,8 @@ function createDefaultProfile(userId: string): UserProfile {
     company_name: null,
     role: null,
     avatar_url: null,
+    sector_id: null,
+    subsector_id: null,
     created_at: now,
     updated_at: now,
   };

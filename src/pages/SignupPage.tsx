@@ -1,12 +1,14 @@
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { getAuthErrorMessage } from "@/lib/auth-errors";
 import { TurnstileCaptcha, type TurnstileCaptchaHandle } from "@/components/auth/turnstile-captcha";
+import { SectorSubsectorFields } from "@/components/platform/sector-subsector-fields";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { getActiveSectorsWithSubsectors, type BusinessSectorWithSubsectors } from "@/lib/business-sectors";
 
 const CAPTCHA_ERROR_MESSAGE = "Não foi possível validar a verificação de segurança. Tente novamente.";
 
@@ -15,8 +17,19 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [sectors, setSectors] = useState<BusinessSectorWithSubsectors[]>([]);
+  const [sectorId, setSectorId] = useState("");
+  const [subsectorId, setSubsectorId] = useState("");
   const submitLockRef = useRef(false);
   const captchaRef = useRef<TurnstileCaptchaHandle>(null);
+  const selectedSector = useMemo(() => sectors.find((sector) => sector.id === sectorId) ?? null, [sectors, sectorId]);
+  const selectedSubsector = useMemo(() => selectedSector?.subsectors.find((subsector) => subsector.id === subsectorId) ?? null, [selectedSector, subsectorId]);
+
+  useEffect(() => {
+    getActiveSectorsWithSubsectors()
+      .then(setSectors)
+      .catch((runtimeError) => setError(runtimeError instanceof Error ? runtimeError.message : "Não foi possível carregar setores."));
+  }, []);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -32,9 +45,23 @@ export default function SignupPage() {
     const name = String(formData.get("name") ?? "");
     const email = String(formData.get("email") ?? "");
     const password = String(formData.get("password") ?? "");
-    const companyName = String(formData.get("companyName") ?? "");
-    const segment = String(formData.get("segment") ?? "");
+    const companyName = String(formData.get("companyName") ?? "").trim();
     const employeesCount = Number(formData.get("employeesCount") ?? 0);
+    const segment = selectedSector && selectedSubsector ? `${selectedSector.name} - ${selectedSubsector.name}` : "";
+
+    if (!sectorId) {
+      submitLockRef.current = false;
+      setIsPending(false);
+      setError("Selecione um setor.");
+      return;
+    }
+
+    if (!subsectorId) {
+      submitLockRef.current = false;
+      setIsPending(false);
+      setError("Selecione um subsetor.");
+      return;
+    }
 
     const { error: authError } = await supabase.auth.signUp({
       email,
@@ -44,7 +71,9 @@ export default function SignupPage() {
         emailRedirectTo: `${window.location.origin}/entrar?cadastro=sucesso`,
         data: {
           name,
-          company_name: companyName,
+          company_name: companyName || null,
+          sector_id: sectorId,
+          subsector_id: subsectorId,
           segment,
           employees_count: employeesCount,
         },
@@ -101,14 +130,19 @@ export default function SignupPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="companyName">Empresa</Label>
-              <Input id="companyName" name="companyName" placeholder="Nome da empresa" required />
+              <Label htmlFor="companyName">Nome da empresa, opcional</Label>
+              <Input id="companyName" name="companyName" placeholder="Nome da empresa, se houver" />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="segment">Segmento</Label>
-              <Input id="segment" name="segment" placeholder="Ex.: Consultoria, varejo, servicos" required />
-            </div>
+            <SectorSubsectorFields
+              sectors={sectors}
+              sectorId={sectorId}
+              subsectorId={subsectorId}
+              onSectorChange={setSectorId}
+              onSubsectorChange={setSubsectorId}
+              disabled={isPending}
+              className="md:col-span-2"
+            />
 
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="employeesCount">Numero de funcionarios</Label>

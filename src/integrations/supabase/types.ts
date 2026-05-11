@@ -1247,6 +1247,83 @@ export type Database = {
         }
         Relationships: []
       }
+      business_sectors: {
+        Row: {
+          created_at: string
+          description: string | null
+          display_order: number | null
+          id: string
+          is_active: boolean
+          name: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean
+          name: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      business_subsectors: {
+        Row: {
+          created_at: string
+          description: string | null
+          display_order: number | null
+          id: string
+          is_active: boolean
+          name: string
+          sector_id: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sector_id: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sector_id?: string
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_subsectors_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "business_sectors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           company_name: string | null
@@ -1258,6 +1335,8 @@ export type Database = {
           is_active: boolean
           role: Database["public"]["Enums"]["app_role"]
           segment: string | null
+          sector_id: string | null
+          subsector_id: string | null
           updated_at: string
         }
         Insert: {
@@ -1270,6 +1349,8 @@ export type Database = {
           is_active?: boolean
           role?: Database["public"]["Enums"]["app_role"]
           segment?: string | null
+          sector_id?: string | null
+          subsector_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -1282,6 +1363,8 @@ export type Database = {
           is_active?: boolean
           role?: Database["public"]["Enums"]["app_role"]
           segment?: string | null
+          sector_id?: string | null
+          subsector_id?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -1705,6 +1788,8 @@ export type Database = {
           id: string
           phone: string | null
           role: string | null
+          sector_id: string | null
+          subsector_id: string | null
           updated_at: string
           user_id: string
         }
@@ -1717,6 +1802,8 @@ export type Database = {
           id?: string
           phone?: string | null
           role?: string | null
+          sector_id?: string | null
+          subsector_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -1729,6 +1816,8 @@ export type Database = {
           id?: string
           phone?: string | null
           role?: string | null
+          sector_id?: string | null
+          subsector_id?: string | null
           updated_at?: string
           user_id?: string
         }

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { TurnstileCaptcha, type TurnstileCaptchaHandle } from "@/components/auth/turnstile-captcha";
 import { ClientLayout } from "@/components/platform/client-layout";
+import { SectorSubsectorFields } from "@/components/platform/sector-subsector-fields";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -47,6 +48,7 @@ import {
   type UserProfile,
 } from "@/lib/account-settings";
 import { validatePassword } from "@/lib/password-security";
+import { getActiveSectorsWithSubsectors, type BusinessSectorWithSubsectors } from "@/lib/business-sectors";
 import {
   createPrivacyRequest,
   deleteOwnAccount,
@@ -86,6 +88,7 @@ function SettingsContent({ user }: { user: User }) {
   const navigate = useNavigate();
   const [tab, setTab] = useState("perfil");
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [sectors, setSectors] = useState<BusinessSectorWithSubsectors[]>([]);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
   const [notifications, setNotifications] = useState<UserNotificationPreferences | null>(null);
@@ -124,14 +127,16 @@ function SettingsContent({ user }: { user: User }) {
       getNotificationPreferences(user.id),
       getUserSubscriptions(user.id),
       getPrivacyRequests(user.id),
+      getActiveSectorsWithSubsectors(),
     ])
-      .then(([nextProfile, nextPreferences, nextNotifications, nextSubscriptions, nextPrivacyRequests]) => {
+      .then(([nextProfile, nextPreferences, nextNotifications, nextSubscriptions, nextPrivacyRequests, nextSectors]) => {
         setProfile({
           ...nextProfile,
           full_name: nextProfile.full_name || String(user.user_metadata?.name ?? user.user_metadata?.full_name ?? ""),
           company_name: nextProfile.company_name || String(user.user_metadata?.company_name ?? ""),
           role: nextProfile.role || String(user.user_metadata?.role_title ?? ""),
         });
+        setSectors(nextSectors);
         setPreferences(nextPreferences);
         setNotifications(nextNotifications);
         setSubscriptions(nextSubscriptions);
@@ -156,6 +161,7 @@ function SettingsContent({ user }: { user: User }) {
 
   async function saveProfile() {
     if (!profile) return;
+    if (profile.sector_id && !profile.subsector_id) throw new Error("Selecione um subsetor.");
     const saved = await updateUserProfile(user.id, profile);
     setProfile(saved);
     toast.success("Perfil salvo com sucesso.");
@@ -458,9 +464,22 @@ function SettingsContent({ user }: { user: User }) {
                 <Field label="Nome completo" value={profile?.full_name ?? ""} onChange={(value) => setProfile((current) => current && { ...current, full_name: value })} />
                 <Field label="E-mail" value={user.email ?? ""} disabled />
                 <Field label="Telefone" value={profile?.phone ?? ""} onChange={(value) => setProfile((current) => current && { ...current, phone: value })} />
-                <Field label="Nome da empresa" value={profile?.company_name ?? ""} onChange={(value) => setProfile((current) => current && { ...current, company_name: value })} />
+                <Field label="Nome da empresa, opcional" value={profile?.company_name ?? ""} onChange={(value) => setProfile((current) => current && { ...current, company_name: value })} />
                 <Field label="Cargo / funcao" value={profile?.role ?? ""} onChange={(value) => setProfile((current) => current && { ...current, role: value })} />
               </div>
+              {!profile?.sector_id && user.user_metadata?.segment ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  Complete seu setor e subsetor para manter seu perfil atualizado.
+                </div>
+              ) : null}
+              <SectorSubsectorFields
+                sectors={sectors}
+                sectorId={profile?.sector_id ?? ""}
+                subsectorId={profile?.subsector_id ?? ""}
+                onSectorChange={(value) => setProfile((current) => current && { ...current, sector_id: value || null, subsector_id: null })}
+                onSubsectorChange={(value) => setProfile((current) => current && { ...current, subsector_id: value || null })}
+                disabled={!profile}
+              />
               <Button onClick={() => void saveProfile().catch((error) => toast.error(error.message))}>Salvar perfil</Button>
             </CardContent>
           </Card>

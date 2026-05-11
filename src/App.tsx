@@ -78,6 +78,7 @@ export default function App() {
       <Route path="/admin/usuarios" element={<AdminPage />} />
       <Route path="/admin/acessos" element={<AdminPage />} />
       <Route path="/admin/suporte" element={<AdminPage />} />
+      <Route path="/admin/configuracoes" element={<AdminPage />} />
       <Route path="/diagnostico/:token" element={<DiagnosticPage />} />
       <Route path="/termos-de-uso" element={<PlaceholderLegalPage title="Termos de Uso" />} />
       <Route path="/politica-de-privacidade" element={<PlaceholderLegalPage title="Política de Privacidade" />} />
