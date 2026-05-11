@@ -15,7 +15,6 @@ const generalNavigation = [
   { to: "/meus-produtos", label: "Meus Produtos", icon: Package },
   { to: "/produtos", label: "Todos os Produtos", icon: LayoutGrid },
   { to: "/meus-cursos", label: "Cursos", icon: BookOpen },
-  { to: "/meu-perfil", label: "Meu Perfil", icon: UserCircle },
   { to: "/configuracoes", label: "Configurações", icon: Settings },
 ];
 
