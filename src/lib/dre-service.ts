@@ -25,21 +25,18 @@ type DefaultDreStructureResult = {
  * os registros, garantindo que listagens grandes (DREs com muitos meses,
  * itens, linhas de modelo etc.) nunca sejam truncadas silenciosamente.
  *
- * Use sempre encadeando filtros ANTES de chamar (incluindo `.eq("user_id", ...)`),
- * para que cada página continue restrita ao usuário correto.
+ * O builder recebe (from, to) e deve retornar a query JÁ filtrada por usuário,
+ * para que cada página continue restrita ao escopo correto.
  */
 const PAGE_SIZE = 1000;
-async function fetchAllRows<T>(
-  buildQuery: () => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
-  applyRange: (query: any, from: number, to: number) => any,
+async function fetchAllPaginated<T>(
+  buildPage: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: any }>,
 ): Promise<T[]> {
   const all: T[] = [];
   let from = 0;
-  // safety cap: 200k linhas por consulta
   for (let page = 0; page < 200; page += 1) {
     const to = from + PAGE_SIZE - 1;
-    const query = applyRange(buildQuery(), from, to);
-    const { data, error } = (await query) as { data: T[] | null; error: { message: string } | null };
+    const { data, error } = await buildPage(from, to);
     if (error) throw error;
     const rows = data ?? [];
     all.push(...rows);
