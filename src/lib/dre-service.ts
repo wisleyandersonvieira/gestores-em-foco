@@ -374,14 +374,18 @@ export async function saveDreEntry(params: {
 }
 
 export async function listDreEntries(userId: string) {
-  const { data, error } = await supabase
-    .from("dre_entries")
-    .select("*, model:dre_models(id,name)")
-    .eq("user_id", userId)
-    .order("competence", { ascending: false });
-
-  if (error) throw new Error("Nao foi possivel carregar DREs cadastrados.");
-  return (data ?? []) as DreEntryWithModel[];
+  try {
+    return (await fetchAllPaginated((from, to) =>
+      supabase
+        .from("dre_entries")
+        .select("*, model:dre_models(id,name)")
+        .eq("user_id", userId)
+        .order("competence", { ascending: false })
+        .range(from, to),
+    )) as DreEntryWithModel[];
+  } catch {
+    throw new Error("Nao foi possivel carregar DREs cadastrados.");
+  }
 }
 
 export async function listDreEntriesByModelAndYears(params: {
@@ -392,21 +396,24 @@ export async function listDreEntriesByModelAndYears(params: {
 }) {
   if (!params.modelId || params.years.length === 0) return [];
 
-  let query = supabase
-    .from("dre_entries")
-    .select("*, model:dre_models(id,name)")
-    .eq("user_id", params.userId)
-    .eq("model_id", params.modelId)
-    .in("competence", params.years.flatMap((year) => Array.from({ length: 12 }, (_, index) => `${year}-${String(index + 1).padStart(2, "0")}`)))
-    .order("competence", { ascending: true });
+  const competences = params.years.flatMap((year) => Array.from({ length: 12 }, (_, index) => `${year}-${String(index + 1).padStart(2, "0")}`));
 
-  if (!params.includeDrafts) {
-    query = query.eq("status", "finalized");
+  try {
+    return (await fetchAllPaginated((from, to) => {
+      let q = supabase
+        .from("dre_entries")
+        .select("*, model:dre_models(id,name)")
+        .eq("user_id", params.userId)
+        .eq("model_id", params.modelId)
+        .in("competence", competences)
+        .order("competence", { ascending: true })
+        .range(from, to);
+      if (!params.includeDrafts) q = q.eq("status", "finalized");
+      return q;
+    })) as DreEntryWithModel[];
+  } catch {
+    throw new Error("Nao foi possivel carregar DREs para analise.");
   }
-
-  const { data, error } = await query;
-  if (error) throw new Error("Nao foi possivel carregar DREs para analise.");
-  return (data ?? []) as DreEntryWithModel[];
 }
 
 export async function getDreEntry(userId: string, entryId: string): Promise<DreEntryWithItems> {
@@ -419,15 +426,21 @@ export async function getDreEntry(userId: string, entryId: string): Promise<DreE
 
   if (error || !entry) throw new Error("DRE nao encontrado.");
 
-  const { data: items, error: itemsError } = await supabase
-    .from("dre_entry_items")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("dre_entry_id", entryId)
-    .order("display_order", { ascending: true });
-
-  if (itemsError) throw new Error("Nao foi possivel carregar os itens do DRE.");
-  return { ...(entry as DreEntryWithModel), items: items ?? [] };
+  let items: DreEntryWithItems["items"];
+  try {
+    items = (await fetchAllPaginated((from, to) =>
+      supabase
+        .from("dre_entry_items")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("dre_entry_id", entryId)
+        .order("display_order", { ascending: true })
+        .range(from, to),
+    )) as DreEntryWithItems["items"];
+  } catch {
+    throw new Error("Nao foi possivel carregar os itens do DRE.");
+  }
+  return { ...(entry as DreEntryWithModel), items };
 }
 
 export async function deleteDreEntry(userId: string, entryId: string) {
