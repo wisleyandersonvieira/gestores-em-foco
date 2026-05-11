@@ -92,6 +92,278 @@ export type Database = {
         }
         Relationships: []
       }
+      business_sectors: {
+        Row: {
+          created_at: string
+          description: string | null
+          display_order: number | null
+          id: string
+          is_active: boolean
+          name: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean
+          name: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      business_subsectors: {
+        Row: {
+          created_at: string
+          description: string | null
+          display_order: number | null
+          id: string
+          is_active: boolean
+          name: string
+          sector_id: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sector_id: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sector_id?: string
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_subsectors_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "business_sectors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_comments: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          status: string
+          topic_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          status?: string
+          topic_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          status?: string
+          topic_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_comments_topic_id_fkey"
+            columns: ["topic_id"]
+            isOneToOne: false
+            referencedRelation: "community_topics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_event_targets: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          sector_id: string | null
+          subsector_id: string | null
+          target_type: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          sector_id?: string | null
+          subsector_id?: string | null
+          target_type: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          sector_id?: string | null
+          subsector_id?: string | null
+          target_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_event_targets_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "community_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_event_targets_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "business_sectors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_event_targets_subsector_id_fkey"
+            columns: ["subsector_id"]
+            isOneToOne: false
+            referencedRelation: "business_subsectors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_events: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          end_at: string | null
+          event_type: string
+          id: string
+          image_url: string | null
+          location: string | null
+          meeting_url: string | null
+          start_at: string
+          status: string
+          title: string
+          updated_at: string
+          visibility_type: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          end_at?: string | null
+          event_type?: string
+          id?: string
+          image_url?: string | null
+          location?: string | null
+          meeting_url?: string | null
+          start_at: string
+          status?: string
+          title: string
+          updated_at?: string
+          visibility_type?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          end_at?: string | null
+          event_type?: string
+          id?: string
+          image_url?: string | null
+          location?: string | null
+          meeting_url?: string | null
+          start_at?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          visibility_type?: string
+        }
+        Relationships: []
+      }
+      community_topics: {
+        Row: {
+          community_type: string
+          content: string
+          created_at: string
+          id: string
+          is_pinned: boolean
+          sector_id: string | null
+          status: string
+          subsector_id: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          community_type: string
+          content: string
+          created_at?: string
+          id?: string
+          is_pinned?: boolean
+          sector_id?: string | null
+          status?: string
+          subsector_id?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          community_type?: string
+          content?: string
+          created_at?: string
+          id?: string
+          is_pinned?: boolean
+          sector_id?: string | null
+          status?: string
+          subsector_id?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_topics_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "business_sectors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_topics_subsector_id_fkey"
+            columns: ["subsector_id"]
+            isOneToOne: false
+            referencedRelation: "business_subsectors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       course_lesson_materials: {
         Row: {
           course_id: string
@@ -1247,83 +1519,6 @@ export type Database = {
         }
         Relationships: []
       }
-      business_sectors: {
-        Row: {
-          created_at: string
-          description: string | null
-          display_order: number | null
-          id: string
-          is_active: boolean
-          name: string
-          slug: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          display_order?: number | null
-          id?: string
-          is_active?: boolean
-          name: string
-          slug: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          display_order?: number | null
-          id?: string
-          is_active?: boolean
-          name?: string
-          slug?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      business_subsectors: {
-        Row: {
-          created_at: string
-          description: string | null
-          display_order: number | null
-          id: string
-          is_active: boolean
-          name: string
-          sector_id: string
-          slug: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          display_order?: number | null
-          id?: string
-          is_active?: boolean
-          name: string
-          sector_id: string
-          slug: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          display_order?: number | null
-          id?: string
-          is_active?: boolean
-          name?: string
-          sector_id?: string
-          slug?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "business_subsectors_sector_id_fkey"
-            columns: ["sector_id"]
-            isOneToOne: false
-            referencedRelation: "business_sectors"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       profiles: {
         Row: {
           company_name: string | null
@@ -1334,8 +1529,8 @@ export type Database = {
           id: string
           is_active: boolean
           role: Database["public"]["Enums"]["app_role"]
-          segment: string | null
           sector_id: string | null
+          segment: string | null
           subsector_id: string | null
           updated_at: string
         }
@@ -1348,8 +1543,8 @@ export type Database = {
           id: string
           is_active?: boolean
           role?: Database["public"]["Enums"]["app_role"]
-          segment?: string | null
           sector_id?: string | null
+          segment?: string | null
           subsector_id?: string | null
           updated_at?: string
         }
@@ -1362,12 +1557,27 @@ export type Database = {
           id?: string
           is_active?: boolean
           role?: Database["public"]["Enums"]["app_role"]
-          segment?: string | null
           sector_id?: string | null
+          segment?: string | null
           subsector_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "business_sectors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_subsector_id_fkey"
+            columns: ["subsector_id"]
+            isOneToOne: false
+            referencedRelation: "business_subsectors"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       site_access_logs: {
         Row: {
@@ -1821,7 +2031,90 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_profiles_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "business_sectors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_profiles_subsector_id_fkey"
+            columns: ["subsector_id"]
+            isOneToOne: false
+            referencedRelation: "business_subsectors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_sectors: {
+        Row: {
+          created_at: string
+          id: string
+          sector_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          sector_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          sector_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_sectors_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "business_sectors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_subsectors: {
+        Row: {
+          created_at: string
+          id: string
+          sector_id: string
+          subsector_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          sector_id: string
+          subsector_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          sector_id?: string
+          subsector_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_subsectors_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "business_sectors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_subsectors_subsector_id_fkey"
+            columns: ["subsector_id"]
+            isOneToOne: false
+            referencedRelation: "business_subsectors"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -1898,15 +2191,21 @@ export type Database = {
         Args: { p_product_slug: string; p_user_id: string }
         Returns: boolean
       }
-      log_user_access: {
+      community_event_visible_to_user: {
+        Args: { p_event_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      create_community_comment: {
+        Args: { p_content: string; p_topic_id: string }
+        Returns: string
+      }
+      create_community_topic: {
         Args: {
-          p_event_type: string
-          p_page?: string | null
-          p_page_title?: string | null
-          p_product_slug?: string | null
-          p_referrer?: string | null
-          p_session_id?: string | null
-          p_user_agent?: string | null
+          p_community_type: string
+          p_content: string
+          p_sector_id: string
+          p_subsector_id: string
+          p_title: string
         }
         Returns: string
       }
@@ -1924,6 +2223,10 @@ export type Database = {
       default_dre_subcategory_id: {
         Args: { p_category_id: string; p_name: string; p_user_id: string }
         Returns: string
+      }
+      get_community_topic_comments: {
+        Args: { p_topic_id: string }
+        Returns: Json
       }
       get_diagnostic_link_by_token: {
         Args: { p_token: string }
@@ -1949,8 +2252,26 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_my_community_events: { Args: never; Returns: Json }
+      get_my_community_overview: { Args: never; Returns: Json }
+      get_my_community_topics: {
+        Args: { p_filter_id?: string; p_filter_type?: string }
+        Returns: Json
+      }
       has_course_access: { Args: { p_course_id: string }; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
+      log_user_access: {
+        Args: {
+          p_event_type: string
+          p_page?: string
+          p_page_title?: string
+          p_product_slug?: string
+          p_referrer?: string
+          p_session_id?: string
+          p_user_agent?: string
+        }
+        Returns: string
+      }
       mark_diagnostic_link_used: {
         Args: { p_link_id: string; p_user_id: string }
         Returns: undefined
@@ -1958,6 +2279,20 @@ export type Database = {
       register_completed_diagnostic_product: {
         Args: { p_session_id: string }
         Returns: undefined
+      }
+      slugify_business_catalog: { Args: { value: string }; Returns: string }
+      sync_user_community_memberships: {
+        Args: { p_sector_ids: string[]; p_subsector_ids: string[] }
+        Returns: undefined
+      }
+      user_belongs_to_community: {
+        Args: {
+          p_community_type: string
+          p_sector_id: string
+          p_subsector_id: string
+          p_user_id: string
+        }
+        Returns: boolean
       }
       user_can_access_template: {
         Args: { p_template_id: string }

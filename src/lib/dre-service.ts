@@ -19,6 +19,33 @@ type DefaultDreStructureResult = {
   model_id: string | null;
 };
 
+/**
+ * O PostgREST do Supabase limita cada resposta a no máximo 1000 linhas.
+ * Este helper itera por páginas usando `.range(from, to)` até trazer todos
+ * os registros, garantindo que listagens grandes (DREs com muitos meses,
+ * itens, linhas de modelo etc.) nunca sejam truncadas silenciosamente.
+ *
+ * O builder recebe (from, to) e deve retornar a query JÁ filtrada por usuário,
+ * para que cada página continue restrita ao escopo correto.
+ */
+const PAGE_SIZE = 1000;
+async function fetchAllPaginated<T>(
+  buildPage: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: any }>,
+): Promise<T[]> {
+  const all: T[] = [];
+  let from = 0;
+  for (let page = 0; page < 200; page += 1) {
+    const to = from + PAGE_SIZE - 1;
+    const { data, error } = await buildPage(from, to);
+    if (error) throw error;
+    const rows = data ?? [];
+    all.push(...rows);
+    if (rows.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  return all;
+}
+
 export async function ensureDefaultDreStructure() {
   const { data, error } = await supabase.rpc("create_default_dre_structure" as any);
   if (error) {
@@ -35,15 +62,19 @@ export async function createDefaultDreCategories(userId: string) {
 }
 
 export async function listDreCategories(userId: string) {
-  const { data, error } = await supabase
-    .from("dre_categories")
-    .select("*")
-    .eq("user_id", userId)
-    .order("display_order", { ascending: true })
-    .order("name", { ascending: true });
-
-  if (error) throw new Error("Nao foi possivel carregar categorias.");
-  return data ?? [];
+  try {
+    return await fetchAllPaginated<DreCategory>((from, to) =>
+      supabase
+        .from("dre_categories")
+        .select("*")
+        .eq("user_id", userId)
+        .order("display_order", { ascending: true })
+        .order("name", { ascending: true })
+        .range(from, to),
+    );
+  } catch {
+    throw new Error("Nao foi possivel carregar categorias.");
+  }
 }
 
 export async function saveDreCategory(payload: TablesInsert<"dre_categories"> | TablesUpdate<"dre_categories">) {
@@ -79,15 +110,19 @@ export async function deleteOrDeactivateDreCategory(category: DreCategory) {
 }
 
 export async function listDreSubcategories(userId: string) {
-  const { data, error } = await supabase
-    .from("dre_subcategories")
-    .select("*, category:dre_categories(id,name,type,status)")
-    .eq("user_id", userId)
-    .order("display_order", { ascending: true })
-    .order("name", { ascending: true });
-
-  if (error) throw new Error("Nao foi possivel carregar subcategorias.");
-  return (data ?? []) as DreSubcategoryWithCategory[];
+  try {
+    return (await fetchAllPaginated<DreSubcategoryWithCategory>((from, to) =>
+      supabase
+        .from("dre_subcategories")
+        .select("*, category:dre_categories(id,name,type,status)")
+        .eq("user_id", userId)
+        .order("display_order", { ascending: true })
+        .order("name", { ascending: true })
+        .range(from, to),
+    )) as DreSubcategoryWithCategory[];
+  } catch {
+    throw new Error("Nao foi possivel carregar subcategorias.");
+  }
 }
 
 export async function saveDreSubcategory(payload: TablesInsert<"dre_subcategories"> | TablesUpdate<"dre_subcategories">) {
@@ -123,30 +158,42 @@ export async function deleteOrDeactivateDreSubcategory(subcategory: DreSubcatego
 }
 
 export async function listDreModels(userId: string, status?: DreRecordStatus) {
-  let query = supabase.from("dre_models").select("*").eq("user_id", userId).order("created_at", { ascending: false });
-  if (status) query = query.eq("status", status);
-
-  const { data, error } = await query;
-  if (error) throw new Error("Nao foi possivel carregar modelos.");
-  return data ?? [];
+  try {
+    return await fetchAllPaginated((from, to) => {
+      let q = supabase
+        .from("dre_models")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .range(from, to);
+      if (status) q = q.eq("status", status);
+      return q;
+    });
+  } catch {
+    throw new Error("Nao foi possivel carregar modelos.");
+  }
 }
 
 export async function getDreModelWithLines(userId: string, modelId: string): Promise<DreModelWithLines> {
   const { data: model, error: modelError } = await supabase.from("dre_models").select("*").eq("user_id", userId).eq("id", modelId).single();
   if (modelError) throw new Error("Modelo nao encontrado.");
 
-  const { data: lines, error: linesError } = await supabase
-    .from("dre_model_lines")
-    .select("*, category:dre_categories!dre_model_lines_category_id_fkey(*), subcategory:dre_subcategories!dre_model_lines_subcategory_id_fkey(*)")
-    .eq("user_id", userId)
-    .eq("model_id", modelId)
-    .order("display_order", { ascending: true });
-
-  if (linesError) {
+  let lines: DreModelWithLines["lines"];
+  try {
+    lines = (await fetchAllPaginated((from, to) =>
+      supabase
+        .from("dre_model_lines")
+        .select("*, category:dre_categories!dre_model_lines_category_id_fkey(*), subcategory:dre_subcategories!dre_model_lines_subcategory_id_fkey(*)")
+        .eq("user_id", userId)
+        .eq("model_id", modelId)
+        .order("display_order", { ascending: true })
+        .range(from, to),
+    )) as DreModelWithLines["lines"];
+  } catch (linesError) {
     if (import.meta.env.DEV) console.error("Erro ao carregar estrutura do modelo DRE:", linesError);
     throw new Error("Nao foi possivel carregar a estrutura do modelo.");
   }
-  return { ...model, lines: (lines ?? []) as DreModelWithLines["lines"] };
+  return { ...model, lines };
 }
 
 export async function saveDreModel(params: {
@@ -327,14 +374,18 @@ export async function saveDreEntry(params: {
 }
 
 export async function listDreEntries(userId: string) {
-  const { data, error } = await supabase
-    .from("dre_entries")
-    .select("*, model:dre_models(id,name)")
-    .eq("user_id", userId)
-    .order("competence", { ascending: false });
-
-  if (error) throw new Error("Nao foi possivel carregar DREs cadastrados.");
-  return (data ?? []) as DreEntryWithModel[];
+  try {
+    return (await fetchAllPaginated((from, to) =>
+      supabase
+        .from("dre_entries")
+        .select("*, model:dre_models(id,name)")
+        .eq("user_id", userId)
+        .order("competence", { ascending: false })
+        .range(from, to),
+    )) as DreEntryWithModel[];
+  } catch {
+    throw new Error("Nao foi possivel carregar DREs cadastrados.");
+  }
 }
 
 export async function listDreEntriesByModelAndYears(params: {
@@ -345,21 +396,24 @@ export async function listDreEntriesByModelAndYears(params: {
 }) {
   if (!params.modelId || params.years.length === 0) return [];
 
-  let query = supabase
-    .from("dre_entries")
-    .select("*, model:dre_models(id,name)")
-    .eq("user_id", params.userId)
-    .eq("model_id", params.modelId)
-    .in("competence", params.years.flatMap((year) => Array.from({ length: 12 }, (_, index) => `${year}-${String(index + 1).padStart(2, "0")}`)))
-    .order("competence", { ascending: true });
+  const competences = params.years.flatMap((year) => Array.from({ length: 12 }, (_, index) => `${year}-${String(index + 1).padStart(2, "0")}`));
 
-  if (!params.includeDrafts) {
-    query = query.eq("status", "finalized");
+  try {
+    return (await fetchAllPaginated((from, to) => {
+      let q = supabase
+        .from("dre_entries")
+        .select("*, model:dre_models(id,name)")
+        .eq("user_id", params.userId)
+        .eq("model_id", params.modelId)
+        .in("competence", competences)
+        .order("competence", { ascending: true })
+        .range(from, to);
+      if (!params.includeDrafts) q = q.eq("status", "finalized");
+      return q;
+    })) as DreEntryWithModel[];
+  } catch {
+    throw new Error("Nao foi possivel carregar DREs para analise.");
   }
-
-  const { data, error } = await query;
-  if (error) throw new Error("Nao foi possivel carregar DREs para analise.");
-  return (data ?? []) as DreEntryWithModel[];
 }
 
 export async function getDreEntry(userId: string, entryId: string): Promise<DreEntryWithItems> {
@@ -372,15 +426,21 @@ export async function getDreEntry(userId: string, entryId: string): Promise<DreE
 
   if (error || !entry) throw new Error("DRE nao encontrado.");
 
-  const { data: items, error: itemsError } = await supabase
-    .from("dre_entry_items")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("dre_entry_id", entryId)
-    .order("display_order", { ascending: true });
-
-  if (itemsError) throw new Error("Nao foi possivel carregar os itens do DRE.");
-  return { ...(entry as DreEntryWithModel), items: items ?? [] };
+  let items: DreEntryWithItems["items"];
+  try {
+    items = (await fetchAllPaginated((from, to) =>
+      supabase
+        .from("dre_entry_items")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("dre_entry_id", entryId)
+        .order("display_order", { ascending: true })
+        .range(from, to),
+    )) as DreEntryWithItems["items"];
+  } catch {
+    throw new Error("Nao foi possivel carregar os itens do DRE.");
+  }
+  return { ...(entry as DreEntryWithModel), items };
 }
 
 export async function deleteDreEntry(userId: string, entryId: string) {
