@@ -277,14 +277,26 @@ Deno.serve(async (request) => {
     auth: { persistSession: false },
   });
 
-  const { data: processedEvent } = await supabaseAdmin
+  // Atomic idempotency: try to insert the event row first.
+  // If a duplicate (23505) is returned, the event was already processed.
+  const { error: eventInsertError } = await supabaseAdmin
     .from("stripe_webhook_events")
-    .select("id")
-    .eq("id", event.id)
-    .maybeSingle();
+    .insert({
+      id: event.id,
+      type: event.type,
+      payload: event as unknown as Record<string, unknown>,
+    });
 
-  if (processedEvent) {
-    return jsonResponse(200, { received: true, duplicate: true });
+  if (eventInsertError) {
+    if (eventInsertError.code === "23505") {
+      return jsonResponse(200, { received: true, duplicate: true });
+    }
+    console.error("stripe-webhook insert failed", {
+      event_id: event.id,
+      event_type: event.type,
+      message: eventInsertError.message,
+    });
+    return jsonResponse(500, { error: "webhook_processing_failed" });
   }
 
   try {
@@ -307,21 +319,13 @@ Deno.serve(async (request) => {
         break;
     }
 
-    const { error: eventInsertError } = await supabaseAdmin
-      .from("stripe_webhook_events")
-      .insert({
-        id: event.id,
-        type: event.type,
-        payload: event as unknown as Record<string, unknown>,
-      });
-
-    if (eventInsertError && eventInsertError.code !== "23505") {
-      throw eventInsertError;
-    }
-
     return jsonResponse(200, { received: true });
   } catch (error) {
-    console.error("stripe-webhook processing failed", error);
+    console.error("stripe-webhook processing failed", {
+      event_id: event.id,
+      event_type: event.type,
+      message: error instanceof Error ? error.message : String(error),
+    });
     return jsonResponse(500, { error: "webhook_processing_failed" });
   }
 });
