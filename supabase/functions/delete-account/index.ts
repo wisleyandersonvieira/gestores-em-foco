@@ -151,7 +151,10 @@ Deno.serve(async (request) => {
 
     return jsonResponse(request, 200, { success: true });
   } catch (error) {
-    console.error("delete-account failed", error);
+    console.error("delete-account failed", {
+      user_id: userId,
+      message: error instanceof Error ? error.message : "unknown_error",
+    });
     return jsonResponse(request, 500, { error: "account_deletion_failed" });
   }
 });
