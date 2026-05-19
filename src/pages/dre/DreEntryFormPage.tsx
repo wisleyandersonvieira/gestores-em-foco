@@ -45,6 +45,7 @@ function DreEntryFormContent({ userId }: { userId: string }) {
           categoryName: item.category_name_snapshot,
           subcategoryName: item.subcategory_name_snapshot,
           categoryType: item.category_type_snapshot,
+          subcategoryIsReductive: item.subcategory_is_reductive ?? false,
           lineType: item.line_type,
           displayOrder: item.display_order,
           value: Number(item.value || 0),
@@ -128,6 +129,7 @@ function DreEntryFormContent({ userId }: { userId: string }) {
                           <div className={line.lineType === "category" ? "font-semibold uppercase" : line.lineType === "sum" ? "font-semibold text-primary" : "pl-6 text-sm"}>
                             {line.lineType === "category" || line.lineType === "sum" ? line.categoryName : line.subcategoryName}
                             {line.lineType === "category" ? <Badge className="ml-2" variant={line.categoryType === "credit" ? "default" : "secondary"}>{line.categoryType === "credit" ? "Credito" : "Debito"}</Badge> : null}
+                            {line.lineType === "subcategory" && line.subcategoryIsReductive ? <Badge className="ml-2" variant="secondary">REDUTORA</Badge> : null}
                           </div>
                         </TableCell>
                         <TableCell>

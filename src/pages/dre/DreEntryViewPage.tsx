@@ -35,6 +35,7 @@ function DreEntryViewContent({ userId }: { userId: string }) {
       categoryName: item.category_name_snapshot,
       subcategoryName: item.subcategory_name_snapshot,
       categoryType: item.category_type_snapshot,
+      subcategoryIsReductive: item.subcategory_is_reductive ?? false,
       lineType: item.line_type,
       displayOrder: item.display_order,
       value: Number(item.value || 0),
@@ -72,7 +73,10 @@ function DreEntryViewContent({ userId }: { userId: string }) {
                 const value = line.lineType === "category" ? calculateCategoryTotal(line.categoryId, lines) : line.lineType === "sum" ? calculateSumLineValue(index, lines) : line.value;
                 return (
                   <TableRow key={`${line.lineType}-${line.categoryId}-${line.subcategoryId}-${index}`} className={line.lineType === "category" ? "bg-muted/70" : line.lineType === "sum" ? "bg-primary/5" : ""}>
-                    <TableCell className={line.lineType === "category" ? "font-semibold uppercase" : line.lineType === "sum" ? "font-semibold text-primary" : "pl-10 text-sm"}>{line.lineType === "category" || line.lineType === "sum" ? line.categoryName : line.subcategoryName}</TableCell>
+                    <TableCell className={line.lineType === "category" ? "font-semibold uppercase" : line.lineType === "sum" ? "font-semibold text-primary" : "pl-10 text-sm"}>
+                      {line.lineType === "category" || line.lineType === "sum" ? line.categoryName : line.subcategoryName}
+                      {line.lineType === "subcategory" && line.subcategoryIsReductive ? <Badge className="ml-2" variant="secondary">REDUTORA</Badge> : null}
+                    </TableCell>
                     <TableCell className="text-right font-medium tabular-nums">{formatCurrency(value)}</TableCell>
                   </TableRow>
                 );

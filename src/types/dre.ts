@@ -5,7 +5,9 @@ export type DreSubcategory = Tables<"dre_subcategories">;
 export type DreModel = Tables<"dre_models">;
 export type DreModelLine = Tables<"dre_model_lines">;
 export type DreEntry = Tables<"dre_entries">;
-export type DreEntryItem = Tables<"dre_entry_items">;
+export type DreEntryItem = Tables<"dre_entry_items"> & {
+  subcategory_is_reductive?: boolean;
+};
 export type ProductSubscription = Tables<"product_subscriptions">;
 
 export type DreCategoryType = DreCategory["type"];
@@ -53,6 +55,7 @@ export type DreDraftLine = {
   categoryName: string;
   subcategoryName: string | null;
   categoryType: DreCategoryType;
+  subcategoryIsReductive: boolean;
   lineType: "category" | "subcategory" | "sum";
   displayOrder: number;
   value: number;

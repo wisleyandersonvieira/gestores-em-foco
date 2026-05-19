@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { calculateDreTotals, formatCompetence, formatPercentage, variationPercentage } from "@/lib/dre-calculations";
+import { calculateDreTotals, effectiveCategoryType, formatCompetence, formatPercentage, variationPercentage } from "@/lib/dre-calculations";
 import { getDreEntry, listDreEntriesByModelAndYears, listDreModels } from "@/lib/dre-service";
 import type { DreCategoryType, DreEntryWithItems, DreEntryWithModel, DreModel } from "@/types/dre";
 
@@ -436,8 +436,9 @@ function buildComparisonPeriod(period: SelectablePeriod, entriesByCompetence: Ma
 
   entries.forEach((entry) => {
     entry.items.filter((item) => item.line_type === "subcategory").forEach((item) => {
-      const key = subcategoryKey(item.category_type_snapshot, item.category_name_snapshot, item.subcategory_name_snapshot ?? "");
-      const current = subcategoryValues.get(key) ?? { value: 0, categoryType: item.category_type_snapshot };
+      const itemCategoryType = effectiveCategoryType({ categoryType: item.category_type_snapshot, subcategoryIsReductive: item.subcategory_is_reductive ?? false });
+      const key = subcategoryKey(itemCategoryType, item.category_name_snapshot, item.subcategory_name_snapshot ?? "");
+      const current = subcategoryValues.get(key) ?? { value: 0, categoryType: itemCategoryType };
       current.value += Number(item.value || 0);
       subcategoryValues.set(key, current);
     });
@@ -472,26 +473,27 @@ function buildComparisonRows(periods: ComparisonPeriod[]) {
 
   periods.forEach((period, periodIndex) => {
     period.entries.forEach((entry) => {
-      entry.items.filter((item) => item.line_type === "category" || item.line_type === "subcategory").forEach((item) => {
-        const category = categoryKey(item.category_type_snapshot, item.category_name_snapshot);
+      entry.items.filter((item) => item.line_type === "subcategory").forEach((item) => {
+        const itemCategoryType = effectiveCategoryType({ categoryType: item.category_type_snapshot, subcategoryIsReductive: item.subcategory_is_reductive ?? false });
+        const category = categoryKey(itemCategoryType, item.category_name_snapshot);
         if (!rows.has(category)) {
           rows.set(category, {
             key: category,
             label: item.category_name_snapshot,
             lineType: "category",
-            categoryType: item.category_type_snapshot,
+            categoryType: itemCategoryType,
             displayOrder: periodIndex * 100000 + item.display_order,
           });
         }
 
         if (item.line_type === "subcategory" && item.subcategory_name_snapshot) {
-          const subcategory = subcategoryKey(item.category_type_snapshot, item.category_name_snapshot, item.subcategory_name_snapshot);
+          const subcategory = subcategoryKey(itemCategoryType, item.category_name_snapshot, item.subcategory_name_snapshot);
           if (!rows.has(subcategory)) {
             rows.set(subcategory, {
               key: subcategory,
               label: item.subcategory_name_snapshot,
               lineType: "subcategory",
-              categoryType: item.category_type_snapshot,
+              categoryType: itemCategoryType,
               parentKey: category,
               displayOrder: periodIndex * 100000 + item.display_order,
             });

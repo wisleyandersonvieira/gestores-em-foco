@@ -290,6 +290,7 @@ export function buildDraftLinesFromModel(model: DreModelWithLines): DreDraftLine
     categoryName: line.line_type === "sum" ? line.sum_label ?? "Subtotal" : line.category?.name ?? "Categoria",
     subcategoryName: line.subcategory?.name ?? null,
     categoryType: line.category?.type ?? "debit",
+    subcategoryIsReductive: line.subcategory?.is_reductive ?? false,
     lineType: line.line_type,
     displayOrder: line.display_order,
     value: 0,
@@ -375,7 +376,7 @@ export async function saveDreEntry(params: {
 
 export async function listDreEntries(userId: string) {
   try {
-    return (await fetchAllPaginated((from, to) =>
+    const entries = (await fetchAllPaginated((from, to) =>
       supabase
         .from("dre_entries")
         .select("*, model:dre_models(id,name)")
@@ -383,6 +384,7 @@ export async function listDreEntries(userId: string) {
         .order("competence", { ascending: false })
         .range(from, to),
     )) as DreEntryWithModel[];
+    return await recalculateEntrySummaries(userId, entries);
   } catch {
     throw new Error("Nao foi possivel carregar DREs cadastrados.");
   }
@@ -399,7 +401,7 @@ export async function listDreEntriesByModelAndYears(params: {
   const competences = params.years.flatMap((year) => Array.from({ length: 12 }, (_, index) => `${year}-${String(index + 1).padStart(2, "0")}`));
 
   try {
-    return (await fetchAllPaginated((from, to) => {
+    const entries = (await fetchAllPaginated((from, to) => {
       let q = supabase
         .from("dre_entries")
         .select("*, model:dre_models(id,name)")
@@ -411,6 +413,7 @@ export async function listDreEntriesByModelAndYears(params: {
       if (!params.includeDrafts) q = q.eq("status", "finalized");
       return q;
     })) as DreEntryWithModel[];
+    return await recalculateEntrySummaries(params.userId, entries);
   } catch {
     throw new Error("Nao foi possivel carregar DREs para analise.");
   }
@@ -428,7 +431,7 @@ export async function getDreEntry(userId: string, entryId: string): Promise<DreE
 
   let items: DreEntryWithItems["items"];
   try {
-    items = (await fetchAllPaginated((from, to) =>
+    const rawItems = (await fetchAllPaginated((from, to) =>
       supabase
         .from("dre_entry_items")
         .select("*")
@@ -437,10 +440,29 @@ export async function getDreEntry(userId: string, entryId: string): Promise<DreE
         .order("display_order", { ascending: true })
         .range(from, to),
     )) as DreEntryWithItems["items"];
+    const subcategoryIds = Array.from(new Set(rawItems.map((item) => item.subcategory_id).filter((id): id is string => Boolean(id))));
+    const reductiveBySubcategory = new Map<string, boolean>();
+
+    if (subcategoryIds.length) {
+      const subcategories = await fetchAllPaginated<Pick<DreSubcategory, "id" | "is_reductive">>((from, to) =>
+        supabase
+          .from("dre_subcategories")
+          .select("id,is_reductive")
+          .eq("user_id", userId)
+          .in("id", subcategoryIds)
+          .range(from, to),
+      );
+      subcategories.forEach((subcategory) => reductiveBySubcategory.set(subcategory.id, subcategory.is_reductive));
+    }
+
+    items = rawItems.map((item) => ({
+      ...item,
+      subcategory_is_reductive: item.subcategory_id ? reductiveBySubcategory.get(item.subcategory_id) ?? false : false,
+    }));
   } catch {
     throw new Error("Nao foi possivel carregar os itens do DRE.");
   }
-  return { ...(entry as DreEntryWithModel), items };
+  return { ...(calculateEntryWithItems(entry as DreEntryWithModel, items)), items };
 }
 
 export async function deleteDreEntry(userId: string, entryId: string) {
@@ -453,4 +475,62 @@ async function hasAnyUsage(queries: Array<PromiseLike<{ count: number | null; er
   const failed = results.some((result) => result.error);
   if (failed) throw new Error("Nao foi possivel verificar vinculos antes da exclusao.");
   return results.some((result) => Number(result.count ?? 0) > 0);
+}
+
+function calculateEntryWithItems(entry: DreEntryWithModel, items: DreEntryWithItems["items"]): DreEntryWithModel {
+  const totals = calculateDreTotals(
+    items.map((item) => ({
+      lineType: item.line_type,
+      categoryType: item.category_type_snapshot,
+      subcategoryIsReductive: item.subcategory_is_reductive ?? false,
+      value: Number(item.value || 0),
+    })),
+  );
+
+  return {
+    ...entry,
+    total_credit: totals.totalCredit,
+    total_debit: totals.totalDebit,
+    result: totals.result,
+    margin_percentage: totals.marginPercentage,
+  };
+}
+
+async function recalculateEntrySummaries(userId: string, entries: DreEntryWithModel[]) {
+  if (entries.length === 0) return entries;
+
+  const entryIds = entries.map((entry) => entry.id);
+  const rawItems = (await fetchAllPaginated((from, to) =>
+    supabase
+      .from("dre_entry_items")
+      .select("*")
+      .eq("user_id", userId)
+      .in("dre_entry_id", entryIds)
+      .range(from, to),
+  )) as DreEntryWithItems["items"];
+  const subcategoryIds = Array.from(new Set(rawItems.map((item) => item.subcategory_id).filter((id): id is string => Boolean(id))));
+  const reductiveBySubcategory = new Map<string, boolean>();
+
+  if (subcategoryIds.length) {
+    const subcategories = await fetchAllPaginated<Pick<DreSubcategory, "id" | "is_reductive">>((from, to) =>
+      supabase
+        .from("dre_subcategories")
+        .select("id,is_reductive")
+        .eq("user_id", userId)
+        .in("id", subcategoryIds)
+        .range(from, to),
+    );
+    subcategories.forEach((subcategory) => reductiveBySubcategory.set(subcategory.id, subcategory.is_reductive));
+  }
+
+  const itemsByEntry = new Map<string, DreEntryWithItems["items"]>();
+  rawItems.forEach((item) => {
+    const enriched = {
+      ...item,
+      subcategory_is_reductive: item.subcategory_id ? reductiveBySubcategory.get(item.subcategory_id) ?? false : false,
+    };
+    itemsByEntry.set(item.dre_entry_id, [...(itemsByEntry.get(item.dre_entry_id) ?? []), enriched]);
+  });
+
+  return entries.map((entry) => calculateEntryWithItems(entry, itemsByEntry.get(entry.id) ?? []));
 }

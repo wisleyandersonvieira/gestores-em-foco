@@ -1331,6 +1331,7 @@ export type Database = {
           created_at: string
           display_order: number
           id: string
+          is_reductive: boolean
           name: string
           status: Database["public"]["Enums"]["dre_record_status"]
           updated_at: string
@@ -1341,6 +1342,7 @@ export type Database = {
           created_at?: string
           display_order?: number
           id?: string
+          is_reductive?: boolean
           name: string
           status?: Database["public"]["Enums"]["dre_record_status"]
           updated_at?: string
@@ -1351,6 +1353,7 @@ export type Database = {
           created_at?: string
           display_order?: number
           id?: string
+          is_reductive?: boolean
           name?: string
           status?: Database["public"]["Enums"]["dre_record_status"]
           updated_at?: string

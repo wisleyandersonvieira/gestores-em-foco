@@ -1,4 +1,4 @@
-import type { DreDraftLine, DreEntry, DreEntryItem, DreTotals } from "@/types/dre";
+import type { DreCategoryType, DreDraftLine, DreEntry, DreEntryItem, DreTotals } from "@/types/dre";
 
 export const DRE_PRODUCT_KEY = "gestor-dre";
 export const DRE_PRODUCT_NAME = "Gestor de DRE";
@@ -47,10 +47,31 @@ export function toCurrencyInput(value: number) {
   return formatCurrency(value).replace(/\u00a0/g, " ");
 }
 
-export function calculateDreTotals(lines: Array<Pick<DreDraftLine, "lineType" | "categoryType" | "value">>): DreTotals {
+export function resolveFinancialBehavior(categoryType: DreCategoryType, isReductive: boolean): DreCategoryType {
+  if (!isReductive) {
+    return categoryType;
+  }
+
+  return categoryType === "debit" ? "credit" : "debit";
+}
+
+export function effectiveCategoryType(line: Pick<DreDraftLine, "categoryType" | "subcategoryIsReductive">): DreCategoryType {
+  return resolveFinancialBehavior(line.categoryType, line.subcategoryIsReductive);
+}
+
+function signedLineValue(line: Pick<DreDraftLine, "categoryType" | "subcategoryIsReductive" | "value">) {
+  const value = Number(line.value || 0);
+  return effectiveCategoryType(line) === "credit" ? value : -value;
+}
+
+type CalculableLine = Pick<DreDraftLine, "lineType" | "categoryType" | "value"> & {
+  subcategoryIsReductive?: boolean;
+};
+
+export function calculateDreTotals(lines: CalculableLine[]): DreTotals {
   const subcategoryLines = lines.filter((line) => line.lineType === "subcategory");
-  const totalCredit = roundCurrency(subcategoryLines.filter((line) => line.categoryType === "credit").reduce((sum, line) => sum + Number(line.value || 0), 0));
-  const totalDebit = roundCurrency(subcategoryLines.filter((line) => line.categoryType === "debit").reduce((sum, line) => sum + Number(line.value || 0), 0));
+  const totalCredit = roundCurrency(subcategoryLines.filter((line) => effectiveCategoryType({ ...line, subcategoryIsReductive: line.subcategoryIsReductive ?? false }) === "credit").reduce((sum, line) => sum + Number(line.value || 0), 0));
+  const totalDebit = roundCurrency(subcategoryLines.filter((line) => effectiveCategoryType({ ...line, subcategoryIsReductive: line.subcategoryIsReductive ?? false }) === "debit").reduce((sum, line) => sum + Number(line.value || 0), 0));
   const result = roundCurrency(totalCredit - totalDebit);
   const marginPercentage = totalCredit > 0 ? roundCurrency((result / totalCredit) * 100) : 0;
 
@@ -60,19 +81,17 @@ export function calculateDreTotals(lines: Array<Pick<DreDraftLine, "lineType" | 
 export function calculateCategoryTotal(categoryId: string | null, lines: DreDraftLine[]) {
   if (!categoryId) return 0;
 
-  return roundCurrency(
-    lines
-      .filter((line) => line.lineType === "subcategory" && line.categoryId === categoryId)
-      .reduce((sum, line) => sum + Number(line.value || 0), 0),
-  );
+  const categoryType = lines.find((line) => line.categoryId === categoryId)?.categoryType ?? "debit";
+  const signedTotal = lines
+    .filter((line) => line.lineType === "subcategory" && line.categoryId === categoryId)
+    .reduce((sum, line) => sum + signedLineValue(line), 0);
+
+  return roundCurrency(categoryType === "credit" ? signedTotal : signedTotal * -1);
 }
 
 export function calculateSumLineValue(lineIndex: number, lines: DreDraftLine[]) {
   const previousSubcategoryLines = lines.slice(0, lineIndex).filter((line) => line.lineType === "subcategory");
-  const credit = previousSubcategoryLines.filter((line) => line.categoryType === "credit").reduce((sum, line) => sum + Number(line.value || 0), 0);
-  const debit = previousSubcategoryLines.filter((line) => line.categoryType === "debit").reduce((sum, line) => sum + Number(line.value || 0), 0);
-
-  return roundCurrency(credit - debit);
+  return roundCurrency(previousSubcategoryLines.reduce((sum, line) => sum + signedLineValue(line), 0));
 }
 
 export function calculateEntryTotals(entry: DreEntry, items: DreEntryItem[]) {
@@ -80,6 +99,7 @@ export function calculateEntryTotals(entry: DreEntry, items: DreEntryItem[]) {
     items.map((item) => ({
       lineType: item.line_type,
       categoryType: item.category_type_snapshot,
+      subcategoryIsReductive: item.subcategory_is_reductive ?? false,
       value: Number(item.value || 0),
     })),
   );

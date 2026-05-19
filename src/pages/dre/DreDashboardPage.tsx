@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { currentCompetence, formatCompetence, formatPercentage, variationPercentage } from "@/lib/dre-calculations";
+import { currentCompetence, effectiveCategoryType, formatCompetence, formatPercentage, variationPercentage } from "@/lib/dre-calculations";
 import { getDreEntry, listDreEntries } from "@/lib/dre-service";
 import type { DreCategoryType, DreEntryWithItems, DreEntryWithModel } from "@/types/dre";
 
@@ -48,27 +48,27 @@ function DreDashboardContent({ userId }: { userId: string }) {
   }, [selectedEntries, userId]);
 
   const totals = useMemo(() => {
-    const totalCredit = selectedEntries.reduce((sum, entry) => sum + entry.total_credit, 0);
-    const totalDebit = selectedEntries.reduce((sum, entry) => sum + entry.total_debit, 0);
+    const totalCredit = entriesWithItems.reduce((sum, entry) => sum + entry.total_credit, 0);
+    const totalDebit = entriesWithItems.reduce((sum, entry) => sum + entry.total_debit, 0);
     const result = totalCredit - totalDebit;
     const margin = totalCredit > 0 ? (result / totalCredit) * 100 : 0;
     return { totalCredit, totalDebit, result, margin };
-  }, [selectedEntries]);
+  }, [entriesWithItems]);
 
   const chartData = useMemo(() => {
     return selectedCompetences.map((competence) => {
-      const monthEntries = entries.filter((entry) => entry.competence === competence && entry.status === "finalized");
+      const monthEntries = entriesWithItems.filter((entry) => entry.competence === competence && entry.status === "finalized");
       const credit = monthEntries.reduce((sum, entry) => sum + entry.total_credit, 0);
       const debit = monthEntries.reduce((sum, entry) => sum + entry.total_debit, 0);
       return { competence: formatCompetence(competence), credit, debit, result: credit - debit };
     });
-  }, [entries, selectedCompetences]);
+  }, [entriesWithItems, selectedCompetences]);
 
   const categoryImpact = useMemo(() => {
     const impact = new Map<string, number>();
     entriesWithItems.forEach((entry) => {
       entry.items
-        .filter((item) => item.line_type === "subcategory" && item.category_type_snapshot === "debit")
+        .filter((item) => item.line_type === "subcategory" && effectiveCategoryType({ categoryType: item.category_type_snapshot, subcategoryIsReductive: item.subcategory_is_reductive ?? false }) === "debit")
         .forEach((item) => {
           impact.set(item.category_name_snapshot, (impact.get(item.category_name_snapshot) ?? 0) + Number(item.value || 0));
         });
@@ -89,10 +89,11 @@ function DreDashboardContent({ userId }: { userId: string }) {
     entriesWithItems.forEach((entry) => {
       if (entry.competence !== first && entry.competence !== last) return;
       entry.items.filter((item) => item.line_type === "subcategory").forEach((item) => {
-        const mapKey = `${item.category_type_snapshot}:${item.category_name_snapshot}`;
+        const itemCategoryType = effectiveCategoryType({ categoryType: item.category_type_snapshot, subcategoryIsReductive: item.subcategory_is_reductive ?? false });
+        const mapKey = `${itemCategoryType}:${item.category_name_snapshot}`;
         const current = values.get(mapKey) ?? {
           category: item.category_name_snapshot,
-          categoryType: item.category_type_snapshot,
+          categoryType: itemCategoryType,
           first: 0,
           last: 0,
         };

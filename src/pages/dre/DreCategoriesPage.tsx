@@ -11,11 +11,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { deleteOrDeactivateDreCategory, deleteOrDeactivateDreSubcategory, listDreCategories, listDreSubcategories, saveDreCategory, saveDreSubcategory } from "@/lib/dre-service";
 import type { DreCategory, DreCategoryType, DreRecordStatus, DreSubcategoryWithCategory } from "@/types/dre";
 
 type CategoryForm = { id?: string; name: string; type: DreCategoryType; status: DreRecordStatus; display_order: number };
-type SubcategoryForm = { id?: string; name: string; category_id: string; status: DreRecordStatus; display_order: number };
+type SubcategoryForm = { id?: string; name: string; category_id: string; status: DreRecordStatus; display_order: number; is_reductive: boolean };
 
 export default function DreCategoriesPage() {
   return <DreLayout>{(user) => <DreCategoriesContent userId={user.id} />}</DreLayout>;
@@ -153,7 +155,7 @@ function DreCategoriesContent({ userId }: { userId: string }) {
             <Button
               variant="outline"
               disabled={!selectedCategoryId}
-              onClick={() => setSubcategoryForm({ name: "", category_id: selectedCategoryId, status: "active", display_order: selectedSubcategories.length + 1 })}
+              onClick={() => setSubcategoryForm({ name: "", category_id: selectedCategoryId, status: "active", display_order: selectedSubcategories.length + 1, is_reductive: false })}
             >
               <Plus className="h-4 w-4" />
               Nova subcategoria
@@ -166,7 +168,10 @@ function DreCategoriesContent({ userId }: { userId: string }) {
               <div key={subcategory.id} className="flex items-center justify-between gap-3 rounded-lg border bg-white p-3">
                 <div>
                   <p className="font-medium">{subcategory.name}</p>
-                  <p className="text-xs text-muted-foreground">Ordem {subcategory.display_order} · {subcategory.status === "active" ? "Ativa" : "Inativa"}</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <p className="text-xs text-muted-foreground">Ordem {subcategory.display_order} · {subcategory.status === "active" ? "Ativa" : "Inativa"}</p>
+                    {subcategory.is_reductive ? <Badge variant="secondary">REDUTORA</Badge> : null}
+                  </div>
                 </div>
                 <div className="flex gap-1">
                   <Button size="icon" variant="ghost" onClick={() => setSubcategoryForm(subcategory)}><Edit2 className="h-4 w-4" /></Button>
@@ -225,6 +230,19 @@ function SubcategoryDialog({ categories, form, setForm, onSubmit }: { categories
               <Label>Status<Select value={form.status} onValueChange={(value) => setForm({ ...form, status: value as DreRecordStatus })}><SelectTrigger className="mt-2"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Ativa</SelectItem><SelectItem value="inactive">Inativa</SelectItem></SelectContent></Select></Label>
               <Label>Ordem<Input className="mt-2" type="number" value={form.display_order} onChange={(event) => setForm({ ...form, display_order: Number(event.target.value) })} /></Label>
             </div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-white px-4 py-3 text-sm">
+                    <span>Subcategoria redutora</span>
+                    <Switch checked={form.is_reductive} onCheckedChange={(checked) => setForm({ ...form, is_reductive: checked })} />
+                  </label>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  Quando marcada, os lançamentos desta subcategoria terão comportamento financeiro inverso da categoria principal apenas nos cálculos analíticos.
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             <Button onClick={onSubmit}>Salvar subcategoria</Button>
           </div>
         ) : null}
