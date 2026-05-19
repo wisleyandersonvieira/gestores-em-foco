@@ -12,39 +12,24 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { calculateDreTotals, calculateNetIncomeFromEntryItems, calculateRevenueFromEntryItems, effectiveCategoryType, formatCompetence, formatPercentage, variationPercentage } from "@/lib/dre-calculations";
-import { getDreEntry, listDreEntriesByModelAndYears, listDreModels } from "@/lib/dre-service";
-import type { DreCategoryType, DreEntryWithItems, DreEntryWithModel, DreModel } from "@/types/dre";
+import { formatCompetence, formatPercentage, variationPercentage } from "@/lib/dre-calculations";
+import {
+  buildDreAnalysisFromModel,
+  buildSelectableDreAnalysisPeriods,
+  dreAnalysisTableHtml,
+  isGoodDreAnalysisVariation,
+  type DreAnalysisPeriod,
+  type DreAnalysisPeriodInput,
+  type DreAnalysisResult,
+  type DreAnalysisRow,
+  type DreAnalysisType,
+} from "@/lib/dre-analysis";
+import { getDreEntry, getDreModelWithLines, listDreEntriesByModelAndYears, listDreModels } from "@/lib/dre-service";
+import type { DreEntryWithModel, DreModel } from "@/types/dre";
 
-type AnalysisType = "monthly" | "quarterly" | "semester";
-type SelectablePeriod = { id: string; label: string; year: string; months: string[] };
-type ComparisonPeriod = SelectablePeriod & {
-  entries: DreEntryWithItems[];
-  values: Map<string, number>;
-  totals: { revenue: number; totalCredit: number; totalDebit: number; result: number; marginPercentage: number };
-  missingMonths: string[];
-};
-type ComparisonRow = {
-  key: string;
-  label: string;
-  lineType: "category" | "subcategory" | "total";
-  categoryType: DreCategoryType | "result" | "margin";
-  displayOrder: number;
-  parentKey?: string;
-};
-type AnalysisResult = {
-  periods: ComparisonPeriod[];
-  rows: ComparisonRow[];
-  summary: {
-    totalCredit: number;
-    revenue: number;
-    totalDebit: number;
-    result: number;
-    averageMargin: number;
-    bestPeriod: string;
-    worstPeriod: string;
-  };
-};
+type AnalysisType = DreAnalysisType;
+type SelectablePeriod = DreAnalysisPeriodInput;
+type AnalysisResult = DreAnalysisResult;
 
 export default function DreAnalysisPage() {
   return <DreLayout>{(user) => <DreAnalysisContent userId={user.id} />}</DreLayout>;
@@ -57,6 +42,7 @@ function DreAnalysisContent({ userId }: { userId: string }) {
   const [years, setYears] = useState<string[]>([]);
   const [includeDrafts, setIncludeDrafts] = useState(false);
   const [showVariation, setShowVariation] = useState(false);
+  const [showVerticalAnalysis, setShowVerticalAnalysis] = useState(false);
   const [availableEntries, setAvailableEntries] = useState<DreEntryWithModel[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -82,7 +68,7 @@ function DreAnalysisContent({ userId }: { userId: string }) {
 
   const allEntriesForModel = useMemo(() => availableEntries, [availableEntries]);
   const availableYears = useMemo(() => buildAvailableYears(availableEntries, years), [availableEntries, years]);
-  const selectablePeriods = useMemo(() => buildSelectablePeriods(analysisType, years, availableEntries), [analysisType, availableEntries, years]);
+  const selectablePeriods = useMemo(() => buildSelectableDreAnalysisPeriods(analysisType, years, availableEntries.map((entry) => entry.competence)), [analysisType, availableEntries, years]);
   const selectedPeriods = useMemo(() => selectablePeriods.filter((period) => selectedIds.includes(period.id)), [selectablePeriods, selectedIds]);
   const canGenerate = Boolean(modelId) && years.length > 0 && selectedPeriods.length > 0;
 
@@ -114,7 +100,8 @@ function DreAnalysisContent({ userId }: { userId: string }) {
           .filter((entry): entry is DreEntryWithModel => Boolean(entry))
           .map((entry) => getDreEntry(userId, entry.id)),
       );
-      setResult(buildComparison(selectedPeriods, detailedEntries));
+      const model = await getDreModelWithLines(userId, modelId);
+      setResult(buildDreAnalysisFromModel({ model, periods: selectedPeriods, entries: detailedEntries }));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Nao foi possivel gerar a analise.");
     } finally {
@@ -128,6 +115,7 @@ function DreAnalysisContent({ userId }: { userId: string }) {
     setYears([]);
     setIncludeDrafts(false);
     setShowVariation(false);
+    setShowVerticalAnalysis(false);
     setAvailableEntries([]);
     setSelectedIds([]);
     setResult(null);
@@ -164,7 +152,7 @@ function DreAnalysisContent({ userId }: { userId: string }) {
             </Label>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-[1fr_280px_280px]">
+          <div className="grid gap-4 lg:grid-cols-[1fr_240px_240px_220px]">
             <div>
               <Label>Ano(s)</Label>
               <div className="mt-2 flex flex-wrap gap-2">
@@ -184,6 +172,10 @@ function DreAnalysisContent({ userId }: { userId: string }) {
               <span>Exibir variacao entre periodos</span>
               <Switch checked={showVariation} onCheckedChange={setShowVariation} />
             </label>
+            <label className="flex items-center justify-between gap-3 rounded-lg border bg-white px-4 py-3 text-sm">
+              <span>Analise vertical</span>
+              <Switch checked={showVerticalAnalysis} onCheckedChange={setShowVerticalAnalysis} />
+            </label>
           </div>
 
           {modelId && years.length > 0 ? (
@@ -201,8 +193,8 @@ function DreAnalysisContent({ userId }: { userId: string }) {
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
             <Button variant="outline" onClick={clearFilters}><RotateCcw className="h-4 w-4" />Limpar filtros</Button>
             <Button disabled={!canGenerate || loading} onClick={() => void generateAnalysis()}>{loading ? "Gerando..." : "Gerar Analise"}</Button>
-            <Button variant="outline" disabled={!result} onClick={() => result && exportAnalysisPdf(result, showVariation)}><Download className="h-4 w-4" />Exportar PDF</Button>
-            <Button variant="outline" disabled={!result} onClick={() => result && exportAnalysisExcel(result, showVariation)}><FileSpreadsheet className="h-4 w-4" />Exportar Excel</Button>
+            <Button variant="outline" disabled={!result} onClick={() => result && exportAnalysisPdf(result, showVariation, showVerticalAnalysis)}><Download className="h-4 w-4" />Exportar PDF</Button>
+            <Button variant="outline" disabled={!result} onClick={() => result && exportAnalysisExcel(result, showVariation, showVerticalAnalysis)}><FileSpreadsheet className="h-4 w-4" />Exportar Excel</Button>
           </div>
         </CardContent>
       </Card>
@@ -228,7 +220,7 @@ function DreAnalysisContent({ userId }: { userId: string }) {
             <IndicatorCard title="Pior periodo" value={result.summary.worstPeriod} />
           </div>
 
-          <ComparisonTable result={result} showVariation={showVariation} />
+          <ComparisonTable result={result} showVariation={showVariation} showVerticalAnalysis={showVerticalAnalysis} />
         </>
       ) : null}
     </div>
@@ -302,7 +294,7 @@ function PeriodSelector({
   );
 }
 
-function ComparisonTable({ result, showVariation }: { result: AnalysisResult; showVariation: boolean }) {
+function ComparisonTable({ result, showVariation, showVerticalAnalysis }: { result: AnalysisResult; showVariation: boolean; showVerticalAnalysis: boolean }) {
   return (
     <Card className="border-primary/10 bg-white/90">
       <CardHeader><CardTitle>Tabela Comparativa</CardTitle></CardHeader>
@@ -318,8 +310,11 @@ function ComparisonTable({ result, showVariation }: { result: AnalysisResult; sh
           </TableHeader>
           <TableBody>
             {result.rows.map((row) => (
-              <TableRow key={row.key} className={row.lineType === "category" ? "bg-muted/70" : row.lineType === "total" ? "bg-primary/5" : ""}>
-                <TableCell className={`sticky left-0 z-10 bg-inherit ${row.lineType === "subcategory" ? "pl-10 text-sm" : "font-semibold"}`}>{row.label}</TableCell>
+              <TableRow key={row.key} className={row.lineType === "category" ? "bg-muted/70" : row.isNetIncome ? "bg-primary/10" : row.isSumLine ? "bg-primary/5" : ""}>
+                <TableCell className={`sticky left-0 z-10 bg-inherit ${row.level === 1 ? "pl-10 text-sm" : "font-semibold"} ${row.isNetIncome ? "text-primary" : ""}`}>
+                  {row.label}
+                  {row.isNetIncome ? <Badge className="ml-2" variant="secondary">LUCRO LÍQUIDO</Badge> : null}
+                </TableCell>
                 {result.periods.map((period, index) => {
                   const current = getRowValue(row, period);
                   const previous = index > 0 ? getRowValue(row, result.periods[index - 1]) : 0;
@@ -332,6 +327,8 @@ function ComparisonTable({ result, showVariation }: { result: AnalysisResult; sh
                       variation={variation}
                       previous={previous}
                       showVariation={showVariation && index > 0}
+                      showVerticalAnalysis={showVerticalAnalysis}
+                      verticalPercentage={getRowVerticalPercentage(row, period)}
                     />
                   );
                 })}
@@ -344,7 +341,7 @@ function ComparisonTable({ result, showVariation }: { result: AnalysisResult; sh
   );
 }
 
-function ColumnHeaders({ period, index, showVariation }: { period: ComparisonPeriod; index: number; showVariation: boolean }) {
+function ColumnHeaders({ period, index, showVariation }: { period: DreAnalysisPeriod; index: number; showVariation: boolean }) {
   return (
     <>
       <TableHead className="min-w-36 text-right">{period.label}</TableHead>
@@ -353,12 +350,31 @@ function ColumnHeaders({ period, index, showVariation }: { period: ComparisonPer
   );
 }
 
-function ValueCells({ row, value, variation, previous, showVariation }: { row: ComparisonRow; value: number; variation: number; previous: number; showVariation: boolean }) {
+function ValueCells({
+  row,
+  value,
+  variation,
+  previous,
+  showVariation,
+  showVerticalAnalysis,
+  verticalPercentage,
+}: {
+  row: DreAnalysisRow;
+  value: number;
+  variation: number;
+  previous: number;
+  showVariation: boolean;
+  showVerticalAnalysis: boolean;
+  verticalPercentage: number;
+}) {
   const formatted = row.categoryType === "margin" ? formatPercentage(value) : formatCurrency(value);
-  const variationClass = variation === 0 ? "text-muted-foreground" : isGoodVariation(row.categoryType, variation) ? "text-emerald-700" : "text-red-700";
+  const variationClass = variation === 0 ? "text-muted-foreground" : isGoodDreAnalysisVariation(row.categoryType, variation) ? "text-emerald-700" : "text-red-700";
   return (
     <>
-      <TableCell className={`text-right font-medium tabular-nums ${row.categoryType === "result" ? value >= 0 ? "text-emerald-700" : "text-red-700" : ""}`}>{formatted}</TableCell>
+      <TableCell className={`text-right font-medium tabular-nums ${row.categoryType === "result" ? value >= 0 ? "text-emerald-700" : "text-red-700" : ""}`}>
+        <span>{formatted}</span>
+        {showVerticalAnalysis && row.categoryType !== "margin" ? <span className="mt-1 block text-xs font-semibold text-muted-foreground">{formatPercentage(verticalPercentage)}</span> : null}
+      </TableCell>
       {showVariation ? (
         <TableCell className={`text-right text-sm font-semibold tabular-nums ${variationClass}`}>
           {formatCurrency(variation)} / {formatPercentage(variationPercentage(previous, value))}
@@ -382,162 +398,12 @@ function buildAvailableYears(entries: DreEntryWithModel[], selectedYears: string
   return Array.from(years).sort();
 }
 
-function buildSelectablePeriods(type: AnalysisType, years: string[], entries: DreEntryWithModel[]): SelectablePeriod[] {
-  if (type === "monthly") {
-    const entryCompetences = new Set(entries.map((entry) => entry.competence));
-    return years.flatMap((year) => Array.from({ length: 12 }, (_, index) => {
-      const competence = `${year}-${String(index + 1).padStart(2, "0")}`;
-      return { id: competence, label: formatCompetence(competence), year, months: [competence] };
-    })).filter((period) => entryCompetences.has(period.id));
-  }
-
-  if (type === "quarterly") {
-    return years.flatMap((year) => [0, 1, 2, 3].map((quarter) => {
-      const startMonth = quarter * 3 + 1;
-      const months = [0, 1, 2].map((offset) => `${year}-${String(startMonth + offset).padStart(2, "0")}`);
-      return { id: `${year}-Q${quarter + 1}`, label: `${quarter + 1}o Tri/${year}`, year, months };
-    }));
-  }
-
-  return years.flatMap((year) => [0, 1].map((semester) => {
-    const startMonth = semester * 6 + 1;
-    const months = Array.from({ length: 6 }, (_, offset) => `${year}-${String(startMonth + offset).padStart(2, "0")}`);
-    return { id: `${year}-S${semester + 1}`, label: `${semester + 1}o Sem/${year}`, year, months };
-  }));
+function getRowValue(row: DreAnalysisRow, period: DreAnalysisPeriod) {
+  return row.values[period.id]?.amount ?? 0;
 }
 
-function buildComparison(periods: SelectablePeriod[], entries: DreEntryWithItems[]): AnalysisResult {
-  const entriesByCompetence = new Map(entries.map((entry) => [entry.competence, entry]));
-  const comparisonPeriods = periods.map((period) => buildComparisonPeriod(period, entriesByCompetence));
-  const rows = buildComparisonRows(comparisonPeriods);
-  const revenue = comparisonPeriods.reduce((sum, period) => sum + period.totals.revenue, 0);
-  const totalCredit = comparisonPeriods.reduce((sum, period) => sum + period.totals.totalCredit, 0);
-  const totalDebit = comparisonPeriods.reduce((sum, period) => sum + period.totals.totalDebit, 0);
-  const result = comparisonPeriods.reduce((sum, period) => sum + period.totals.result, 0);
-  const averageMargin = comparisonPeriods.length ? comparisonPeriods.reduce((sum, period) => sum + period.totals.marginPercentage, 0) / comparisonPeriods.length : 0;
-  const best = [...comparisonPeriods].sort((a, b) => b.totals.result - a.totals.result)[0];
-  const worst = [...comparisonPeriods].sort((a, b) => a.totals.result - b.totals.result)[0];
-
-  return {
-    periods: comparisonPeriods,
-    rows,
-    summary: {
-      totalCredit,
-      revenue,
-      totalDebit,
-      result,
-      averageMargin,
-      bestPeriod: best?.label ?? "-",
-      worstPeriod: worst?.label ?? "-",
-    },
-  };
-}
-
-function buildComparisonPeriod(period: SelectablePeriod, entriesByCompetence: Map<string, DreEntryWithItems>): ComparisonPeriod {
-  const entries = period.months.map((month) => entriesByCompetence.get(month)).filter((entry): entry is DreEntryWithItems => Boolean(entry));
-  const subcategoryValues = new Map<string, { value: number; categoryType: DreCategoryType }>();
-
-  entries.forEach((entry) => {
-    entry.items.filter((item) => item.line_type === "subcategory").forEach((item) => {
-      const itemCategoryType = effectiveCategoryType({ categoryType: item.category_type_snapshot, subcategoryIsReductive: item.subcategory_is_reductive ?? false });
-      const key = subcategoryKey(itemCategoryType, item.category_name_snapshot, item.subcategory_name_snapshot ?? "");
-      const current = subcategoryValues.get(key) ?? { value: 0, categoryType: itemCategoryType };
-      current.value += Number(item.value || 0);
-      subcategoryValues.set(key, current);
-    });
-  });
-
-  const values = new Map<string, number>();
-  subcategoryValues.forEach((item, key) => {
-    values.set(key, item.value);
-    const [, categoryType, categoryName] = key.split("::");
-    const category = categoryKey(categoryType as DreCategoryType, categoryName);
-    values.set(category, (values.get(category) ?? 0) + item.value);
-  });
-
-  const linesForTotals = Array.from(subcategoryValues.values()).map((item) => ({ lineType: "subcategory" as const, categoryType: item.categoryType, value: item.value }));
-  const totals = calculateDreTotals(linesForTotals);
-  const revenue = entries.reduce((sum, entry) => sum + calculateRevenueFromEntryItems(entry.items), 0);
-  const netIncome = entries.reduce((sum, entry) => sum + calculateNetIncomeFromEntryItems(entry.items, entry.result), 0);
-  values.set("total-credit", revenue);
-  values.set("total-debit", totals.totalDebit);
-  values.set("result", netIncome);
-  values.set("margin", revenue > 0 ? (netIncome / revenue) * 100 : totals.marginPercentage);
-
-  return {
-    ...period,
-    entries,
-    values,
-    totals: {
-      revenue,
-      totalCredit: totals.totalCredit,
-      totalDebit: totals.totalDebit,
-      result: netIncome,
-      marginPercentage: revenue > 0 ? (netIncome / revenue) * 100 : totals.marginPercentage,
-    },
-    missingMonths: period.months.filter((month) => !entriesByCompetence.has(month)),
-  };
-}
-
-function buildComparisonRows(periods: ComparisonPeriod[]) {
-  const rows = new Map<string, ComparisonRow>();
-
-  periods.forEach((period, periodIndex) => {
-    period.entries.forEach((entry) => {
-      entry.items.filter((item) => item.line_type === "subcategory").forEach((item) => {
-        const itemCategoryType = effectiveCategoryType({ categoryType: item.category_type_snapshot, subcategoryIsReductive: item.subcategory_is_reductive ?? false });
-        const category = categoryKey(itemCategoryType, item.category_name_snapshot);
-        if (!rows.has(category)) {
-          rows.set(category, {
-            key: category,
-            label: item.category_name_snapshot,
-            lineType: "category",
-            categoryType: itemCategoryType,
-            displayOrder: periodIndex * 100000 + item.display_order,
-          });
-        }
-
-        if (item.line_type === "subcategory" && item.subcategory_name_snapshot) {
-          const subcategory = subcategoryKey(itemCategoryType, item.category_name_snapshot, item.subcategory_name_snapshot);
-          if (!rows.has(subcategory)) {
-            rows.set(subcategory, {
-              key: subcategory,
-              label: item.subcategory_name_snapshot,
-              lineType: "subcategory",
-              categoryType: itemCategoryType,
-              parentKey: category,
-              displayOrder: periodIndex * 100000 + item.display_order,
-            });
-          }
-        }
-      });
-    });
-  });
-
-  return [
-    ...Array.from(rows.values()).sort((a, b) => a.displayOrder - b.displayOrder),
-    { key: "total-credit", label: "Faturamento", lineType: "total" as const, categoryType: "credit" as const, displayOrder: 900000 },
-    { key: "total-debit", label: "Total de Debitos", lineType: "total" as const, categoryType: "debit" as const, displayOrder: 900001 },
-    { key: "result", label: "Resultado", lineType: "total" as const, categoryType: "result" as const, displayOrder: 900002 },
-    { key: "margin", label: "Margem de Lucro", lineType: "total" as const, categoryType: "margin" as const, displayOrder: 900003 },
-  ];
-}
-
-function getRowValue(row: ComparisonRow, period: ComparisonPeriod) {
-  return period.values.get(row.key) ?? 0;
-}
-
-function isGoodVariation(categoryType: ComparisonRow["categoryType"], difference: number) {
-  if (difference === 0 || categoryType === "margin") return true;
-  return categoryType === "credit" || categoryType === "result" ? difference > 0 : difference < 0;
-}
-
-function categoryKey(categoryType: DreCategoryType, categoryName: string) {
-  return `cat::${categoryType}::${categoryName}`;
-}
-
-function subcategoryKey(categoryType: DreCategoryType, categoryName: string, subcategoryName: string) {
-  return `sub::${categoryType}::${categoryName}::${subcategoryName}`;
+function getRowVerticalPercentage(row: DreAnalysisRow, period: DreAnalysisPeriod) {
+  return row.values[period.id]?.verticalPercentage ?? 0;
 }
 
 function groupPeriodsByYear(periods: SelectablePeriod[]) {
@@ -547,7 +413,7 @@ function groupPeriodsByYear(periods: SelectablePeriod[]) {
   }, {});
 }
 
-function exportAnalysisPdf(result: AnalysisResult, showVariation: boolean) {
+function exportAnalysisPdf(result: AnalysisResult, showVariation: boolean, showVerticalAnalysis: boolean) {
   const reportWindow = window.open("", "_blank", "width=1100,height=800");
   if (!reportWindow) {
     toast.error("Nao foi possivel abrir a janela de exportacao.");
@@ -577,15 +443,15 @@ function exportAnalysisPdf(result: AnalysisResult, showVariation: boolean) {
         ${reportCard("Melhor periodo", result.summary.bestPeriod)}
         ${reportCard("Pior periodo", result.summary.worstPeriod)}
       </section>
-      ${comparisonTableHtml(result, showVariation)}
+      ${dreAnalysisTableHtml(result, showVariation, showVerticalAnalysis)}
       <script>window.onload = () => { window.focus(); window.print(); };</script>
     </body></html>
   `);
   reportWindow.document.close();
 }
 
-function exportAnalysisExcel(result: AnalysisResult, showVariation: boolean) {
-  const html = `<!doctype html><html><head><meta charset="utf-8" /></head><body>${comparisonTableHtml(result, showVariation)}</body></html>`;
+function exportAnalysisExcel(result: AnalysisResult, showVariation: boolean, showVerticalAnalysis: boolean) {
+  const html = `<!doctype html><html><head><meta charset="utf-8" /></head><body>${dreAnalysisTableHtml(result, showVariation, showVerticalAnalysis)}</body></html>`;
   const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -593,17 +459,6 @@ function exportAnalysisExcel(result: AnalysisResult, showVariation: boolean) {
   link.download = "analise-dre.xls";
   link.click();
   URL.revokeObjectURL(url);
-}
-
-function comparisonTableHtml(result: AnalysisResult, showVariation: boolean) {
-  return `<table><thead><tr><th>Categoria / Subcategoria</th>${result.periods.map((period, index) => `<th>${escapeHtml(period.label)}</th>${showVariation && index > 0 ? "<th>Var. anterior</th>" : ""}`).join("")}</tr></thead><tbody>
-    ${result.rows.map((row) => `<tr class="${row.lineType === "category" ? "cat" : row.lineType === "subcategory" ? "sub" : "total"}"><td>${escapeHtml(row.label)}</td>${result.periods.map((period, index) => {
-      const current = getRowValue(row, period);
-      const previous = index > 0 ? getRowValue(row, result.periods[index - 1]) : 0;
-      const variation = current - previous;
-      return `<td>${row.categoryType === "margin" ? formatPercentage(current) : formatCurrency(current)}</td>${showVariation && index > 0 ? `<td class="${isGoodVariation(row.categoryType, variation) ? "positive" : "negative"}">${formatCurrency(variation)} / ${formatPercentage(variationPercentage(previous, current))}</td>` : ""}`;
-    }).join("")}</tr>`).join("")}
-  </tbody></table>`;
 }
 
 function reportCard(label: string, value: string, tone = "") {

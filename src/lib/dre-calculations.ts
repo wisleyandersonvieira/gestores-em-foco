@@ -105,11 +105,11 @@ export function calculateDreTotals(lines: CalculableLine[]): DreTotals {
   return { totalCredit, totalDebit, result, marginPercentage };
 }
 
-export function calculateRevenueFromLines(lines: Array<Pick<DreDraftLine, "lineType" | "categoryIsRevenue" | "value">>) {
+export function calculateRevenueFromLines(lines: Array<Pick<DreDraftLine, "lineType" | "categoryIsRevenue" | "categoryType" | "subcategoryIsReductive" | "value">>) {
   return roundCurrency(
     lines
       .filter((line) => line.lineType === "subcategory" && line.categoryIsRevenue)
-      .reduce((sum, line) => sum + Number(line.value || 0), 0),
+      .reduce((sum, line) => sum + signedLineValue(line), 0),
   );
 }
 
@@ -122,7 +122,7 @@ export function calculateRevenueFromEntryItems(items: DreEntryItem[]) {
   return roundCurrency(
     items
       .filter((item) => item.line_type === "subcategory" && item.category_is_revenue)
-      .reduce((sum, item) => sum + Number(item.value || 0), 0),
+      .reduce((sum, item) => sum + (effectiveCategoryType({ categoryType: item.category_type_snapshot, subcategoryIsReductive: item.subcategory_is_reductive ?? false }) === "credit" ? Number(item.value || 0) : -Number(item.value || 0)), 0),
   );
 }
 
