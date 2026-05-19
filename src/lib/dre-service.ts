@@ -130,13 +130,22 @@ export async function saveDreSubcategory(payload: TablesInsert<"dre_subcategorie
   if (!name) throw new Error("Informe o nome da subcategoria.");
   if (!payload.category_id) throw new Error("Selecione uma categoria.");
 
+  const subcategoryPayload = {
+    category_id: payload.category_id,
+    display_order: payload.display_order ?? 0,
+    is_reductive: payload.is_reductive ?? false,
+    name,
+    status: payload.status ?? "active",
+    user_id: payload.user_id,
+  };
+
   if ("id" in payload && payload.id) {
-    const { error } = await supabase.from("dre_subcategories").update({ ...payload, name }).eq("id", payload.id);
+    const { error } = await supabase.from("dre_subcategories").update(subcategoryPayload).eq("id", payload.id);
     if (error) throw new Error("Nao foi possivel atualizar a subcategoria.");
     return;
   }
 
-  const { error } = await supabase.from("dre_subcategories").insert({ ...(payload as TablesInsert<"dre_subcategories">), name });
+  const { error } = await supabase.from("dre_subcategories").insert(subcategoryPayload as TablesInsert<"dre_subcategories">);
   if (error) throw new Error("Nao foi possivel criar a subcategoria.");
 }
 

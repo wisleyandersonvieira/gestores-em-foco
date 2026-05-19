@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, Edit2, Plus, PlusCircle, Save, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, CheckSquare, Edit2, Plus, PlusCircle, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { DreLayout } from "@/components/dre/dre-layout";
@@ -126,8 +126,21 @@ function DreModelsContent({ userId }: { userId: string }) {
               <Label>Descricao<Textarea className="mt-2" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></Label>
 
               <div>
-                <h2 className="font-display text-xl font-semibold">Montagem do modelo</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Selecione categorias e escolha quais subcategorias entram em cada bloco.</p>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h2 className="font-display text-xl font-semibold">Montagem do modelo</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">Selecione categorias e escolha quais subcategorias entram em cada bloco.</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={categories.length === 0}
+                    onClick={() => setForm({ ...form, structure: selectAllCategoryStructure(categories, subcategories, form.structure) })}
+                  >
+                    <CheckSquare className="h-4 w-4" />
+                    Selecionar tudo
+                  </Button>
+                </div>
               </div>
 
               <div className="grid gap-3">
@@ -287,4 +300,23 @@ function moveStructureLine(structure: DreModelBuilderLine[], index: number, dire
   const [line] = next.splice(index, 1);
   next.splice(nextIndex, 0, line);
   return next;
+}
+
+function selectAllCategoryStructure(
+  categories: DreCategory[],
+  subcategories: DreSubcategoryWithCategory[],
+  currentStructure: DreModelBuilderLine[],
+): DreModelBuilderLine[] {
+  const sumLines = currentStructure.filter((line) => line.kind === "sum");
+
+  return [
+    ...categories.map((category) => ({
+      kind: "category" as const,
+      categoryId: category.id,
+      subcategoryIds: subcategories
+        .filter((subcategory) => subcategory.category_id === category.id)
+        .map((subcategory) => subcategory.id),
+    })),
+    ...sumLines,
+  ];
 }

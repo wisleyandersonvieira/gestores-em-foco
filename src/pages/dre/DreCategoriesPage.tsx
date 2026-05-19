@@ -174,7 +174,7 @@ function DreCategoriesContent({ userId }: { userId: string }) {
                   </div>
                 </div>
                 <div className="flex gap-1">
-                  <Button size="icon" variant="ghost" onClick={() => setSubcategoryForm(subcategory)}><Edit2 className="h-4 w-4" /></Button>
+                  <Button size="icon" variant="ghost" onClick={() => setSubcategoryForm(toSubcategoryForm(subcategory))}><Edit2 className="h-4 w-4" /></Button>
                   <Button size="icon" variant="ghost" onClick={() => setPendingDelete({ kind: "subcategory", item: subcategory })}><Trash2 className="h-4 w-4" /></Button>
                 </div>
               </div>
@@ -194,6 +194,17 @@ function DreCategoriesContent({ userId }: { userId: string }) {
       />
     </div>
   );
+}
+
+function toSubcategoryForm(subcategory: DreSubcategoryWithCategory): SubcategoryForm {
+  return {
+    id: subcategory.id,
+    name: subcategory.name,
+    category_id: subcategory.category_id,
+    status: subcategory.status,
+    display_order: subcategory.display_order,
+    is_reductive: subcategory.is_reductive ?? false,
+  };
 }
 
 function CategoryDialog({ form, setForm, onSubmit }: { form: CategoryForm | null; setForm: (form: CategoryForm | null) => void; onSubmit: () => void }) {
