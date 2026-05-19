@@ -262,13 +262,10 @@ function calculateVerticalPercentage(amount: number, revenue: number) {
 function calculateComparativeTotalDebit(lines: DreDraftLine[]) {
   return roundCurrency(
     lines
-      .filter((line) => line.lineType === "subcategory")
+      .filter((line) => line.lineType === "subcategory" && line.categoryType === "debit")
       .reduce((sum, line) => {
         const value = Number(line.value || 0);
-        if (line.categoryType === "debit") {
-          return sum + (line.subcategoryIsReductive ? -value : value);
-        }
-        return sum + (line.subcategoryIsReductive ? value : 0);
+        return sum + (line.subcategoryIsReductive ? -value : value);
       }, 0),
   );
 }
