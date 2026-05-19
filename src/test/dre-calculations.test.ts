@@ -44,8 +44,8 @@ describe("DRE reductive subcategories", () => {
   it("inverts debit category subcategory behavior when reductive", () => {
     expect(resolveFinancialBehavior("debit", true)).toBe("credit");
     expect(calculateDreTotals([line({ categoryType: "debit", subcategoryIsReductive: true })])).toMatchObject({
-      totalCredit: 1000,
-      totalDebit: 0,
+      totalCredit: 0,
+      totalDebit: -1000,
       result: 1000,
     });
   });
@@ -68,7 +68,7 @@ describe("DRE reductive subcategories", () => {
     });
   });
 
-  it("only inverts the marked subcategory in category totals, KPIs, charts and exports", () => {
+  it("subtracts reductive debit subcategories from total debits without changing result", () => {
     const lines = [
       line({ subcategoryId: "rent", subcategoryName: "Aluguel", value: 1000 }),
       line({ subcategoryId: "energy", subcategoryName: "Energia", value: 500 }),
@@ -76,8 +76,8 @@ describe("DRE reductive subcategories", () => {
     ];
 
     expect(calculateDreTotals(lines)).toMatchObject({
-      totalCredit: 200,
-      totalDebit: 1500,
+      totalCredit: 0,
+      totalDebit: 1300,
       result: -1300,
     });
     expect(calculateCategoryTotal("cat-1", lines)).toBe(1300);
@@ -122,7 +122,7 @@ describe("DRE net income and revenue configuration", () => {
     expect(calculateNetIncomeFromEntryItems(items, 900)).toBe(250);
   });
 
-  it("calculates dashboard totals with debit category reductive subcategory as credit", () => {
+  it("calculates dashboard totals with debit category reductive subcategory as debit reduction", () => {
     const items = [
       item({ category_id: "expenses", category_type_snapshot: "debit", subcategory_id: "rent", subcategory_is_reductive: false, value: 1000 }),
       item({ category_id: "expenses", category_type_snapshot: "debit", subcategory_id: "energy", subcategory_is_reductive: false, value: 500 }),
@@ -130,8 +130,8 @@ describe("DRE net income and revenue configuration", () => {
     ];
 
     expect(calculateEffectiveTotalsFromEntryItems(items)).toMatchObject({
-      totalCredit: 200,
-      totalDebit: 1500,
+      totalCredit: 0,
+      totalDebit: 1300,
       result: -1300,
     });
   });

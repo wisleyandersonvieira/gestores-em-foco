@@ -91,6 +91,20 @@ describe("DRE analysis from model", () => {
     expect(result.rows.find((row) => row.label === "Devolucoes")?.subcategoryIsReductive).toBe(true);
     expect(dreAnalysisTableHtml(result, false, false)).toContain("Devolucoes (redutora)");
   });
+
+  it("subtracts reductive expense subcategories from comparative total debits without changing result or margin", () => {
+    const result = buildDreAnalysisFromModel({
+      model: expenseReductiveModelFixture(),
+      periods: [{ id: "2026-04", label: "Abril/2026", year: "2026", months: ["2026-04"] }],
+      entries: [expenseReductiveEntryFixture("2026-04", { sales: 1000, expenses: 300, expenseReductions: 50 })],
+    });
+
+    expect(result.summary.totalDebit).toBe(250);
+    expect(result.rows.find((row) => row.label === "Total de Debitos")?.values["2026-04"].amount).toBe(250);
+    expect(result.summary.result).toBe(750);
+    expect(result.summary.averageMargin).toBe(75);
+    expect(dreAnalysisTableHtml(result, false, false)).toContain("250,00");
+  });
 });
 
 function modelFixture(): DreModelWithLines {
@@ -131,6 +145,50 @@ function entryFixture(competence: string, values: { sales: number; returns: numb
     total_credit: values.sales,
     total_debit: values.returns + values.costs,
     result: values.sales - values.returns - values.costs,
+    margin_percentage: 0,
+    created_at: "",
+    updated_at: "",
+    model: { id: "model", name: "Modelo" },
+    items,
+  } as DreEntryWithItems;
+}
+
+function expenseReductiveModelFixture(): DreModelWithLines {
+  return {
+    id: "model",
+    user_id: "user",
+    name: "Modelo",
+    description: null,
+    status: "active",
+    created_at: "",
+    updated_at: "",
+    lines: [
+      modelLine({ id: "line-revenue", category_id: "revenue", line_type: "category", display_order: 0, category: category("revenue", "Receita", "credit", true) }),
+      modelLine({ id: "line-sales", category_id: "revenue", subcategory_id: "sales", line_type: "subcategory", parent_category_id: "revenue", display_order: 1, category: category("revenue", "Receita", "credit", true), subcategory: subcategory("sales", "Vendas", false) }),
+      modelLine({ id: "line-expenses", category_id: "expenses", line_type: "category", display_order: 1000, category: category("expenses", "Outras Despesas e Receitas", "debit", false) }),
+      modelLine({ id: "line-expense", category_id: "expenses", subcategory_id: "expense", line_type: "subcategory", parent_category_id: "expenses", display_order: 1001, category: category("expenses", "Outras Despesas e Receitas", "debit", false), subcategory: subcategory("expense", "Despesas", false) }),
+      modelLine({ id: "line-reductions", category_id: "expenses", subcategory_id: "expense-reductions", line_type: "subcategory", parent_category_id: "expenses", display_order: 1002, category: category("expenses", "Outras Despesas e Receitas", "debit", false), subcategory: subcategory("expense-reductions", "Recebimento de Brindes", true) }),
+      modelLine({ id: "line-net-income", category_id: null, subcategory_id: null, line_type: "sum", sum_label: "Lucro Liquido", display_order: 2000, is_net_income: true }),
+    ],
+  } as DreModelWithLines;
+}
+
+function expenseReductiveEntryFixture(competence: string, values: { sales: number; expenses: number; expenseReductions: number }): DreEntryWithItems {
+  const items = [
+    item({ category_id: "revenue", subcategory_id: "sales", category_name_snapshot: "Receita", subcategory_name_snapshot: "Vendas", category_type_snapshot: "credit", category_is_revenue: true, display_order: 1, value: values.sales }),
+    item({ category_id: "expenses", subcategory_id: "expense", category_name_snapshot: "Outras Despesas e Receitas", subcategory_name_snapshot: "Despesas", category_type_snapshot: "debit", display_order: 1001, value: values.expenses }),
+    item({ category_id: "expenses", subcategory_id: "expense-reductions", category_name_snapshot: "Outras Despesas e Receitas", subcategory_name_snapshot: "Recebimento de Brindes", category_type_snapshot: "debit", subcategory_is_reductive: true, display_order: 1002, value: values.expenseReductions }),
+  ];
+
+  return {
+    id: `entry-${competence}`,
+    user_id: "user",
+    model_id: "model",
+    competence,
+    status: "finalized",
+    total_credit: values.sales,
+    total_debit: values.expenses - values.expenseReductions,
+    result: values.sales - values.expenses + values.expenseReductions,
     margin_percentage: 0,
     created_at: "",
     updated_at: "",

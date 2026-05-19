@@ -95,9 +95,21 @@ type CalculableLine = Pick<DreDraftLine, "lineType" | "categoryType" | "value"> 
 
 export function calculateDreTotals(lines: CalculableLine[]): DreTotals {
   const subcategoryLines = lines.filter((line) => line.lineType === "subcategory");
-  const totalCredit = roundCurrency(subcategoryLines.filter((line) => effectiveCategoryType({ ...line, subcategoryIsReductive: line.subcategoryIsReductive ?? false }) === "credit").reduce((sum, line) => sum + Number(line.value || 0), 0));
-  const totalDebit = roundCurrency(subcategoryLines.filter((line) => effectiveCategoryType({ ...line, subcategoryIsReductive: line.subcategoryIsReductive ?? false }) === "debit").reduce((sum, line) => sum + Number(line.value || 0), 0));
-  const result = roundCurrency(totalCredit - totalDebit);
+  const totalCredit = roundCurrency(subcategoryLines.reduce((sum, line) => {
+    const value = Number(line.value || 0);
+    if (line.categoryType === "credit") {
+      return sum + (line.subcategoryIsReductive ? 0 : value);
+    }
+    return sum;
+  }, 0));
+  const totalDebit = roundCurrency(subcategoryLines.reduce((sum, line) => {
+    const value = Number(line.value || 0);
+    if (line.categoryType === "debit") {
+      return sum + (line.subcategoryIsReductive ? -value : value);
+    }
+    return sum + (line.subcategoryIsReductive ? value : 0);
+  }, 0));
+  const result = roundCurrency(subcategoryLines.reduce((sum, line) => sum + signedLineValue({ ...line, subcategoryIsReductive: line.subcategoryIsReductive ?? false }), 0));
   const revenue = roundCurrency(subcategoryLines.filter((line) => line.categoryIsRevenue).reduce((sum, line) => sum + Number(line.value || 0), 0));
   const marginBase = revenue > 0 ? revenue : totalCredit;
   const marginPercentage = marginBase > 0 ? roundCurrency((result / marginBase) * 100) : 0;
