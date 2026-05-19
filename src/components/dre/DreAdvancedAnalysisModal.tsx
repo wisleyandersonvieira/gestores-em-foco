@@ -33,7 +33,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -872,7 +871,7 @@ export function DreAdvancedAnalysisModal({ result, modelName, onClose }: DreAdva
               </TabsList>
             </div>
 
-            <ScrollArea className="flex-1">
+            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
               <div className="p-6">
                 <TabsContent value="summary" className="mt-0"><ExecutiveSummarySection data={analysis} /></TabsContent>
                 <TabsContent value="indicators" className="mt-0"><IndicatorsSection data={analysis} /></TabsContent>
@@ -883,7 +882,7 @@ export function DreAdvancedAnalysisModal({ result, modelName, onClose }: DreAdva
                 <TabsContent value="alerts" className="mt-0"><AlertsSection data={analysis} /></TabsContent>
                 <TabsContent value="recommendations" className="mt-0"><RecommendationsSection data={analysis} /></TabsContent>
               </div>
-            </ScrollArea>
+            </div>
           </Tabs>
         )}
       </DialogContent>

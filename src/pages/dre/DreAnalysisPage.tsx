@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BarChart2, Download, FileSpreadsheet, RotateCcw } from "lucide-react";
+import { BarChart2, ChevronDown, Download, FileSpreadsheet, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 import { DreLayout } from "@/components/dre/dre-layout";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -131,7 +132,17 @@ function DreAnalysisContent({ userId }: { userId: string }) {
       </div>
 
       <Card className="border-primary/10 bg-white/90">
-        <CardHeader><CardTitle>Filtros da analise</CardTitle></CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <CardTitle>Filtros da analise</CardTitle>
+          <button
+            type="button"
+            className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+            onClick={clearFilters}
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Limpar filtros
+          </button>
+        </CardHeader>
         <CardContent className="space-y-5">
           <div className="grid gap-4 lg:grid-cols-[1.2fr_260px]">
             <Label>
@@ -154,30 +165,32 @@ function DreAnalysisContent({ userId }: { userId: string }) {
             </Label>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-[1fr_240px_240px_220px]">
+          <div className="space-y-3">
             <div>
               <Label>Ano(s)</Label>
               <div className="mt-2 flex flex-wrap gap-2">
                 {availableYears.map((year) => (
-                  <label key={year} className="flex items-center gap-2 rounded-lg border bg-white px-3 py-2 text-sm">
+                  <label key={year} className="flex cursor-pointer items-center gap-2 rounded-lg border bg-white px-3 py-2 text-sm">
                     <Checkbox checked={years.includes(year)} onCheckedChange={(checked) => toggleYear(year, Boolean(checked))} />
                     {year}
                   </label>
                 ))}
               </div>
             </div>
-            <label className="flex items-center justify-between gap-3 rounded-lg border bg-white px-4 py-3 text-sm">
-              <span>Incluir DREs em rascunho</span>
-              <Switch checked={includeDrafts} onCheckedChange={setIncludeDrafts} />
-            </label>
-            <label className="flex items-center justify-between gap-3 rounded-lg border bg-white px-4 py-3 text-sm">
-              <span>Exibir variacao entre periodos</span>
-              <Switch checked={showVariation} onCheckedChange={setShowVariation} />
-            </label>
-            <label className="flex items-center justify-between gap-3 rounded-lg border bg-white px-4 py-3 text-sm">
-              <span>Analise vertical</span>
-              <Switch checked={showVerticalAnalysis} onCheckedChange={setShowVerticalAnalysis} />
-            </label>
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-lg border bg-white px-4 py-3">
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <Switch checked={includeDrafts} onCheckedChange={setIncludeDrafts} />
+                <span>Incluir DREs em rascunho</span>
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <Switch checked={showVariation} onCheckedChange={setShowVariation} />
+                <span>Exibir variacao entre periodos</span>
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <Switch checked={showVerticalAnalysis} onCheckedChange={setShowVerticalAnalysis} />
+                <span>Analise vertical</span>
+              </label>
+            </div>
           </div>
 
           {modelId && years.length > 0 ? (
@@ -192,12 +205,30 @@ function DreAnalysisContent({ userId }: { userId: string }) {
             <div className="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">Selecione um modelo e pelo menos um ano para carregar os DREs disponiveis.</div>
           )}
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-            <Button variant="outline" onClick={clearFilters}><RotateCcw className="h-4 w-4" />Limpar filtros</Button>
-            <Button disabled={!canGenerate || loading} onClick={() => void generateAnalysis()}>{loading ? "Gerando..." : "Gerar Analise"}</Button>
-            <Button variant="outline" disabled={!result} onClick={() => setShowAdvancedAnalysis(true)}><BarChart2 className="h-4 w-4" />Analise Detalhada</Button>
-            <Button variant="outline" disabled={!result} onClick={() => result && exportAnalysisPdf(result, showVariation, showVerticalAnalysis)}><Download className="h-4 w-4" />Exportar PDF</Button>
-            <Button variant="outline" disabled={!result} onClick={() => result && exportAnalysisExcel(result, showVariation, showVerticalAnalysis)}><FileSpreadsheet className="h-4 w-4" />Exportar Excel</Button>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" disabled={!result} className="gap-1">
+                  <Download className="h-4 w-4" />
+                  Exportar
+                  <ChevronDown className="h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => result && exportAnalysisPdf(result, showVariation, showVerticalAnalysis)}>
+                  <Download className="h-4 w-4" />Exportar PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => result && exportAnalysisExcel(result, showVariation, showVerticalAnalysis)}>
+                  <FileSpreadsheet className="h-4 w-4" />Exportar Excel
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button variant="outline" disabled={!result} onClick={() => setShowAdvancedAnalysis(true)}>
+              <BarChart2 className="h-4 w-4" />Analise Detalhada
+            </Button>
+            <Button disabled={!canGenerate || loading} onClick={() => void generateAnalysis()}>
+              {loading ? "Gerando..." : "Gerar Analise"}
+            </Button>
           </div>
         </CardContent>
       </Card>
