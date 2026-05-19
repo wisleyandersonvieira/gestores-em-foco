@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Download, FileSpreadsheet, RotateCcw } from "lucide-react";
+import { BarChart2, Download, FileSpreadsheet, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 import { DreLayout } from "@/components/dre/dre-layout";
@@ -25,6 +25,7 @@ import {
   type DreAnalysisType,
 } from "@/lib/dre-analysis";
 import { getDreEntry, getDreModelWithLines, listDreEntriesByModelAndYears, listDreModels } from "@/lib/dre-service";
+import { DreAdvancedAnalysisModal } from "@/components/dre/DreAdvancedAnalysisModal";
 import type { DreEntryWithModel, DreModel } from "@/types/dre";
 
 type AnalysisType = DreAnalysisType;
@@ -47,6 +48,7 @@ function DreAnalysisContent({ userId }: { userId: string }) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showAdvancedAnalysis, setShowAdvancedAnalysis] = useState(false);
 
   useEffect(() => {
     void listDreModels(userId, "active")
@@ -193,11 +195,20 @@ function DreAnalysisContent({ userId }: { userId: string }) {
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
             <Button variant="outline" onClick={clearFilters}><RotateCcw className="h-4 w-4" />Limpar filtros</Button>
             <Button disabled={!canGenerate || loading} onClick={() => void generateAnalysis()}>{loading ? "Gerando..." : "Gerar Analise"}</Button>
+            <Button variant="outline" disabled={!result} onClick={() => setShowAdvancedAnalysis(true)}><BarChart2 className="h-4 w-4" />Analise Detalhada</Button>
             <Button variant="outline" disabled={!result} onClick={() => result && exportAnalysisPdf(result, showVariation, showVerticalAnalysis)}><Download className="h-4 w-4" />Exportar PDF</Button>
             <Button variant="outline" disabled={!result} onClick={() => result && exportAnalysisExcel(result, showVariation, showVerticalAnalysis)}><FileSpreadsheet className="h-4 w-4" />Exportar Excel</Button>
           </div>
         </CardContent>
       </Card>
+
+      {showAdvancedAnalysis && result ? (
+        <DreAdvancedAnalysisModal
+          result={result}
+          modelName={models.find((m) => m.id === modelId)?.name ?? ""}
+          onClose={() => setShowAdvancedAnalysis(false)}
+        />
+      ) : null}
 
       {result ? (
         <>
