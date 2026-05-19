@@ -1079,6 +1079,7 @@ export type Database = {
           created_at: string
           display_order: number
           id: string
+          is_revenue: boolean
           name: string
           status: Database["public"]["Enums"]["dre_record_status"]
           type: Database["public"]["Enums"]["dre_category_type"]
@@ -1089,6 +1090,7 @@ export type Database = {
           created_at?: string
           display_order?: number
           id?: string
+          is_revenue?: boolean
           name: string
           status?: Database["public"]["Enums"]["dre_record_status"]
           type: Database["public"]["Enums"]["dre_category_type"]
@@ -1099,6 +1101,7 @@ export type Database = {
           created_at?: string
           display_order?: number
           id?: string
+          is_revenue?: boolean
           name?: string
           status?: Database["public"]["Enums"]["dre_record_status"]
           type?: Database["public"]["Enums"]["dre_category_type"]
@@ -1233,6 +1236,7 @@ export type Database = {
           created_at: string
           display_order: number
           id: string
+          is_net_income: boolean
           line_type: Database["public"]["Enums"]["dre_model_line_type"]
           model_id: string
           parent_category_id: string | null
@@ -1245,6 +1249,7 @@ export type Database = {
           created_at?: string
           display_order?: number
           id?: string
+          is_net_income?: boolean
           line_type: Database["public"]["Enums"]["dre_model_line_type"]
           model_id: string
           parent_category_id?: string | null
@@ -1257,6 +1262,7 @@ export type Database = {
           created_at?: string
           display_order?: number
           id?: string
+          is_net_income?: boolean
           line_type?: Database["public"]["Enums"]["dre_model_line_type"]
           model_id?: string
           parent_category_id?: string | null

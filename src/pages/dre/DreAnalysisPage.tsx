@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { calculateDreTotals, effectiveCategoryType, formatCompetence, formatPercentage, variationPercentage } from "@/lib/dre-calculations";
+import { calculateDreTotals, calculateNetIncomeFromEntryItems, calculateRevenueFromEntryItems, effectiveCategoryType, formatCompetence, formatPercentage, variationPercentage } from "@/lib/dre-calculations";
 import { getDreEntry, listDreEntriesByModelAndYears, listDreModels } from "@/lib/dre-service";
 import type { DreCategoryType, DreEntryWithItems, DreEntryWithModel, DreModel } from "@/types/dre";
 
@@ -21,7 +21,7 @@ type SelectablePeriod = { id: string; label: string; year: string; months: strin
 type ComparisonPeriod = SelectablePeriod & {
   entries: DreEntryWithItems[];
   values: Map<string, number>;
-  totals: { totalCredit: number; totalDebit: number; result: number; marginPercentage: number };
+  totals: { revenue: number; totalCredit: number; totalDebit: number; result: number; marginPercentage: number };
   missingMonths: string[];
 };
 type ComparisonRow = {
@@ -37,6 +37,7 @@ type AnalysisResult = {
   rows: ComparisonRow[];
   summary: {
     totalCredit: number;
+    revenue: number;
     totalDebit: number;
     result: number;
     averageMargin: number;
@@ -219,7 +220,7 @@ function DreAnalysisContent({ userId }: { userId: string }) {
           ) : null}
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <IndicatorCard title="Total de Creditos" value={formatCurrency(result.summary.totalCredit)} />
+            <IndicatorCard title="Faturamento" value={formatCurrency(result.summary.revenue)} />
             <IndicatorCard title="Total de Debitos" value={formatCurrency(result.summary.totalDebit)} />
             <IndicatorCard title="Resultado acumulado" value={formatCurrency(result.summary.result)} tone={result.summary.result >= 0 ? "positive" : "negative"} />
             <IndicatorCard title="Margem media" value={formatPercentage(result.summary.averageMargin)} />
@@ -409,9 +410,10 @@ function buildComparison(periods: SelectablePeriod[], entries: DreEntryWithItems
   const entriesByCompetence = new Map(entries.map((entry) => [entry.competence, entry]));
   const comparisonPeriods = periods.map((period) => buildComparisonPeriod(period, entriesByCompetence));
   const rows = buildComparisonRows(comparisonPeriods);
+  const revenue = comparisonPeriods.reduce((sum, period) => sum + period.totals.revenue, 0);
   const totalCredit = comparisonPeriods.reduce((sum, period) => sum + period.totals.totalCredit, 0);
   const totalDebit = comparisonPeriods.reduce((sum, period) => sum + period.totals.totalDebit, 0);
-  const result = totalCredit - totalDebit;
+  const result = comparisonPeriods.reduce((sum, period) => sum + period.totals.result, 0);
   const averageMargin = comparisonPeriods.length ? comparisonPeriods.reduce((sum, period) => sum + period.totals.marginPercentage, 0) / comparisonPeriods.length : 0;
   const best = [...comparisonPeriods].sort((a, b) => b.totals.result - a.totals.result)[0];
   const worst = [...comparisonPeriods].sort((a, b) => a.totals.result - b.totals.result)[0];
@@ -421,6 +423,7 @@ function buildComparison(periods: SelectablePeriod[], entries: DreEntryWithItems
     rows,
     summary: {
       totalCredit,
+      revenue,
       totalDebit,
       result,
       averageMargin,
@@ -454,16 +457,24 @@ function buildComparisonPeriod(period: SelectablePeriod, entriesByCompetence: Ma
 
   const linesForTotals = Array.from(subcategoryValues.values()).map((item) => ({ lineType: "subcategory" as const, categoryType: item.categoryType, value: item.value }));
   const totals = calculateDreTotals(linesForTotals);
-  values.set("total-credit", totals.totalCredit);
+  const revenue = entries.reduce((sum, entry) => sum + calculateRevenueFromEntryItems(entry.items), 0);
+  const netIncome = entries.reduce((sum, entry) => sum + calculateNetIncomeFromEntryItems(entry.items, entry.result), 0);
+  values.set("total-credit", revenue);
   values.set("total-debit", totals.totalDebit);
-  values.set("result", totals.result);
-  values.set("margin", totals.marginPercentage);
+  values.set("result", netIncome);
+  values.set("margin", revenue > 0 ? (netIncome / revenue) * 100 : totals.marginPercentage);
 
   return {
     ...period,
     entries,
     values,
-    totals,
+    totals: {
+      revenue,
+      totalCredit: totals.totalCredit,
+      totalDebit: totals.totalDebit,
+      result: netIncome,
+      marginPercentage: revenue > 0 ? (netIncome / revenue) * 100 : totals.marginPercentage,
+    },
     missingMonths: period.months.filter((month) => !entriesByCompetence.has(month)),
   };
 }
@@ -505,7 +516,7 @@ function buildComparisonRows(periods: ComparisonPeriod[]) {
 
   return [
     ...Array.from(rows.values()).sort((a, b) => a.displayOrder - b.displayOrder),
-    { key: "total-credit", label: "Total de Creditos", lineType: "total" as const, categoryType: "credit" as const, displayOrder: 900000 },
+    { key: "total-credit", label: "Faturamento", lineType: "total" as const, categoryType: "credit" as const, displayOrder: 900000 },
     { key: "total-debit", label: "Total de Debitos", lineType: "total" as const, categoryType: "debit" as const, displayOrder: 900001 },
     { key: "result", label: "Resultado", lineType: "total" as const, categoryType: "result" as const, displayOrder: 900002 },
     { key: "margin", label: "Margem de Lucro", lineType: "total" as const, categoryType: "margin" as const, displayOrder: 900003 },
@@ -559,7 +570,7 @@ function exportAnalysisPdf(result: AnalysisResult, showVariation: boolean) {
     </style></head><body>
       <section class="header"><div><p class="eyebrow">Gestor de DRE</p><h1>Analise Comparativa de DRE</h1></div><div class="meta">Gerado em ${escapeHtml(generatedAt)}<br />Periodos: ${escapeHtml(result.periods.map((period) => period.label).join(", "))}</div></section>
       <section class="cards">
-        ${reportCard("Creditos", formatCurrency(result.summary.totalCredit))}
+        ${reportCard("Faturamento", formatCurrency(result.summary.revenue))}
         ${reportCard("Debitos", formatCurrency(result.summary.totalDebit))}
         ${reportCard("Resultado", formatCurrency(result.summary.result), result.summary.result >= 0 ? "positive" : "negative")}
         ${reportCard("Margem media", formatPercentage(result.summary.averageMargin))}

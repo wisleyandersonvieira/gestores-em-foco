@@ -3,10 +3,15 @@ import { describe, expect, it } from "vitest";
 import {
   calculateCategoryTotal,
   calculateDreTotals,
+  calculateNetIncomeFromEntryItems,
+  calculateRevenueFromEntryItems,
+  getNetIncomeLine,
+  getRevenueCategories,
   calculateSumLineValue,
   resolveFinancialBehavior,
+  validateRevenueCategory,
 } from "@/lib/dre-calculations";
-import type { DreDraftLine } from "@/types/dre";
+import type { DreDraftLine, DreEntryItem } from "@/types/dre";
 
 function line(overrides: Partial<DreDraftLine>): DreDraftLine {
   return {
@@ -15,6 +20,8 @@ function line(overrides: Partial<DreDraftLine>): DreDraftLine {
     categoryName: "Categoria",
     subcategoryName: "Subcategoria",
     categoryType: "debit",
+    categoryIsRevenue: false,
+    isNetIncome: false,
     subcategoryIsReductive: false,
     lineType: "subcategory",
     displayOrder: 1,
@@ -76,3 +83,63 @@ describe("DRE reductive subcategories", () => {
     expect(calculateSumLineValue(3, lines)).toBe(-1300);
   });
 });
+
+describe("DRE net income and revenue configuration", () => {
+  it("gets the configured net income sum line instead of assuming the last line", () => {
+    const lines = [
+      { line_type: "sum", is_net_income: true, display_order: 3000 },
+      { line_type: "sum", is_net_income: false, display_order: 9000 },
+    ];
+
+    expect(getNetIncomeLine(lines)?.display_order).toBe(3000);
+  });
+
+  it("sums only configured revenue categories", () => {
+    const categories = [
+      { type: "credit" as const, is_revenue: true, name: "Receita de Serviços" },
+      { type: "credit" as const, is_revenue: false, name: "Receitas Financeiras" },
+      { type: "debit" as const, is_revenue: false, name: "Custos" },
+    ];
+
+    expect(getRevenueCategories(categories).map((category) => category.name)).toEqual(["Receita de Serviços"]);
+  });
+
+  it("does not allow debit categories to compose revenue", () => {
+    expect(() => validateRevenueCategory({ type: "debit", is_revenue: true })).toThrow("Apenas categorias de credito");
+  });
+
+  it("uses revenue categories and configured net income for KPI margins", () => {
+    const items = [
+      item({ category_id: "services", category_type_snapshot: "credit", category_is_revenue: true, value: 1000 }),
+      item({ category_id: "finance", category_type_snapshot: "credit", category_is_revenue: false, value: 300 }),
+      item({ category_id: "costs", category_type_snapshot: "debit", value: 400 }),
+      item({ line_type: "sum", category_id: null, category_name_snapshot: "Lucro Líquido", is_net_income: true, value: 250 }),
+      item({ line_type: "sum", category_id: null, category_name_snapshot: "Outra soma", is_net_income: false, value: 999 }),
+    ];
+
+    expect(calculateRevenueFromEntryItems(items)).toBe(1000);
+    expect(calculateNetIncomeFromEntryItems(items, 900)).toBe(250);
+  });
+});
+
+function item(overrides: Partial<DreEntryItem>): DreEntryItem {
+  return {
+    id: "item",
+    user_id: "user",
+    dre_entry_id: "entry",
+    category_id: "cat",
+    subcategory_id: "sub",
+    category_name_snapshot: "Categoria",
+    subcategory_name_snapshot: "Subcategoria",
+    category_type_snapshot: "credit",
+    line_type: "subcategory",
+    display_order: 1,
+    value: 1000,
+    created_at: "",
+    updated_at: "",
+    category_is_revenue: false,
+    is_net_income: false,
+    subcategory_is_reductive: false,
+    ...overrides,
+  };
+}

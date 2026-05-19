@@ -1,6 +1,17 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
-import { calculateCategoryTotal, calculateDreTotals, calculateSumLineValue } from "@/lib/dre-calculations";
+import {
+  assertSingleNetIncomeLine,
+  calculateCategoryTotal,
+  calculateDreTotals,
+  calculateNetIncomeFromEntryItems,
+  calculateNetIncomeFromLines,
+  calculateRevenueFromEntryItems,
+  calculateRevenueFromLines,
+  calculateSumLineValue,
+  roundCurrency,
+  validateRevenueCategory,
+} from "@/lib/dre-calculations";
 import type {
   DreCategory,
   DreDraftLine,
@@ -80,14 +91,23 @@ export async function listDreCategories(userId: string) {
 export async function saveDreCategory(payload: TablesInsert<"dre_categories"> | TablesUpdate<"dre_categories">) {
   const name = String(payload.name ?? "").trim();
   if (!name) throw new Error("Informe o nome da categoria.");
+  const categoryPayload = {
+    display_order: payload.display_order ?? 0,
+    is_revenue: payload.type === "credit" ? payload.is_revenue ?? false : false,
+    name,
+    status: payload.status ?? "active",
+    type: payload.type ?? "debit",
+    user_id: payload.user_id,
+  };
+  validateRevenueCategory(categoryPayload);
 
   if ("id" in payload && payload.id) {
-    const { error } = await supabase.from("dre_categories").update({ ...payload, name }).eq("id", payload.id);
+    const { error } = await supabase.from("dre_categories").update(categoryPayload).eq("id", payload.id);
     if (error) throw new Error("Nao foi possivel atualizar a categoria.");
     return;
   }
 
-  const { error } = await supabase.from("dre_categories").insert({ ...(payload as TablesInsert<"dre_categories">), name });
+  const { error } = await supabase.from("dre_categories").insert(categoryPayload as TablesInsert<"dre_categories">);
   if (error) throw new Error("Nao foi possivel criar a categoria.");
 }
 
@@ -114,7 +134,7 @@ export async function listDreSubcategories(userId: string) {
     return (await fetchAllPaginated<DreSubcategoryWithCategory>((from, to) =>
       supabase
         .from("dre_subcategories")
-        .select("*, category:dre_categories(id,name,type,status)")
+        .select("*, category:dre_categories(id,name,type,status,is_revenue)")
         .eq("user_id", userId)
         .order("display_order", { ascending: true })
         .order("name", { ascending: true })
@@ -228,6 +248,10 @@ export async function saveDreModel(params: {
     : await supabase.from("dre_models").insert(modelPayload).select("*").single();
 
   if (error || !model) throw new Error("Nao foi possivel salvar o modelo.");
+  assertSingleNetIncomeLine(params.structure.map((line) => ({
+    line_type: line.kind === "sum" ? "sum" : "category",
+    is_net_income: line.kind === "sum" ? line.isNetIncome : false,
+  })));
 
   const linePayloads = params.structure.flatMap((line, lineIndex) => {
     const lineOrder = lineIndex * 1000;
@@ -240,6 +264,7 @@ export async function saveDreModel(params: {
         subcategory_id: null,
         parent_category_id: null,
         sum_label: line.label.trim() || "Subtotal",
+        is_net_income: line.isNetIncome,
         display_order: lineOrder,
       }];
     }
@@ -253,6 +278,7 @@ export async function saveDreModel(params: {
         subcategory_id: null,
         parent_category_id: null,
         sum_label: null,
+        is_net_income: false,
         display_order: lineOrder,
       },
       ...line.subcategoryIds.map((subcategoryId, subcategoryIndex) => ({
@@ -263,6 +289,7 @@ export async function saveDreModel(params: {
         subcategory_id: subcategoryId,
         parent_category_id: line.categoryId,
         sum_label: null,
+        is_net_income: false,
         display_order: lineOrder + subcategoryIndex + 1,
       })),
     ];
@@ -299,6 +326,8 @@ export function buildDraftLinesFromModel(model: DreModelWithLines): DreDraftLine
     categoryName: line.line_type === "sum" ? line.sum_label ?? "Subtotal" : line.category?.name ?? "Categoria",
     subcategoryName: line.subcategory?.name ?? null,
     categoryType: line.category?.type ?? "debit",
+    categoryIsRevenue: line.category?.is_revenue ?? false,
+    isNetIncome: line.is_net_income ?? false,
     subcategoryIsReductive: line.subcategory?.is_reductive ?? false,
     lineType: line.line_type,
     displayOrder: line.display_order,
@@ -344,6 +373,8 @@ export async function saveDreEntry(params: {
         : line.value,
   }));
   const totals = calculateDreTotals(normalizedLines);
+  const revenue = calculateRevenueFromLines(normalizedLines);
+  const netIncome = calculateNetIncomeFromLines(normalizedLines, totals.result);
 
   const entryPayload = {
     user_id: params.userId,
@@ -352,8 +383,8 @@ export async function saveDreEntry(params: {
     status: params.status,
     total_credit: totals.totalCredit,
     total_debit: totals.totalDebit,
-    result: totals.result,
-    margin_percentage: totals.marginPercentage,
+    result: netIncome,
+    margin_percentage: revenue > 0 ? roundCurrency((netIncome / revenue) * 100) : totals.marginPercentage,
   };
 
   const { data: entry, error } = params.id
@@ -450,7 +481,10 @@ export async function getDreEntry(userId: string, entryId: string): Promise<DreE
         .range(from, to),
     )) as DreEntryWithItems["items"];
     const subcategoryIds = Array.from(new Set(rawItems.map((item) => item.subcategory_id).filter((id): id is string => Boolean(id))));
+    const categoryIds = Array.from(new Set(rawItems.map((item) => item.category_id).filter((id): id is string => Boolean(id))));
     const reductiveBySubcategory = new Map<string, boolean>();
+    const revenueByCategory = new Map<string, boolean>();
+    const netIncomeDisplayOrders = new Set<number>();
 
     if (subcategoryIds.length) {
       const subcategories = await fetchAllPaginated<Pick<DreSubcategory, "id" | "is_reductive">>((from, to) =>
@@ -463,9 +497,33 @@ export async function getDreEntry(userId: string, entryId: string): Promise<DreE
       );
       subcategories.forEach((subcategory) => reductiveBySubcategory.set(subcategory.id, subcategory.is_reductive));
     }
+    if (categoryIds.length) {
+      const categories = await fetchAllPaginated<Pick<DreCategory, "id" | "is_revenue">>((from, to) =>
+        supabase
+          .from("dre_categories")
+          .select("id,is_revenue")
+          .eq("user_id", userId)
+          .in("id", categoryIds)
+          .range(from, to),
+      );
+      categories.forEach((category) => revenueByCategory.set(category.id, category.is_revenue));
+    }
+    const netIncomeLines = await fetchAllPaginated<Pick<DreModelWithLines["lines"][number], "display_order" | "is_net_income">>((from, to) =>
+      supabase
+        .from("dre_model_lines")
+        .select("display_order,is_net_income")
+        .eq("user_id", userId)
+        .eq("model_id", entry.model_id)
+        .eq("line_type", "sum")
+        .eq("is_net_income", true)
+        .range(from, to),
+    );
+    netIncomeLines.forEach((line) => netIncomeDisplayOrders.add(line.display_order));
 
     items = rawItems.map((item) => ({
       ...item,
+      category_is_revenue: item.category_id ? revenueByCategory.get(item.category_id) ?? false : false,
+      is_net_income: item.line_type === "sum" && netIncomeDisplayOrders.has(item.display_order),
       subcategory_is_reductive: item.subcategory_id ? reductiveBySubcategory.get(item.subcategory_id) ?? false : false,
     }));
   } catch {
@@ -491,17 +549,20 @@ function calculateEntryWithItems(entry: DreEntryWithModel, items: DreEntryWithIt
     items.map((item) => ({
       lineType: item.line_type,
       categoryType: item.category_type_snapshot,
+      categoryIsRevenue: item.category_is_revenue ?? false,
       subcategoryIsReductive: item.subcategory_is_reductive ?? false,
       value: Number(item.value || 0),
     })),
   );
+  const revenue = calculateRevenueFromEntryItems(items);
+  const netIncome = calculateNetIncomeFromEntryItems(items, totals.result);
 
   return {
     ...entry,
     total_credit: totals.totalCredit,
     total_debit: totals.totalDebit,
-    result: totals.result,
-    margin_percentage: totals.marginPercentage,
+    result: netIncome,
+    margin_percentage: revenue > 0 ? roundCurrency((netIncome / revenue) * 100) : totals.marginPercentage,
   };
 }
 
@@ -518,7 +579,12 @@ async function recalculateEntrySummaries(userId: string, entries: DreEntryWithMo
       .range(from, to),
   )) as DreEntryWithItems["items"];
   const subcategoryIds = Array.from(new Set(rawItems.map((item) => item.subcategory_id).filter((id): id is string => Boolean(id))));
+  const categoryIds = Array.from(new Set(rawItems.map((item) => item.category_id).filter((id): id is string => Boolean(id))));
   const reductiveBySubcategory = new Map<string, boolean>();
+  const revenueByCategory = new Map<string, boolean>();
+  const entryModelId = new Map(entries.map((entry) => [entry.id, entry.model_id]));
+  const modelIds = Array.from(new Set(entries.map((entry) => entry.model_id)));
+  const netIncomeDisplayOrderByModel = new Map<string, Set<number>>();
 
   if (subcategoryIds.length) {
     const subcategories = await fetchAllPaginated<Pick<DreSubcategory, "id" | "is_reductive">>((from, to) =>
@@ -531,11 +597,40 @@ async function recalculateEntrySummaries(userId: string, entries: DreEntryWithMo
     );
     subcategories.forEach((subcategory) => reductiveBySubcategory.set(subcategory.id, subcategory.is_reductive));
   }
+  if (categoryIds.length) {
+    const categories = await fetchAllPaginated<Pick<DreCategory, "id" | "is_revenue">>((from, to) =>
+      supabase
+        .from("dre_categories")
+        .select("id,is_revenue")
+        .eq("user_id", userId)
+        .in("id", categoryIds)
+        .range(from, to),
+    );
+    categories.forEach((category) => revenueByCategory.set(category.id, category.is_revenue));
+  }
+  if (modelIds.length) {
+    const netIncomeLines = await fetchAllPaginated<Pick<DreModelWithLines["lines"][number], "model_id" | "display_order">>((from, to) =>
+      supabase
+        .from("dre_model_lines")
+        .select("model_id,display_order")
+        .eq("user_id", userId)
+        .in("model_id", modelIds)
+        .eq("line_type", "sum")
+        .eq("is_net_income", true)
+        .range(from, to),
+    );
+    netIncomeLines.forEach((line) => {
+      netIncomeDisplayOrderByModel.set(line.model_id, new Set([...(netIncomeDisplayOrderByModel.get(line.model_id) ?? []), line.display_order]));
+    });
+  }
 
   const itemsByEntry = new Map<string, DreEntryWithItems["items"]>();
   rawItems.forEach((item) => {
+    const modelId = entryModelId.get(item.dre_entry_id);
     const enriched = {
       ...item,
+      category_is_revenue: item.category_id ? revenueByCategory.get(item.category_id) ?? false : false,
+      is_net_income: item.line_type === "sum" && Boolean(modelId && netIncomeDisplayOrderByModel.get(modelId)?.has(item.display_order)),
       subcategory_is_reductive: item.subcategory_id ? reductiveBySubcategory.get(item.subcategory_id) ?? false : false,
     };
     itemsByEntry.set(item.dre_entry_id, [...(itemsByEntry.get(item.dre_entry_id) ?? []), enriched]);

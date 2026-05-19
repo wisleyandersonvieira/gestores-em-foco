@@ -51,7 +51,7 @@ function DreModelsContent({ userId }: { userId: string }) {
         .filter((line) => line.line_type === "category" || line.line_type === "sum")
         .map((line) => {
           if (line.line_type === "sum") {
-            return { kind: "sum" as const, id: line.id, label: line.sum_label ?? "Subtotal" };
+            return { kind: "sum" as const, id: line.id, label: line.sum_label ?? "Subtotal", isNetIncome: line.is_net_income ?? false };
           }
 
           return {
@@ -198,7 +198,7 @@ function DreModelsContent({ userId }: { userId: string }) {
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => setForm({ ...form, structure: [...form.structure, { kind: "sum", id: crypto.randomUUID(), label: "Subtotal" }] })}
+                    onClick={() => setForm({ ...form, structure: [...form.structure, { kind: "sum", id: crypto.randomUUID(), label: "Subtotal", isNetIncome: false }] })}
                   >
                     <PlusCircle className="h-4 w-4" />
                     Inserir soma
@@ -211,7 +211,10 @@ function DreModelsContent({ userId }: { userId: string }) {
                         <div className="min-w-0 flex-1">
                           {item.kind === "sum" ? (
                             <Label>
-                              Linha de somatorio
+                              <span className="flex items-center gap-2">
+                                Linha de somatorio
+                                {item.isNetIncome ? <Badge variant="secondary">LUCRO LÍQUIDO</Badge> : null}
+                              </span>
                               <Input
                                 className="mt-2"
                                 value={item.label}
@@ -220,6 +223,20 @@ function DreModelsContent({ userId }: { userId: string }) {
                                   structure: form.structure.map((line, lineIndex) => lineIndex === index && line.kind === "sum" ? { ...line, label: event.target.value } : line),
                                 })}
                               />
+                              <label className="mt-3 flex items-center gap-2 text-sm font-normal">
+                                <Checkbox
+                                  checked={item.isNetIncome}
+                                  onCheckedChange={(checked) => setForm({
+                                    ...form,
+                                    structure: form.structure.map((line, lineIndex) => {
+                                      if (line.kind !== "sum") return line;
+                                      if (lineIndex === index) return { ...line, isNetIncome: Boolean(checked) };
+                                      return checked ? { ...line, isNetIncome: false } : line;
+                                    }),
+                                  })}
+                                />
+                                Esta linha representa o Lucro Líquido
+                              </label>
                             </Label>
                           ) : (
                             <>

@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { currentCompetence, effectiveCategoryType, formatCompetence, formatPercentage, variationPercentage } from "@/lib/dre-calculations";
+import { calculateRevenueFromEntryItems, currentCompetence, effectiveCategoryType, formatCompetence, formatPercentage, variationPercentage } from "@/lib/dre-calculations";
 import { getDreEntry, listDreEntries } from "@/lib/dre-service";
 import type { DreCategoryType, DreEntryWithItems, DreEntryWithModel } from "@/types/dre";
 
@@ -48,19 +48,20 @@ function DreDashboardContent({ userId }: { userId: string }) {
   }, [selectedEntries, userId]);
 
   const totals = useMemo(() => {
-    const totalCredit = entriesWithItems.reduce((sum, entry) => sum + entry.total_credit, 0);
+    const revenue = entriesWithItems.reduce((sum, entry) => sum + calculateRevenueFromEntryItems(entry.items), 0);
     const totalDebit = entriesWithItems.reduce((sum, entry) => sum + entry.total_debit, 0);
-    const result = totalCredit - totalDebit;
-    const margin = totalCredit > 0 ? (result / totalCredit) * 100 : 0;
-    return { totalCredit, totalDebit, result, margin };
+    const result = entriesWithItems.reduce((sum, entry) => sum + entry.result, 0);
+    const margin = revenue > 0 ? (result / revenue) * 100 : 0;
+    return { revenue, totalDebit, result, margin };
   }, [entriesWithItems]);
 
   const chartData = useMemo(() => {
     return selectedCompetences.map((competence) => {
       const monthEntries = entriesWithItems.filter((entry) => entry.competence === competence && entry.status === "finalized");
-      const credit = monthEntries.reduce((sum, entry) => sum + entry.total_credit, 0);
+      const revenue = monthEntries.reduce((sum, entry) => sum + calculateRevenueFromEntryItems(entry.items), 0);
       const debit = monthEntries.reduce((sum, entry) => sum + entry.total_debit, 0);
-      return { competence: formatCompetence(competence), credit, debit, result: credit - debit };
+      const result = monthEntries.reduce((sum, entry) => sum + entry.result, 0);
+      return { competence: formatCompetence(competence), revenue, debit, result };
     });
   }, [entriesWithItems, selectedCompetences]);
 
@@ -173,7 +174,7 @@ function DreDashboardContent({ userId }: { userId: string }) {
       </Card>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <IndicatorCard title="Faturamento Total" value={formatCurrency(totals.totalCredit)} />
+        <IndicatorCard title="Faturamento Total" value={formatCurrency(totals.revenue)} />
         <IndicatorCard title="Despesas Totais" value={formatCurrency(totals.totalDebit)} />
         <IndicatorCard title="Lucro / Resultado" value={formatCurrency(totals.result)} tone={totals.result >= 0 ? "positive" : "negative"} />
         <IndicatorCard title="Margem de Lucro" value={formatPercentage(totals.margin)} />
@@ -183,13 +184,13 @@ function DreDashboardContent({ userId }: { userId: string }) {
 
       <div className="grid gap-5 xl:grid-cols-2">
         <ChartCard title="Evolução de faturamento, despesas e lucro">
-          <ChartContainer className="aspect-auto h-80 w-full" config={{ credit: { label: "Crédito", color: "#16a34a" }, debit: { label: "Débito", color: "#dc2626" }, result: { label: "Lucro", color: "#2563eb" } }}>
+          <ChartContainer className="aspect-auto h-80 w-full" config={{ revenue: { label: "Faturamento", color: "#16a34a" }, debit: { label: "Débito", color: "#dc2626" }, result: { label: "Lucro Líquido", color: "#2563eb" } }}>
             <LineChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
               <CartesianGrid vertical={false} />
               <XAxis dataKey="competence" tickLine={false} axisLine={false} />
               <YAxis tickFormatter={(value) => `${Number(value) / 1000}k`} width={48} />
               <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />} />
-              <Line type="monotone" dataKey="credit" stroke="var(--color-credit)" strokeWidth={2} />
+              <Line type="monotone" dataKey="revenue" stroke="var(--color-revenue)" strokeWidth={2} />
               <Line type="monotone" dataKey="debit" stroke="var(--color-debit)" strokeWidth={2} />
               <Line type="monotone" dataKey="result" stroke="var(--color-result)" strokeWidth={2} />
             </LineChart>
@@ -197,13 +198,13 @@ function DreDashboardContent({ userId }: { userId: string }) {
         </ChartCard>
 
         <ChartCard title="Comparativo crédito, débito e lucro">
-          <ChartContainer className="aspect-auto h-80 w-full" config={{ credit: { label: "Crédito", color: "#16a34a" }, debit: { label: "Débito", color: "#dc2626" }, result: { label: "Lucro", color: "#2563eb" } }}>
+          <ChartContainer className="aspect-auto h-80 w-full" config={{ revenue: { label: "Faturamento", color: "#16a34a" }, debit: { label: "Débito", color: "#dc2626" }, result: { label: "Lucro Líquido", color: "#2563eb" } }}>
             <BarChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
               <CartesianGrid vertical={false} />
               <XAxis dataKey="competence" tickLine={false} axisLine={false} />
               <YAxis tickFormatter={(value) => `${Number(value) / 1000}k`} width={48} />
               <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />} />
-              <Bar dataKey="credit" fill="var(--color-credit)" radius={6} />
+              <Bar dataKey="revenue" fill="var(--color-revenue)" radius={6} />
               <Bar dataKey="debit" fill="var(--color-debit)" radius={6} />
               <Bar dataKey="result" fill="var(--color-result)" radius={6} />
             </BarChart>
@@ -279,8 +280,8 @@ function ChartCard({ title, children }: { title: string; children: React.ReactNo
 
 function exportDashboardPdf(params: {
   selectedCompetences: string[];
-  totals: { totalCredit: number; totalDebit: number; result: number; margin: number };
-  chartData: Array<{ competence: string; credit: number; debit: number; result: number }>;
+  totals: { revenue: number; totalDebit: number; result: number; margin: number };
+  chartData: Array<{ competence: string; revenue: number; debit: number; result: number }>;
   categoryImpact: Array<{ category: string; value: number; percentage: number }>;
   analysis: Array<{
     category: string;
@@ -349,7 +350,7 @@ function exportDashboardPdf(params: {
           </section>
 
           <section class="cards">
-            ${reportCard("Faturamento Total", formatCurrency(params.totals.totalCredit))}
+            ${reportCard("Faturamento Total", formatCurrency(params.totals.revenue))}
             ${reportCard("Despesas Totais", formatCurrency(params.totals.totalDebit))}
             ${reportCard("Resultado", formatCurrency(params.totals.result), params.totals.result >= 0 ? "positive" : "negative")}
             ${reportCard("Margem", formatPercentage(params.totals.margin))}
@@ -357,12 +358,12 @@ function exportDashboardPdf(params: {
 
           <h2>Evolucao por competencia</h2>
           <table>
-            <thead><tr><th>Competencia</th><th class="right">Creditos</th><th class="right">Debitos</th><th class="right">Resultado</th></tr></thead>
+            <thead><tr><th>Competencia</th><th class="right">Faturamento</th><th class="right">Debitos</th><th class="right">Lucro liquido</th></tr></thead>
             <tbody>
               ${params.chartData.map((item) => `
                 <tr>
                   <td>${escapeHtml(item.competence)}</td>
-                  <td class="right">${formatCurrency(item.credit)}</td>
+                  <td class="right">${formatCurrency(item.revenue)}</td>
                   <td class="right">${formatCurrency(item.debit)}</td>
                   <td class="right ${item.result >= 0 ? "positive" : "negative"}">${formatCurrency(item.result)}</td>
                 </tr>

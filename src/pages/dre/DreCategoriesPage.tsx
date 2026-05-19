@@ -16,7 +16,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { deleteOrDeactivateDreCategory, deleteOrDeactivateDreSubcategory, listDreCategories, listDreSubcategories, saveDreCategory, saveDreSubcategory } from "@/lib/dre-service";
 import type { DreCategory, DreCategoryType, DreRecordStatus, DreSubcategoryWithCategory } from "@/types/dre";
 
-type CategoryForm = { id?: string; name: string; type: DreCategoryType; status: DreRecordStatus; display_order: number };
+type CategoryForm = { id?: string; name: string; type: DreCategoryType; status: DreRecordStatus; display_order: number; is_revenue: boolean };
 type SubcategoryForm = { id?: string; name: string; category_id: string; status: DreRecordStatus; display_order: number; is_reductive: boolean };
 
 export default function DreCategoriesPage() {
@@ -90,7 +90,7 @@ function DreCategoriesContent({ userId }: { userId: string }) {
           <h1 className="font-display text-3xl font-semibold">Categorias e Subcategorias</h1>
           <p className="mt-1 text-sm text-muted-foreground">Organize as linhas base para seus modelos de DRE.</p>
         </div>
-        <Button onClick={() => setCategoryForm({ name: "", type: "credit", status: "active", display_order: categories.length + 1 })}>
+        <Button onClick={() => setCategoryForm({ name: "", type: "credit", status: "active", display_order: categories.length + 1, is_revenue: false })}>
           <Plus className="h-4 w-4" />
           Nova categoria
         </Button>
@@ -136,11 +136,12 @@ function DreCategoriesContent({ userId }: { userId: string }) {
                     <p className="font-semibold">{category.name}</p>
                     <div className="mt-2 flex gap-2">
                       <Badge variant={category.type === "credit" ? "default" : "secondary"}>{category.type === "credit" ? "Credito" : "Debito"}</Badge>
+                      {category.is_revenue ? <Badge variant="outline">FATURAMENTO</Badge> : null}
                       <Badge variant="outline">{category.status === "active" ? "Ativa" : "Inativa"}</Badge>
                     </div>
                   </div>
                   <div className="flex gap-1">
-                    <Button size="icon" variant="ghost" onClick={(event) => { event.stopPropagation(); setCategoryForm(category); }}><Edit2 className="h-4 w-4" /></Button>
+                    <Button size="icon" variant="ghost" onClick={(event) => { event.stopPropagation(); setCategoryForm(toCategoryForm(category)); }}><Edit2 className="h-4 w-4" /></Button>
                     <Button size="icon" variant="ghost" onClick={(event) => { event.stopPropagation(); setPendingDelete({ kind: "category", item: category }); }}><Trash2 className="h-4 w-4" /></Button>
                   </div>
                 </div>
@@ -196,6 +197,17 @@ function DreCategoriesContent({ userId }: { userId: string }) {
   );
 }
 
+function toCategoryForm(category: DreCategory): CategoryForm {
+  return {
+    id: category.id,
+    name: category.name,
+    type: category.type,
+    status: category.status,
+    display_order: category.display_order,
+    is_revenue: category.is_revenue ?? false,
+  };
+}
+
 function toSubcategoryForm(subcategory: DreSubcategoryWithCategory): SubcategoryForm {
   return {
     id: subcategory.id,
@@ -216,10 +228,25 @@ function CategoryDialog({ form, setForm, onSubmit }: { form: CategoryForm | null
           <div className="grid gap-4">
             <Label>Nome<Input className="mt-2" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Label>
             <div className="grid gap-4 sm:grid-cols-3">
-              <Label>Tipo<Select value={form.type} onValueChange={(value) => setForm({ ...form, type: value as DreCategoryType })}><SelectTrigger className="mt-2"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="credit">Credito</SelectItem><SelectItem value="debit">Debito</SelectItem></SelectContent></Select></Label>
+              <Label>Tipo<Select value={form.type} onValueChange={(value) => setForm({ ...form, type: value as DreCategoryType, is_revenue: value === "credit" ? form.is_revenue : false })}><SelectTrigger className="mt-2"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="credit">Credito</SelectItem><SelectItem value="debit">Debito</SelectItem></SelectContent></Select></Label>
               <Label>Status<Select value={form.status} onValueChange={(value) => setForm({ ...form, status: value as DreRecordStatus })}><SelectTrigger className="mt-2"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Ativa</SelectItem><SelectItem value="inactive">Inativa</SelectItem></SelectContent></Select></Label>
               <Label>Ordem<Input className="mt-2" type="number" value={form.display_order} onChange={(event) => setForm({ ...form, display_order: Number(event.target.value) })} /></Label>
             </div>
+            {form.type === "credit" ? (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-white px-4 py-3 text-sm">
+                      <span>Esta categoria compõe o faturamento</span>
+                      <Switch checked={form.is_revenue} onCheckedChange={(checked) => setForm({ ...form, is_revenue: checked })} />
+                    </label>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    Categorias marcadas serão utilizadas para cálculo de faturamento no dashboard e análise DRE.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : null}
             <Button onClick={onSubmit}>Salvar categoria</Button>
           </div>
         ) : null}

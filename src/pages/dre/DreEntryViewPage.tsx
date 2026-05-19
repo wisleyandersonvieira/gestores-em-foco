@@ -35,6 +35,8 @@ function DreEntryViewContent({ userId }: { userId: string }) {
       categoryName: item.category_name_snapshot,
       subcategoryName: item.subcategory_name_snapshot,
       categoryType: item.category_type_snapshot,
+      categoryIsRevenue: item.category_is_revenue ?? false,
+      isNetIncome: item.is_net_income ?? false,
       subcategoryIsReductive: item.subcategory_is_reductive ?? false,
       lineType: item.line_type,
       displayOrder: item.display_order,
@@ -75,6 +77,7 @@ function DreEntryViewContent({ userId }: { userId: string }) {
                   <TableRow key={`${line.lineType}-${line.categoryId}-${line.subcategoryId}-${index}`} className={line.lineType === "category" ? "bg-muted/70" : line.lineType === "sum" ? "bg-primary/5" : ""}>
                     <TableCell className={line.lineType === "category" ? "font-semibold uppercase" : line.lineType === "sum" ? "font-semibold text-primary" : "pl-10 text-sm"}>
                       {line.lineType === "category" || line.lineType === "sum" ? line.categoryName : line.subcategoryName}
+                      {line.lineType === "sum" && line.isNetIncome ? <Badge className="ml-2" variant="secondary">LUCRO LÍQUIDO</Badge> : null}
                       {line.lineType === "subcategory" && line.subcategoryIsReductive ? <Badge className="ml-2" variant="secondary">REDUTORA</Badge> : null}
                     </TableCell>
                     <TableCell className="text-right font-medium tabular-nums">{formatCurrency(value)}</TableCell>

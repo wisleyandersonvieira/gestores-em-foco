@@ -6,6 +6,8 @@ export type DreModel = Tables<"dre_models">;
 export type DreModelLine = Tables<"dre_model_lines">;
 export type DreEntry = Tables<"dre_entries">;
 export type DreEntryItem = Tables<"dre_entry_items"> & {
+  category_is_revenue?: boolean;
+  is_net_income?: boolean;
   subcategory_is_reductive?: boolean;
 };
 export type ProductSubscription = Tables<"product_subscriptions">;
@@ -15,7 +17,7 @@ export type DreRecordStatus = DreCategory["status"];
 export type DreEntryStatus = DreEntry["status"];
 
 export type DreSubcategoryWithCategory = DreSubcategory & {
-  category?: Pick<DreCategory, "id" | "name" | "type" | "status"> | null;
+  category?: Pick<DreCategory, "id" | "name" | "type" | "status" | "is_revenue"> | null;
 };
 
 export type DreModelLineWithRefs = DreModelLine & {
@@ -45,6 +47,7 @@ export type DreModelBuilderSum = {
   kind: "sum";
   id: string;
   label: string;
+  isNetIncome: boolean;
 };
 
 export type DreModelBuilderLine = DreModelBuilderCategory | DreModelBuilderSum;
@@ -55,6 +58,8 @@ export type DreDraftLine = {
   categoryName: string;
   subcategoryName: string | null;
   categoryType: DreCategoryType;
+  categoryIsRevenue: boolean;
+  isNetIncome: boolean;
   subcategoryIsReductive: boolean;
   lineType: "category" | "subcategory" | "sum";
   displayOrder: number;
