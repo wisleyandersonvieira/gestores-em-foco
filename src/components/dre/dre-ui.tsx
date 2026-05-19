@@ -102,18 +102,88 @@ export function CompetenceMultiFilter({ selected, onChange }: { selected: string
   );
 }
 
-export function CompetenceSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+const MONTH_LABELS_SHORT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+export function CompetenceSelect({
+  value,
+  onChange,
+  minYear = 2000,
+  maxYear = new Date().getFullYear() + 5,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  minYear?: number;
+  maxYear?: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const parsed = value?.split("-") ?? [];
+  const selectedYear = Number(parsed[0]) || new Date().getFullYear();
+  const selectedMonth = Number(parsed[1]) || new Date().getMonth() + 1;
+  const [viewYear, setViewYear] = useState(selectedYear);
+
+  useEffect(() => {
+    if (open) setViewYear(selectedYear);
+  }, [open, selectedYear]);
+
   return (
-    <Select value={value} onValueChange={onChange}>
-      <SelectTrigger>
-        <SelectValue placeholder="Selecione a competencia" />
-      </SelectTrigger>
-      <SelectContent>
-        {competenceOptionsAroundCurrent().map((competence) => (
-          <SelectItem key={competence} value={competence}>{formatCompetence(competence)}</SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="mt-2 flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-left text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+        >
+          <span>{value ? formatCompetence(value) : "Selecione a competencia"}</span>
+          <span className="text-muted-foreground">▾</span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-3" align="start">
+        <div className="mb-3 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => setViewYear((y) => Math.max(minYear, y - 1))}
+            disabled={viewYear <= minYear}
+            className="rounded-md border px-2 py-1 text-sm hover:bg-muted disabled:opacity-40"
+          >
+            ‹
+          </button>
+          <Select value={String(viewYear)} onValueChange={(v) => setViewYear(Number(v))}>
+            <SelectTrigger className="h-8 w-28"><SelectValue /></SelectTrigger>
+            <SelectContent className="max-h-64">
+              {Array.from({ length: maxYear - minYear + 1 }, (_, i) => maxYear - i).map((year) => (
+                <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <button
+            type="button"
+            onClick={() => setViewYear((y) => Math.min(maxYear, y + 1))}
+            disabled={viewYear >= maxYear}
+            className="rounded-md border px-2 py-1 text-sm hover:bg-muted disabled:opacity-40"
+          >
+            ›
+          </button>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {MONTH_LABELS_SHORT.map((label, idx) => {
+            const month = idx + 1;
+            const isSelected = viewYear === selectedYear && month === selectedMonth;
+            return (
+              <button
+                key={month}
+                type="button"
+                onClick={() => {
+                  onChange(`${viewYear}-${String(month).padStart(2, "0")}`);
+                  setOpen(false);
+                }}
+                className={`rounded-md border px-2 py-2 text-sm transition ${isSelected ? "border-primary bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
