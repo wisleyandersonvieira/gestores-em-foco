@@ -113,6 +113,7 @@ function buildAnalysisPeriod(
 ): DreAnalysisPeriod {
   const entries = period.months.map((month) => entriesByCompetence.get(month)).filter((entry): entry is DreEntryWithItems => Boolean(entry));
   const totals = calculateDreTotals(lines);
+  const totalDebit = calculateComparativeTotalDebit(lines);
   const revenue = calculateRevenueFromLines(lines);
   const displayLines = resolveDreDisplayLines(lines);
   const netIncomeLine = displayLines.find((line) => line.lineType === "sum" && line.isNetIncome);
@@ -125,7 +126,7 @@ function buildAnalysisPeriod(
     totals: {
       revenue,
       totalCredit: totals.totalCredit,
-      totalDebit: totals.totalDebit,
+      totalDebit,
       result,
       marginPercentage,
     },
@@ -256,6 +257,20 @@ function calculateCategoryTotalFromModel(categoryId: string | null, lines: DreDr
 function calculateVerticalPercentage(amount: number, revenue: number) {
   if (!revenue) return 0;
   return roundCurrency((amount / revenue) * 100);
+}
+
+function calculateComparativeTotalDebit(lines: DreDraftLine[]) {
+  return roundCurrency(
+    lines
+      .filter((line) => line.lineType === "subcategory")
+      .reduce((sum, line) => {
+        const value = Number(line.value || 0);
+        if (line.categoryType === "debit") {
+          return sum + (line.subcategoryIsReductive ? -value : value);
+        }
+        return sum + (line.subcategoryIsReductive ? value : 0);
+      }, 0),
+  );
 }
 
 function modelLineKey(categoryId: string | null, subcategoryId: string | null, lineType: DreDraftLine["lineType"], displayOrder: number) {
