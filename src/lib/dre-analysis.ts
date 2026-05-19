@@ -49,6 +49,7 @@ export type DreAnalysisRow = {
   parentKey?: string;
   isSumLine: boolean;
   isNetIncome: boolean;
+  subcategoryIsReductive: boolean;
   values: Record<string, DreAnalysisValue>;
 };
 
@@ -182,6 +183,7 @@ function buildRowsFromModel(
       parentKey: line.lineType === "subcategory" ? modelLineKey(line.categoryId, null, "category", Math.floor(line.displayOrder / 1000) * 1000) : undefined,
       isSumLine: line.lineType === "sum",
       isNetIncome: line.lineType === "sum" && line.isNetIncome,
+      subcategoryIsReductive: line.lineType === "subcategory" && line.subcategoryIsReductive,
       values,
     };
   });
@@ -219,6 +221,7 @@ function buildTotalRow(
     displayOrder,
     isSumLine: true,
     isNetIncome,
+    subcategoryIsReductive: false,
     values,
   };
 }
@@ -292,7 +295,7 @@ export function buildSelectableDreAnalysisPeriods(type: DreAnalysisType, years: 
 
 export function dreAnalysisTableHtml(result: DreAnalysisResult, showVariation: boolean, showVerticalAnalysis: boolean) {
   return `<table><thead><tr><th>Categoria / Subcategoria</th>${result.periods.map((period, index) => `<th>${escapeHtml(period.label)}</th>${showVariation && index > 0 ? "<th>Var. anterior</th>" : ""}`).join("")}</tr></thead><tbody>
-    ${result.rows.map((row) => `<tr class="${row.lineType === "category" ? "cat" : row.lineType === "subcategory" ? "sub" : "total"}"><td>${escapeHtml(row.label)}${row.isNetIncome ? " - LUCRO LIQUIDO" : ""}</td>${result.periods.map((period, index) => {
+    ${result.rows.map((row) => `<tr class="${row.lineType === "category" ? "cat" : row.lineType === "subcategory" ? "sub" : "total"}"><td>${escapeHtml(formatDreAnalysisRowLabel(row))}${row.isNetIncome ? " - LUCRO LIQUIDO" : ""}</td>${result.periods.map((period, index) => {
       const current = row.values[period.id]?.amount ?? 0;
       const previous = index > 0 ? result.rows.find((candidate) => candidate.key === row.key)?.values[result.periods[index - 1].id]?.amount ?? 0 : 0;
       const variation = current - previous;
@@ -301,6 +304,10 @@ export function dreAnalysisTableHtml(result: DreAnalysisResult, showVariation: b
       return `<td>${value}${vertical}</td>${showVariation && index > 0 ? `<td class="${isGoodDreAnalysisVariation(row.categoryType, variation) ? "positive" : "negative"}">${formatCurrency(variation)} / ${formatPercentage(variationPercentage(previous, current))}</td>` : ""}`;
     }).join("")}</tr>`).join("")}
   </tbody></table>`;
+}
+
+export function formatDreAnalysisRowLabel(row: Pick<DreAnalysisRow, "label" | "lineType" | "subcategoryIsReductive">) {
+  return row.lineType === "subcategory" && row.subcategoryIsReductive ? `${row.label} (redutora)` : row.label;
 }
 
 export function isGoodDreAnalysisVariation(categoryType: DreAnalysisRow["categoryType"], difference: number) {

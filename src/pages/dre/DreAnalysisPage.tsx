@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BarChart2, ChevronDown, Download, FileSpreadsheet, RotateCcw } from "lucide-react";
+import { BarChart2, ChevronDown, Download, FileSpreadsheet, Minus, Plus, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 import { DreLayout } from "@/components/dre/dre-layout";
@@ -18,6 +18,7 @@ import {
   buildDreAnalysisFromModel,
   buildSelectableDreAnalysisPeriods,
   dreAnalysisTableHtml,
+  formatDreAnalysisRowLabel,
   isGoodDreAnalysisVariation,
   type DreAnalysisPeriod,
   type DreAnalysisPeriodInput,
@@ -340,6 +341,39 @@ function PeriodSelector({
 }
 
 function ComparisonTable({ result, showVariation, showVerticalAnalysis }: { result: AnalysisResult; showVariation: boolean; showVerticalAnalysis: boolean }) {
+  const categoryKeys = useMemo(
+    () => result.rows
+      .filter((row) => row.lineType === "category" && result.rows.some((candidate) => candidate.lineType === "subcategory" && candidate.parentKey === row.key))
+      .map((row) => row.key),
+    [result.rows],
+  );
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(() => new Set());
+  const allExpanded = categoryKeys.length > 0 && expandedKeys.size === categoryKeys.length;
+  const visibleRows = useMemo(
+    () => result.rows.filter((row) => row.lineType !== "subcategory" || Boolean(row.parentKey && expandedKeys.has(row.parentKey))),
+    [expandedKeys, result.rows],
+  );
+
+  useEffect(() => {
+    setExpandedKeys(new Set());
+  }, [result]);
+
+  function toggleCategory(categoryKey: string) {
+    setExpandedKeys((current) => {
+      const next = new Set(current);
+      if (next.has(categoryKey)) {
+        next.delete(categoryKey);
+      } else {
+        next.add(categoryKey);
+      }
+      return next;
+    });
+  }
+
+  function toggleAllCategories() {
+    setExpandedKeys(allExpanded ? new Set() : new Set(categoryKeys));
+  }
+
   return (
     <Card className="border-primary/10 bg-white/90">
       <CardHeader><CardTitle>Tabela Comparativa</CardTitle></CardHeader>
@@ -347,17 +381,43 @@ function ComparisonTable({ result, showVariation, showVerticalAnalysis }: { resu
         <Table className="min-w-[920px]">
           <TableHeader className="sticky top-0 z-10 bg-white">
             <TableRow>
-              <TableHead className="sticky left-0 z-20 min-w-72 bg-white">Categoria / Subcategoria</TableHead>
+              <TableHead className="sticky left-0 z-20 min-w-72 bg-white">
+                <div className="flex items-center gap-2">
+                  <span>Categoria / Subcategoria</span>
+                  <button
+                    type="button"
+                    className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    onClick={toggleAllCategories}
+                    aria-label={allExpanded ? "Recolher todas as subcategorias" : "Expandir todas as subcategorias"}
+                    title={allExpanded ? "Recolher todas" : "Expandir todas"}
+                  >
+                    {allExpanded ? <Minus className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+                  </button>
+                </div>
+              </TableHead>
               {result.periods.map((period, index) => (
                 <ColumnHeaders key={period.id} period={period} index={index} showVariation={showVariation} />
               ))}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {result.rows.map((row) => (
+            {visibleRows.map((row) => (
               <TableRow key={row.key} className={row.lineType === "category" ? "bg-muted/70" : row.isNetIncome ? "bg-primary/10" : row.isSumLine ? "bg-primary/5" : ""}>
                 <TableCell className={`sticky left-0 z-10 bg-inherit ${row.level === 1 ? "pl-10 text-sm" : "font-semibold"} ${row.isNetIncome ? "text-primary" : ""}`}>
-                  {row.label}
+                  <div className="flex items-center gap-2">
+                    {categoryKeys.includes(row.key) ? (
+                      <button
+                        type="button"
+                        className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                        onClick={() => toggleCategory(row.key)}
+                        aria-label={expandedKeys.has(row.key) ? `Recolher subcategorias de ${row.label}` : `Expandir subcategorias de ${row.label}`}
+                        title={expandedKeys.has(row.key) ? "Recolher subcategorias" : "Expandir subcategorias"}
+                      >
+                        {expandedKeys.has(row.key) ? <Minus className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+                      </button>
+                    ) : row.lineType === "category" ? <span className="h-6 w-6 shrink-0" /> : null}
+                    <span>{formatDreAnalysisRowLabel(row)}</span>
+                  </div>
                   {row.isNetIncome ? <Badge className="ml-2" variant="secondary">LUCRO LÍQUIDO</Badge> : null}
                 </TableCell>
                 {result.periods.map((period, index) => {

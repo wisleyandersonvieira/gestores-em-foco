@@ -80,6 +80,17 @@ describe("DRE analysis from model", () => {
     expect(dreAnalysisTableHtml(result, false, true)).toContain("<small>66,67%</small>");
     expect(dreAnalysisTableHtml(result, false, false)).not.toContain("<small>66,67%</small>");
   });
+
+  it("marks reductive subcategories in analysis rows and exported table HTML", () => {
+    const result = buildDreAnalysisFromModel({
+      model: modelFixture(),
+      periods: [{ id: "2026-03", label: "Marco/2026", year: "2026", months: ["2026-03"] }],
+      entries: [entryFixture("2026-03", { sales: 1000, returns: 100, costs: 300 })],
+    });
+
+    expect(result.rows.find((row) => row.label === "Devolucoes")?.subcategoryIsReductive).toBe(true);
+    expect(dreAnalysisTableHtml(result, false, false)).toContain("Devolucoes (redutora)");
+  });
 });
 
 function modelFixture(): DreModelWithLines {
