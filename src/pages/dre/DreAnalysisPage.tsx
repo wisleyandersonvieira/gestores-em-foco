@@ -216,7 +216,10 @@ function DreAnalysisContent({ userId }: { userId: string }) {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => result && exportAnalysisPdf(result, showVariation, showVerticalAnalysis)}>
-                  <Download className="h-4 w-4" />Exportar PDF
+                  <Download className="h-4 w-4" />Exportar PDF (Analitica)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => result && exportAnalysisPdfSynthetic(result, showVariation, showVerticalAnalysis)}>
+                  <Download className="h-4 w-4" />Exportar PDF (Sintetica)
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => result && exportAnalysisExcel(result, showVariation, showVerticalAnalysis)}>
                   <FileSpreadsheet className="h-4 w-4" />Exportar Excel
@@ -486,6 +489,44 @@ function exportAnalysisPdf(result: AnalysisResult, showVariation: boolean, showV
         ${reportCard("Pior periodo", result.summary.worstPeriod)}
       </section>
       ${dreAnalysisTableHtml(result, showVariation, showVerticalAnalysis)}
+      <script>window.onload = () => { window.focus(); window.print(); };</script>
+    </body></html>
+  `);
+  reportWindow.document.close();
+}
+
+function exportAnalysisPdfSynthetic(result: AnalysisResult, showVariation: boolean, showVerticalAnalysis: boolean) {
+  const syntheticResult = { ...result, rows: result.rows.filter((row) => row.lineType !== "subcategory") };
+  const reportWindow = window.open("", "_blank", "width=1100,height=800");
+  if (!reportWindow) {
+    toast.error("Nao foi possivel abrir a janela de exportacao.");
+    return;
+  }
+
+  const generatedAt = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date());
+  reportWindow.document.write(`
+    <!doctype html><html lang="pt-BR"><head><meta charset="utf-8" /><title>Analise de DRE (Sintetica)</title>
+    <style>
+      @page { size: A4 landscape; margin: 12mm; }
+      body { font-family: Inter, Arial, sans-serif; color: #172033; margin: 0; }
+      h1 { color: #0f2b46; margin: 0; } .eyebrow { color: #b45309; font-size: 11px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
+      .header { display:flex; justify-content:space-between; gap:20px; border-bottom:3px solid #0f2b46; padding-bottom:14px; margin-bottom:18px; }
+      .cards { display:grid; grid-template-columns: repeat(6, 1fr); gap:8px; margin-bottom:18px; }
+      .card { border:1px solid #dbe3ef; border-radius:8px; padding:10px; } .card span { display:block; color:#64748b; font-size:10px; margin-bottom:6px; } .card strong { font-size:13px; }
+      table { width:100%; border-collapse:collapse; font-size:10px; } th { background:#0f2b46; color:#fff; padding:7px; text-align:right; } th:first-child, td:first-child { text-align:left; }
+      td { border-bottom:1px solid #e2e8f0; padding:7px; text-align:right; } .cat, .total { font-weight:700; background:#f1f5f9; }
+      .positive { color:#047857; } .negative { color:#b91c1c; } .meta { color:#64748b; font-size:11px; text-align:right; }
+    </style></head><body>
+      <section class="header"><div><p class="eyebrow">Gestor de DRE</p><h1>Analise Comparativa de DRE (Sintetica)</h1></div><div class="meta">Gerado em ${escapeHtml(generatedAt)}<br />Periodos: ${escapeHtml(result.periods.map((period) => period.label).join(", "))}</div></section>
+      <section class="cards">
+        ${reportCard("Faturamento", formatCurrency(result.summary.revenue))}
+        ${reportCard("Debitos", formatCurrency(result.summary.totalDebit))}
+        ${reportCard("Resultado", formatCurrency(result.summary.result), result.summary.result >= 0 ? "positive" : "negative")}
+        ${reportCard("Margem media", formatPercentage(result.summary.averageMargin))}
+        ${reportCard("Melhor periodo", result.summary.bestPeriod)}
+        ${reportCard("Pior periodo", result.summary.worstPeriod)}
+      </section>
+      ${dreAnalysisTableHtml(syntheticResult, showVariation, showVerticalAnalysis)}
       <script>window.onload = () => { window.focus(); window.print(); };</script>
     </body></html>
   `);
