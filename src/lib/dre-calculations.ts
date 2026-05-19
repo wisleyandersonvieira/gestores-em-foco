@@ -126,6 +126,17 @@ export function calculateRevenueFromEntryItems(items: DreEntryItem[]) {
   );
 }
 
+export function calculateEffectiveTotalsFromEntryItems(items: DreEntryItem[]): DreTotals {
+  return calculateDreTotals(
+    items.map((item) => ({
+      lineType: item.line_type,
+      categoryType: item.category_type_snapshot,
+      subcategoryIsReductive: item.subcategory_is_reductive ?? false,
+      value: Number(item.value || 0),
+    })),
+  );
+}
+
 export function calculateNetIncomeFromEntryItems(items: DreEntryItem[], fallback: number) {
   const netIncomeLine = items.find((item) => item.line_type === "sum" && item.is_net_income);
   return roundCurrency(netIncomeLine ? Number(netIncomeLine.value || 0) : fallback);

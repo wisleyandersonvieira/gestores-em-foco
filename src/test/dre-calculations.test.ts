@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   calculateCategoryTotal,
   calculateDreTotals,
+  calculateEffectiveTotalsFromEntryItems,
   calculateNetIncomeFromEntryItems,
   calculateRevenueFromEntryItems,
   getNetIncomeLine,
@@ -119,6 +120,33 @@ describe("DRE net income and revenue configuration", () => {
 
     expect(calculateRevenueFromEntryItems(items)).toBe(1000);
     expect(calculateNetIncomeFromEntryItems(items, 900)).toBe(250);
+  });
+
+  it("calculates dashboard totals with debit category reductive subcategory as credit", () => {
+    const items = [
+      item({ category_id: "expenses", category_type_snapshot: "debit", subcategory_id: "rent", subcategory_is_reductive: false, value: 1000 }),
+      item({ category_id: "expenses", category_type_snapshot: "debit", subcategory_id: "energy", subcategory_is_reductive: false, value: 500 }),
+      item({ category_id: "expenses", category_type_snapshot: "debit", subcategory_id: "discounts", subcategory_is_reductive: true, value: 200 }),
+    ];
+
+    expect(calculateEffectiveTotalsFromEntryItems(items)).toMatchObject({
+      totalCredit: 200,
+      totalDebit: 1500,
+      result: -1300,
+    });
+  });
+
+  it("calculates dashboard totals with credit category reductive subcategory as debit", () => {
+    const items = [
+      item({ category_id: "sales", category_type_snapshot: "credit", subcategory_id: "services", subcategory_is_reductive: false, value: 1000 }),
+      item({ category_id: "sales", category_type_snapshot: "credit", subcategory_id: "returns", subcategory_is_reductive: true, value: 150 }),
+    ];
+
+    expect(calculateEffectiveTotalsFromEntryItems(items)).toMatchObject({
+      totalCredit: 1000,
+      totalDebit: 150,
+      result: 850,
+    });
   });
 });
 

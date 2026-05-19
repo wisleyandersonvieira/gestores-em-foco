@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { calculateRevenueFromEntryItems, currentCompetence, effectiveCategoryType, formatCompetence, formatPercentage, variationPercentage } from "@/lib/dre-calculations";
+import { calculateEffectiveTotalsFromEntryItems, currentCompetence, effectiveCategoryType, formatCompetence, formatPercentage, variationPercentage } from "@/lib/dre-calculations";
 import { getDreEntry, listDreEntries } from "@/lib/dre-service";
 import type { DreCategoryType, DreEntryWithItems, DreEntryWithModel } from "@/types/dre";
 
@@ -48,9 +48,10 @@ function DreDashboardContent({ userId }: { userId: string }) {
   }, [selectedEntries, userId]);
 
   const totals = useMemo(() => {
-    const revenue = entriesWithItems.reduce((sum, entry) => sum + calculateRevenueFromEntryItems(entry.items), 0);
-    const totalDebit = entriesWithItems.reduce((sum, entry) => sum + entry.total_debit, 0);
-    const result = entriesWithItems.reduce((sum, entry) => sum + entry.result, 0);
+    const effectiveTotals = entriesWithItems.map((entry) => calculateEffectiveTotalsFromEntryItems(entry.items));
+    const revenue = effectiveTotals.reduce((sum, entryTotals) => sum + entryTotals.totalCredit, 0);
+    const totalDebit = effectiveTotals.reduce((sum, entryTotals) => sum + entryTotals.totalDebit, 0);
+    const result = effectiveTotals.reduce((sum, entryTotals) => sum + entryTotals.result, 0);
     const margin = revenue > 0 ? (result / revenue) * 100 : 0;
     return { revenue, totalDebit, result, margin };
   }, [entriesWithItems]);
@@ -58,9 +59,10 @@ function DreDashboardContent({ userId }: { userId: string }) {
   const chartData = useMemo(() => {
     return selectedCompetences.map((competence) => {
       const monthEntries = entriesWithItems.filter((entry) => entry.competence === competence && entry.status === "finalized");
-      const revenue = monthEntries.reduce((sum, entry) => sum + calculateRevenueFromEntryItems(entry.items), 0);
-      const debit = monthEntries.reduce((sum, entry) => sum + entry.total_debit, 0);
-      const result = monthEntries.reduce((sum, entry) => sum + entry.result, 0);
+      const effectiveTotals = monthEntries.map((entry) => calculateEffectiveTotalsFromEntryItems(entry.items));
+      const revenue = effectiveTotals.reduce((sum, entryTotals) => sum + entryTotals.totalCredit, 0);
+      const debit = effectiveTotals.reduce((sum, entryTotals) => sum + entryTotals.totalDebit, 0);
+      const result = effectiveTotals.reduce((sum, entryTotals) => sum + entryTotals.result, 0);
       return { competence: formatCompetence(competence), revenue, debit, result };
     });
   }, [entriesWithItems, selectedCompetences]);
