@@ -1,4 +1,4 @@
-import type { DreCategory, DreCategoryType, DreDraftLine, DreEntry, DreEntryItem, DreModelLine, DreTotals } from "@/types/dre";
+import type { DreCategory, DreCategoryType, DreDisplayLine, DreDraftLine, DreEntry, DreEntryItem, DreModelLine, DreTotals } from "@/types/dre";
 
 export const DRE_PRODUCT_KEY = "gestor-dre";
 export const DRE_PRODUCT_NAME = "Gestor de DRE";
@@ -156,6 +156,30 @@ export function calculateCategoryTotal(categoryId: string | null, lines: DreDraf
 export function calculateSumLineValue(lineIndex: number, lines: DreDraftLine[]) {
   const previousSubcategoryLines = lines.slice(0, lineIndex).filter((line) => line.lineType === "subcategory");
   return roundCurrency(previousSubcategoryLines.reduce((sum, line) => sum + signedLineValue(line), 0));
+}
+
+export function entryItemsToDraftLines(items: DreEntryItem[]): DreDraftLine[] {
+  return items.map((item) => ({
+    categoryId: item.category_id,
+    subcategoryId: item.subcategory_id,
+    categoryName: item.category_name_snapshot,
+    subcategoryName: item.subcategory_name_snapshot,
+    categoryType: item.category_type_snapshot,
+    categoryIsRevenue: item.category_is_revenue ?? false,
+    isNetIncome: item.is_net_income ?? false,
+    subcategoryIsReductive: item.subcategory_is_reductive ?? false,
+    lineType: item.line_type,
+    displayOrder: item.display_order,
+    value: Number(item.value || 0),
+  }));
+}
+
+export function resolveDreDisplayLines(lines: DreDraftLine[]): DreDisplayLine[] {
+  return lines.map((line, index) => ({
+    ...line,
+    description: line.lineType === "category" || line.lineType === "sum" ? line.categoryName : line.subcategoryName ?? "",
+    displayValue: line.lineType === "category" ? calculateCategoryTotal(line.categoryId, lines) : line.lineType === "sum" ? calculateSumLineValue(index, lines) : line.value,
+  }));
 }
 
 export function calculateEntryTotals(entry: DreEntry, items: DreEntryItem[]) {

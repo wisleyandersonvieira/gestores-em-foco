@@ -66,6 +66,11 @@ export type DreDraftLine = {
   value: number;
 };
 
+export type DreDisplayLine = DreDraftLine & {
+  description: string;
+  displayValue: number;
+};
+
 export type DreTotals = {
   totalCredit: number;
   totalDebit: number;

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Edit2 } from "lucide-react";
+import { Edit2, FileDown, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { DreLayout } from "@/components/dre/dre-layout";
@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
-import { calculateCategoryTotal, calculateSumLineValue, formatCompetence, formatPercentage } from "@/lib/dre-calculations";
+import { entryItemsToDraftLines, formatCompetence, formatPercentage, resolveDreDisplayLines } from "@/lib/dre-calculations";
+import { exportDreToPdf } from "@/lib/dre-pdf";
 import { getDreEntry } from "@/lib/dre-service";
 import type { DreDraftLine, DreEntryWithItems } from "@/types/dre";
 
@@ -20,6 +21,7 @@ export default function DreEntryViewPage() {
 function DreEntryViewContent({ userId }: { userId: string }) {
   const { entryId } = useParams();
   const [entry, setEntry] = useState<DreEntryWithItems | null>(null);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   useEffect(() => {
     if (!entryId) return;
@@ -29,20 +31,25 @@ function DreEntryViewContent({ userId }: { userId: string }) {
   }, [entryId, userId]);
 
   const lines = useMemo<DreDraftLine[]>(() => {
-    return (entry?.items ?? []).map((item) => ({
-      categoryId: item.category_id,
-      subcategoryId: item.subcategory_id,
-      categoryName: item.category_name_snapshot,
-      subcategoryName: item.subcategory_name_snapshot,
-      categoryType: item.category_type_snapshot,
-      categoryIsRevenue: item.category_is_revenue ?? false,
-      isNetIncome: item.is_net_income ?? false,
-      subcategoryIsReductive: item.subcategory_is_reductive ?? false,
-      lineType: item.line_type,
-      displayOrder: item.display_order,
-      value: Number(item.value || 0),
-    }));
+    return entryItemsToDraftLines(entry?.items ?? []);
   }, [entry]);
+
+  const displayLines = useMemo(() => resolveDreDisplayLines(lines), [lines]);
+
+  const handleExportPdf = async () => {
+    if (!entry || exportingPdf) return;
+
+    try {
+      setExportingPdf(true);
+      await new Promise((resolve) => window.requestAnimationFrame(resolve));
+      exportDreToPdf({ entry, lines });
+      toast.success("PDF exportado com sucesso.");
+    } catch {
+      toast.error("Nao foi possivel exportar o PDF. Tente novamente em instantes.");
+    } finally {
+      setExportingPdf(false);
+    }
+  };
 
   if (!entry) {
     return <div className="text-sm text-muted-foreground">Carregando DRE...</div>;
@@ -55,7 +62,13 @@ function DreEntryViewContent({ userId }: { userId: string }) {
           <h1 className="font-display text-3xl font-semibold">Visualizacao do DRE</h1>
           <p className="mt-1 text-sm text-muted-foreground">{entry.model?.name ?? "Modelo"} · {formatCompetence(entry.competence)}</p>
         </div>
-        <Button asChild><Link to={`/dre-facil/dres/${entry.id}/editar`}><Edit2 className="h-4 w-4" />Editar</Link></Button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button variant="outline" onClick={handleExportPdf} disabled={exportingPdf}>
+            {exportingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+            {exportingPdf ? "Exportando..." : "Exportar PDF"}
+          </Button>
+          <Button asChild><Link to={`/dre-facil/dres/${entry.id}/editar`}><Edit2 className="h-4 w-4" />Editar</Link></Button>
+        </div>
       </div>
 
       <Card className="border-primary/10 bg-white/95 shadow-sm">
@@ -71,16 +84,15 @@ function DreEntryViewContent({ userId }: { userId: string }) {
         <CardContent className="p-0">
           <Table>
             <TableBody>
-              {lines.map((line, index) => {
-                const value = line.lineType === "category" ? calculateCategoryTotal(line.categoryId, lines) : line.lineType === "sum" ? calculateSumLineValue(index, lines) : line.value;
+              {displayLines.map((line, index) => {
                 return (
                   <TableRow key={`${line.lineType}-${line.categoryId}-${line.subcategoryId}-${index}`} className={line.lineType === "category" ? "bg-muted/70" : line.lineType === "sum" ? "bg-primary/5" : ""}>
                     <TableCell className={line.lineType === "category" ? "font-semibold uppercase" : line.lineType === "sum" ? "font-semibold text-primary" : "pl-10 text-sm"}>
-                      {line.lineType === "category" || line.lineType === "sum" ? line.categoryName : line.subcategoryName}
+                      {line.description}
                       {line.lineType === "sum" && line.isNetIncome ? <Badge className="ml-2" variant="secondary">LUCRO LÍQUIDO</Badge> : null}
                       {line.lineType === "subcategory" && line.subcategoryIsReductive ? <Badge className="ml-2" variant="secondary">REDUTORA</Badge> : null}
                     </TableCell>
-                    <TableCell className="text-right font-medium tabular-nums">{formatCurrency(value)}</TableCell>
+                    <TableCell className="text-right font-medium tabular-nums">{formatCurrency(line.displayValue)}</TableCell>
                   </TableRow>
                 );
               })}
