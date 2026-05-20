@@ -288,7 +288,7 @@ function VariationsSection({ data }: { data: AdvancedDreAnalysis }) {
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">Ordenado por maior impacto financeiro absoluto. Exibindo {displayed.length} de {vars.length} variações.</p>
+      <p className="text-sm text-muted-foreground">Comparação entre o primeiro e o último período selecionado, ordenada por maior impacto financeiro absoluto. Exibindo {displayed.length} de {vars.length} variações.</p>
       <div className="overflow-x-auto rounded-lg border">
         <Table>
           <TableHeader>
@@ -296,8 +296,8 @@ function VariationsSection({ data }: { data: AdvancedDreAnalysis }) {
               <TableHead className="min-w-40">Categoria</TableHead>
               <TableHead className="min-w-36">Subcategoria</TableHead>
               <TableHead>Tipo</TableHead>
-              <TableHead className="text-right">Anterior</TableHead>
-              <TableHead className="text-right">Atual</TableHead>
+              <TableHead className="text-right">Período inicial</TableHead>
+              <TableHead className="text-right">Período final</TableHead>
               <TableHead className="text-right">Var. %</TableHead>
               <TableHead className="text-right">Impacto R$</TableHead>
               <TableHead className="text-right">Impacto Margem</TableHead>
@@ -325,6 +325,10 @@ function VariationRow({ v }: { v: AdvancedVariationItem }) {
     ? "text-red-700" : v.financial_impact < 0 && v.type === "expense"
       ? "text-emerald-700" : v.financial_impact > 0
         ? "text-emerald-700" : "text-red-700";
+  const variationColor = v.variation_pct > 0 && v.type === "expense"
+    ? "text-red-600" : v.variation_pct < 0 && v.type === "expense"
+      ? "text-emerald-600" : v.variation_pct > 0
+        ? "text-emerald-600" : "text-red-600";
 
   return (
     <TableRow className={v.level === "HIGH" ? "bg-red-50/40" : ""}>
@@ -337,7 +341,7 @@ function VariationRow({ v }: { v: AdvancedVariationItem }) {
       </TableCell>
       <TableCell className="text-right tabular-nums text-sm">{formatCurrency(v.previous_value)}</TableCell>
       <TableCell className="text-right tabular-nums text-sm">{formatCurrency(v.current_value)}</TableCell>
-      <TableCell className={`text-right tabular-nums text-sm font-semibold ${v.variation_pct > 0 ? "text-red-600" : "text-emerald-600"}`}>
+      <TableCell className={`text-right tabular-nums text-sm font-semibold ${variationColor}`}>
         {v.variation_pct > 0 ? "+" : ""}{formatPercentage(v.variation_pct)}
       </TableCell>
       <TableCell className={`text-right tabular-nums text-sm font-semibold ${impactColor}`}>
@@ -355,17 +359,19 @@ function VariationRow({ v }: { v: AdvancedVariationItem }) {
 
 function AbcCurveSection({ data }: { data: AdvancedDreAnalysis }) {
   const [view, setView] = useState<"expenses" | "revenue">("expenses");
+  const [selectedClass, setSelectedClass] = useState<"A" | "B" | "C" | null>(null);
   const items = data.abc_curve[view];
   const { concentration_alert } = data.abc_curve;
 
   const classColors: Record<string, string> = { A: COLORS.primary, B: COLORS.amber, C: COLORS.neutral };
-  const paretoData = items.map((i) => ({ name: i.item.length > 20 ? i.item.slice(0, 18) + "…" : i.item, value: i.value, cumulative: i.cumulative_pct, class: i.class }));
+  const visibleItems = selectedClass ? items.filter((i) => i.class === selectedClass) : items;
+  const paretoData = visibleItems.map((i) => ({ name: i.item.length > 20 ? i.item.slice(0, 18) + "…" : i.item, value: i.value, cumulative: i.cumulative_pct, class: i.class }));
 
   return (
     <div className="space-y-4">
       <div className="flex gap-2">
-        <Button size="sm" variant={view === "expenses" ? "default" : "outline"} onClick={() => setView("expenses")}>Despesas</Button>
-        <Button size="sm" variant={view === "revenue" ? "default" : "outline"} onClick={() => setView("revenue")}>Receitas</Button>
+        <Button size="sm" variant={view === "expenses" ? "default" : "outline"} onClick={() => { setView("expenses"); setSelectedClass(null); }}>Despesas</Button>
+        <Button size="sm" variant={view === "revenue" ? "default" : "outline"} onClick={() => { setView("revenue"); setSelectedClass(null); }}>Receitas</Button>
       </div>
 
       {concentration_alert && view === "expenses" && (
@@ -386,7 +392,11 @@ function AbcCurveSection({ data }: { data: AdvancedDreAnalysis }) {
               const clsItems = items.filter((i) => i.class === cls);
               const total = clsItems.reduce((s, i) => s + i.pct, 0);
               return (
-                <Card key={cls} className="border-primary/10 bg-white">
+                <Card
+                  key={cls}
+                  className={`cursor-pointer border-primary/10 bg-white transition hover:border-primary/30 ${selectedClass === cls ? "ring-2 ring-primary/30" : ""}`}
+                  onClick={() => setSelectedClass((current) => current === cls ? null : cls)}
+                >
                   <CardContent className="p-3">
                     <div className="flex items-center gap-2">
                       <span className="text-2xl font-bold" style={{ color: classColors[cls] }}>Classe {cls}</span>
@@ -398,9 +408,13 @@ function AbcCurveSection({ data }: { data: AdvancedDreAnalysis }) {
             })}
           </div>
 
+          <p className="text-xs text-muted-foreground">
+            {selectedClass ? `Exibindo somente itens da Classe ${selectedClass}. Clique novamente no card para voltar a exibir todas as classes.` : "Clique em uma classe para filtrar o gráfico e a tabela."}
+          </p>
+
           {paretoData.length > 0 && (
             <Card className="border-primary/10 bg-white">
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Gráfico de Pareto</CardTitle></CardHeader>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Gráfico de Pareto{selectedClass ? ` · Classe ${selectedClass}` : ""}</CardTitle></CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={260}>
                   <ComposedChart data={paretoData} margin={{ top: 4, right: 40, bottom: 60, left: 10 }}>
@@ -436,7 +450,7 @@ function AbcCurveSection({ data }: { data: AdvancedDreAnalysis }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((item, i) => (
+                {visibleItems.map((item, i) => (
                   <TableRow key={i}>
                     <TableCell className="font-medium text-sm">{item.item}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{item.category}</TableCell>
@@ -529,7 +543,7 @@ function ChartsSection({ data }: { data: AdvancedDreAnalysis }) {
                 <Bar dataKey="down" stackId="w" name="Despesa/Redução" fill={COLORS.expense} radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-            <ChartInsight text="Do faturamento bruto ao resultado líquido, cada barra mostra o impacto de cada grupo de linhas." />
+            <ChartInsight text="Do faturamento bruto ao resultado líquido, cada barra mostra o impacto consolidado de cada grupo nos períodos selecionados." />
           </CardContent>
         </Card>
       )}
@@ -557,7 +571,7 @@ function ChartsSection({ data }: { data: AdvancedDreAnalysis }) {
       {/* Top 5 expenses */}
       {cd.top_expenses.length > 0 && (
         <Card className="border-primary/10 bg-white">
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Top 5 Categorias de Despesa (período atual)</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Top 5 Categorias de Despesa (períodos selecionados)</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={cd.top_expenses} layout="vertical" margin={{ top: 4, right: 60, bottom: 4, left: 20 }}>
@@ -577,7 +591,7 @@ function ChartsSection({ data }: { data: AdvancedDreAnalysis }) {
       {/* Expenses distribution (donut) */}
       {cd.expenses_distribution.length > 0 && (
         <Card className="border-primary/10 bg-white">
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Distribuição de Despesas (período atual)</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Distribuição de Despesas (períodos selecionados)</CardTitle></CardHeader>
           <CardContent>
             <div className="flex flex-col sm:flex-row items-center gap-4">
               <ResponsiveContainer width={200} height={200}>

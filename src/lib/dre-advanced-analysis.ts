@@ -263,17 +263,17 @@ function categoryLabelMap(rows: DreAnalysisRow[]): Record<string, string> {
 export function computeVariations(
   subcategoryRows: DreAnalysisRow[],
   currentPeriod: DreAnalysisPeriod,
-  previousPeriod: DreAnalysisPeriod | null,
+  comparisonPeriod: DreAnalysisPeriod | null,
   categoryLabels: Record<string, string>,
 ): AdvancedVariationItem[] {
-  if (!previousPeriod) return [];
+  if (!comparisonPeriod || comparisonPeriod.id === currentPeriod.id) return [];
 
   const currentRevenue = currentPeriod.totals.revenue;
 
   return subcategoryRows
     .map((row): AdvancedVariationItem => {
       const current = row.values[currentPeriod.id]?.amount ?? 0;
-      const previous = row.values[previousPeriod.id]?.amount ?? 0;
+      const previous = row.values[comparisonPeriod.id]?.amount ?? 0;
       const impact = current - previous;
       const varPct = variationPercentage(previous, current);
       const marginImpact = currentRevenue > 0 ? roundCurrency((impact / currentRevenue) * 100) : 0;
@@ -301,12 +301,12 @@ export function computeVariations(
 
 export function computeAbcCurve(
   subcategoryRows: DreAnalysisRow[],
-  currentPeriodId: string,
+  periods: DreAnalysisPeriod[],
   categoryLabels: Record<string, string>,
 ): AdvancedDreAnalysis["abc_curve"] {
   const toItems = (rows: DreAnalysisRow[]): AbcItem[] => {
     const raw = rows
-      .map((r) => ({ item: r.label, category: categoryLabels[r.parentKey ?? ""] ?? "", value: r.values[currentPeriodId]?.amount ?? 0 }))
+      .map((r) => ({ item: r.label, category: categoryLabels[r.parentKey ?? ""] ?? "", value: sumPeriodValues(periods, (p) => r.values[p.id]?.amount ?? 0) }))
       .filter((i) => i.value > 0)
       .sort((a, b) => b.value - a.value);
 
@@ -339,7 +339,7 @@ export function computeAbcCurve(
 
 // ── Waterfall ──────────────────────────────────────────────────────────────────
 
-function buildWaterfallData(rows: DreAnalysisRow[], currentPeriodId: string): WaterfallItem[] {
+function buildWaterfallData(rows: DreAnalysisRow[], periods: DreAnalysisPeriod[]): WaterfallItem[] {
   const ordered = rows
     .filter((r) => r.lineType === "category" || r.lineType === "sum")
     .sort((a, b) => a.displayOrder - b.displayOrder);
@@ -348,7 +348,7 @@ function buildWaterfallData(rows: DreAnalysisRow[], currentPeriodId: string): Wa
   let running = 0;
 
   for (const row of ordered) {
-    const amount = row.values[currentPeriodId]?.amount ?? 0;
+    const amount = sumPeriodValues(periods, (p) => row.values[p.id]?.amount ?? 0);
 
     if (row.lineType === "sum") {
       const total = amount;
@@ -928,10 +928,10 @@ export function generateAdvancedDreAnalysis(
   const selectedTotalExpenses = roundCurrency(selectedRevenue - selectedNetProfit);
 
   // Variations
-  const variations = computeVariations(subcategoryRows, currentPeriod, previousPeriod, catLabels);
+  const variations = computeVariations(subcategoryRows, currentPeriod, periodsCount > 1 ? firstPeriod : null, catLabels);
 
   // ABC Curve
-  const abc_curve = computeAbcCurve(subcategoryRows, currentPeriod.id, catLabels);
+  const abc_curve = computeAbcCurve(subcategoryRows, periods, catLabels);
 
   // Alerts
   const alerts = computeAlerts({
@@ -977,17 +977,17 @@ export function generateAdvancedDreAnalysis(
   }));
 
   const topExpensesForChart = [...expenseRows]
-    .sort((a, b) => (b.values[currentPeriod.id]?.amount ?? 0) - (a.values[currentPeriod.id]?.amount ?? 0))
+    .sort((a, b) => sumPeriodValues(periods, (p) => b.values[p.id]?.amount ?? 0) - sumPeriodValues(periods, (p) => a.values[p.id]?.amount ?? 0))
     .slice(0, 5)
-    .map((r) => ({ name: r.label, value: r.values[currentPeriod.id]?.amount ?? 0 }));
+    .map((r) => ({ name: r.label, value: sumPeriodValues(periods, (p) => r.values[p.id]?.amount ?? 0) }));
 
   const expensesDistribution = [...expenseRows]
-    .map((r) => ({ name: r.label, value: r.values[currentPeriod.id]?.amount ?? 0 }))
+    .map((r) => ({ name: r.label, value: sumPeriodValues(periods, (p) => r.values[p.id]?.amount ?? 0) }))
     .filter((i) => i.value > 0)
     .sort((a, b) => b.value - a.value)
     .slice(0, 8);
 
-  const waterfall = buildWaterfallData(rows, currentPeriod.id);
+  const waterfall = buildWaterfallData(rows, periods);
 
   // Margin data for section
   const grossMarginMap = grossPerPeriod ?? {};

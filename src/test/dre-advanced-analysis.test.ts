@@ -133,6 +133,7 @@ describe("determineAlertLevel", () => {
 
 describe("computeAbcCurve", () => {
   const periodId = "p1";
+  const periods = [periodFixture({ id: periodId })];
   const catLabels: Record<string, string> = { "category::exp::0": "Despesas Operacionais" };
 
   it("classifies items correctly into A/B/C", () => {
@@ -144,7 +145,7 @@ describe("computeAbcCurve", () => {
       rowFixture({ key: "k5", label: "Miscel", categoryType: "debit", parentKey: "category::exp::0", values: { [periodId]: { amount: 100, verticalPercentage: 0 } } }),
     ];
 
-    const { expenses } = computeAbcCurve(rows, periodId, catLabels);
+    const { expenses } = computeAbcCurve(rows, periods, catLabels);
 
     // CPV = 5000 = 60.7% → class A (cumulative 60.7%)
     expect(expenses[0].item).toBe("CPV");
@@ -156,7 +157,7 @@ describe("computeAbcCurve", () => {
   });
 
   it("returns empty when no expense rows", () => {
-    const { expenses } = computeAbcCurve([], periodId, {});
+    const { expenses } = computeAbcCurve([], periods, {});
     expect(expenses).toHaveLength(0);
   });
 
@@ -170,7 +171,7 @@ describe("computeAbcCurve", () => {
       rowFixture({ key: "k5", label: "Custo E", categoryType: "debit", values: { [periodId]: { amount: 300, verticalPercentage: 0 } } }),
     ];
 
-    const { concentration_alert } = computeAbcCurve(rows, periodId, {});
+    const { concentration_alert } = computeAbcCurve(rows, periods, {});
     expect(concentration_alert).not.toBeNull();
     expect(concentration_alert).toContain("concentram");
   });
@@ -179,7 +180,7 @@ describe("computeAbcCurve", () => {
     const rows: DreAnalysisRow[] = Array.from({ length: 10 }, (_, i) =>
       rowFixture({ key: `k${i}`, label: `Item ${i}`, categoryType: "debit", values: { [periodId]: { amount: 1000, verticalPercentage: 0 } } }),
     );
-    const { concentration_alert } = computeAbcCurve(rows, periodId, {});
+    const { concentration_alert } = computeAbcCurve(rows, periods, {});
     expect(concentration_alert).toBeNull();
   });
 
@@ -189,7 +190,7 @@ describe("computeAbcCurve", () => {
       rowFixture({ key: "r2", label: "Servicos", categoryType: "credit", values: { [periodId]: { amount: 2000, verticalPercentage: 0 } } }),
       rowFixture({ key: "e1", label: "CPV", categoryType: "debit", values: { [periodId]: { amount: 5000, verticalPercentage: 0 } } }),
     ];
-    const { revenue, expenses } = computeAbcCurve(rows, periodId, {});
+    const { revenue, expenses } = computeAbcCurve(rows, periods, {});
     expect(revenue).toHaveLength(2);
     expect(expenses).toHaveLength(1);
   });
@@ -200,8 +201,19 @@ describe("computeAbcCurve", () => {
       rowFixture({ key: "k2", label: "B", categoryType: "debit", values: { [periodId]: { amount: 200, verticalPercentage: 0 } } }),
       rowFixture({ key: "k3", label: "C", categoryType: "debit", values: { [periodId]: { amount: 100, verticalPercentage: 0 } } }),
     ];
-    const { expenses } = computeAbcCurve(rows, periodId, {});
+    const { expenses } = computeAbcCurve(rows, periods, {});
     expect(expenses[expenses.length - 1].cumulative_pct).toBeCloseTo(100, 0);
+  });
+
+  it("uses the sum of selected periods for ABC values", () => {
+    const rows: DreAnalysisRow[] = [
+      rowFixture({ key: "k1", label: "A", categoryType: "debit", values: { p1: { amount: 300, verticalPercentage: 0 }, p2: { amount: 700, verticalPercentage: 0 } } }),
+      rowFixture({ key: "k2", label: "B", categoryType: "debit", values: { p1: { amount: 200, verticalPercentage: 0 }, p2: { amount: 100, verticalPercentage: 0 } } }),
+    ];
+    const { expenses } = computeAbcCurve(rows, [periodFixture({ id: "p1" }), periodFixture({ id: "p2" })], {});
+    expect(expenses[0].item).toBe("A");
+    expect(expenses[0].value).toBe(1000);
+    expect(expenses[1].value).toBe(300);
   });
 });
 
@@ -518,6 +530,53 @@ describe("generateAdvancedDreAnalysis — 2 periods", () => {
     expect(analysis.indicators.total_expenses.value).toBe(120000);
     expect(analysis.indicators.gross_margin.value).toBe(59.09);
     expect(analysis.indicators.operating_margin.value).toBe(45.45);
+  });
+
+  it("uses the sum of selected periods for ABC and expense charts", () => {
+    const model = makeModel();
+    const entries = [
+      makeEntry("2026-01", { sales: 100000, cpv: 40000, admin: 10000, freight: 5000 }),
+      makeEntry("2026-02", { sales: 120000, cpv: 50000, admin: 12000, freight: 3000 }),
+    ];
+    const result = buildDreAnalysisFromModel({
+      model,
+      periods: [
+        { id: "2026-01", label: "Jan/2026", year: "2026", months: ["2026-01"] },
+        { id: "2026-02", label: "Fev/2026", year: "2026", months: ["2026-02"] },
+      ],
+      entries,
+    });
+
+    const analysis = generateAdvancedDreAnalysis(result, { modelName: "M" });
+
+    expect(analysis.abc_curve.expenses.find((item) => item.item === "CPV")?.value).toBe(90000);
+    expect(analysis.charts_data.top_expenses.find((item) => item.name === "CPV")?.value).toBe(90000);
+    expect(analysis.charts_data.expenses_distribution.find((item) => item.name === "Administrativo")?.value).toBe(22000);
+  });
+
+  it("compares the first selected period with the last selected period in variations", () => {
+    const model = makeModel();
+    const entries = [
+      makeEntry("2026-01", { sales: 100000, cpv: 40000, admin: 10000, freight: 5000 }),
+      makeEntry("2026-02", { sales: 100000, cpv: 40000, admin: 10000, freight: 7000 }),
+      makeEntry("2026-03", { sales: 100000, cpv: 40000, admin: 10000, freight: 9000 }),
+    ];
+    const result = buildDreAnalysisFromModel({
+      model,
+      periods: [
+        { id: "2026-01", label: "Jan/2026", year: "2026", months: ["2026-01"] },
+        { id: "2026-02", label: "Fev/2026", year: "2026", months: ["2026-02"] },
+        { id: "2026-03", label: "Mar/2026", year: "2026", months: ["2026-03"] },
+      ],
+      entries,
+    });
+
+    const analysis = generateAdvancedDreAnalysis(result, { modelName: "M" });
+    const freightVar = analysis.variations.find((v) => v.subcategory === "Fretes");
+
+    expect(freightVar?.previous_value).toBe(5000);
+    expect(freightVar?.current_value).toBe(9000);
+    expect(freightVar?.financial_impact).toBe(4000);
   });
 
   it("computes variations between current and previous period", () => {
