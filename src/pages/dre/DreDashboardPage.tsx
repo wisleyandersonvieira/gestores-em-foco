@@ -1,19 +1,30 @@
 import { useEffect, useMemo, useState } from "react";
 import type React from "react";
-import { Bar, BarChart, CartesianGrid, LabelList, Line, LineChart, XAxis, YAxis } from "recharts";
-import { Download } from "lucide-react";
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import type { TooltipProps } from "recharts";
+import { ArrowDown, ArrowUp, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 
 import { DreLayout } from "@/components/dre/dre-layout";
-import { CompetenceMultiFilter, IndicatorCard, formatCurrency } from "@/components/dre/dre-ui";
+import { CompetenceMultiFilter, formatCurrency } from "@/components/dre/dre-ui";
+import { DreAdvancedAnalysisModal } from "@/components/dre/DreAdvancedAnalysisModal";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { calculateEffectiveTotalsFromEntryItems, currentCompetence, effectiveCategoryType, formatCompetence, formatPercentage, variationPercentage } from "@/lib/dre-calculations";
-import { getDreEntry, listDreEntries } from "@/lib/dre-service";
-import type { DreCategoryType, DreEntryWithItems, DreEntryWithModel } from "@/types/dre";
+import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
+import { buildDreAnalysisFromModel, type DreAnalysisResult } from "@/lib/dre-analysis";
+import { calculateEffectiveTotalsFromEntryItems, currentCompetence, formatCompetence, formatPercentage } from "@/lib/dre-calculations";
+import { generateAdvancedDreAnalysis, type AdvancedAlert, type AdvancedDreAnalysis, type AlertLevel } from "@/lib/dre-advanced-analysis";
+import { getDreEntry, getDreModelWithLines, listDreEntries } from "@/lib/dre-service";
+import type { DreEntryWithItems, DreEntryWithModel, DreModelWithLines } from "@/types/dre";
+
+type DashboardChartPoint = {
+  period: string;
+  revenue: number;
+  netIncome: number;
+  margin: number;
+};
 
 export default function DreDashboardPage() {
   return <DreLayout>{(user) => <DreDashboardContent userId={user.id} />}</DreLayout>;
@@ -23,12 +34,14 @@ function DreDashboardContent({ userId }: { userId: string }) {
   const [selectedCompetences, setSelectedCompetences] = useState(() => {
     const now = new Date();
     const year = now.getFullYear();
-    const lastMonth = Math.max(1, now.getMonth()); // mês anterior ao atual (1-12)
+    const lastMonth = Math.max(1, now.getMonth());
     return Array.from({ length: lastMonth }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`);
   });
   const [entries, setEntries] = useState<DreEntryWithModel[]>([]);
   const [entriesWithItems, setEntriesWithItems] = useState<DreEntryWithItems[]>([]);
+  const [model, setModel] = useState<DreModelWithLines | null>(null);
   const [isLoadingEntries, setIsLoadingEntries] = useState(true);
+  const [showAdvancedAnalysis, setShowAdvancedAnalysis] = useState(false);
 
   useEffect(() => {
     setIsLoadingEntries(true);
@@ -43,141 +56,117 @@ function DreDashboardContent({ userId }: { userId: string }) {
     [entries, selectedCompetences],
   );
 
+  const primaryModelId = useMemo(() => {
+    const sorted = [...selectedEntries].sort((a, b) => b.competence.localeCompare(a.competence));
+    return sorted[0]?.model_id ?? "";
+  }, [selectedEntries]);
+
+  const selectedEntriesForModel = useMemo(
+    () => selectedEntries.filter((entry) => entry.model_id === primaryModelId).sort((a, b) => a.competence.localeCompare(b.competence)),
+    [primaryModelId, selectedEntries],
+  );
+
   useEffect(() => {
+    setEntriesWithItems([]);
+    if (selectedEntriesForModel.length === 0) return;
+
     async function loadItems() {
-      const detailed = await Promise.all(selectedEntries.map((entry) => getDreEntry(userId, entry.id)));
-      setEntriesWithItems(detailed);
+      const detailed = await Promise.all(selectedEntriesForModel.map((entry) => getDreEntry(userId, entry.id)));
+      setEntriesWithItems(detailed.sort((a, b) => a.competence.localeCompare(b.competence)));
     }
 
     void loadItems().catch(() => setEntriesWithItems([]));
-  }, [selectedEntries, userId]);
+  }, [selectedEntriesForModel, userId]);
 
-  const totals = useMemo(() => {
+  useEffect(() => {
+    setModel(null);
+    if (!primaryModelId) return;
+
+    void getDreModelWithLines(userId, primaryModelId)
+      .then(setModel)
+      .catch((error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel carregar o modelo do dashboard."));
+  }, [primaryModelId, userId]);
+
+  const fallbackTotals = useMemo(() => {
     const effectiveTotals = entriesWithItems.map((entry) => calculateEffectiveTotalsFromEntryItems(entry.items));
     const revenue = effectiveTotals.reduce((sum, entryTotals) => sum + entryTotals.totalCredit, 0);
-    const totalDebit = effectiveTotals.reduce((sum, entryTotals) => sum + entryTotals.totalDebit, 0);
     const result = effectiveTotals.reduce((sum, entryTotals) => sum + entryTotals.result, 0);
     const margin = revenue > 0 ? (result / revenue) * 100 : 0;
-    return { revenue, totalDebit, result, margin };
+    return { revenue, result, margin };
   }, [entriesWithItems]);
 
-  const chartData = useMemo(() => {
-    return selectedCompetences.map((competence) => {
-      const monthEntries = entriesWithItems.filter((entry) => entry.competence === competence && entry.status === "finalized");
-      const effectiveTotals = monthEntries.map((entry) => calculateEffectiveTotalsFromEntryItems(entry.items));
-      const revenue = effectiveTotals.reduce((sum, entryTotals) => sum + entryTotals.totalCredit, 0);
-      const debit = effectiveTotals.reduce((sum, entryTotals) => sum + entryTotals.totalDebit, 0);
-      const result = effectiveTotals.reduce((sum, entryTotals) => sum + entryTotals.result, 0);
-      return { competence: formatCompetence(competence), revenue, debit, result };
-    });
-  }, [entriesWithItems, selectedCompetences]);
+  const analysisResult = useMemo<DreAnalysisResult | null>(() => {
+    if (!model || entriesWithItems.length === 0) return null;
+    const periods = entriesWithItems.map((entry) => ({
+      id: entry.competence,
+      label: formatCompetence(entry.competence),
+      year: entry.competence.slice(0, 4),
+      months: [entry.competence],
+    }));
+    return buildDreAnalysisFromModel({ model, periods, entries: entriesWithItems });
+  }, [entriesWithItems, model]);
 
-  const categoryImpact = useMemo(() => {
-    const impact = new Map<string, number>();
-    entriesWithItems.forEach((entry) => {
-      entry.items
-        .filter((item) => item.line_type === "subcategory" && effectiveCategoryType({ categoryType: item.category_type_snapshot, subcategoryIsReductive: item.subcategory_is_reductive ?? false }) === "debit")
-        .forEach((item) => {
-          impact.set(item.category_name_snapshot, (impact.get(item.category_name_snapshot) ?? 0) + Number(item.value || 0));
-        });
-    });
-    const totalDebit = Array.from(impact.values()).reduce((sum, value) => sum + value, 0);
-    return Array.from(impact.entries())
-      .map(([category, value]) => ({ category, value, percentage: totalDebit > 0 ? (value / totalDebit) * 100 : 0 }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 8);
-  }, [entriesWithItems]);
+  const advancedAnalysis = useMemo<AdvancedDreAnalysis | null>(() => {
+    if (!analysisResult || !model) return null;
+    return generateAdvancedDreAnalysis(analysisResult, { modelName: model.name });
+  }, [analysisResult, model]);
 
-  const analysis = useMemo(() => {
-    const ordered = [...selectedCompetences].sort();
-    const first = ordered[0];
-    const last = ordered[ordered.length - 1] ?? first;
-    const values = new Map<string, { category: string; categoryType: DreCategoryType; first: number; last: number }>();
+  const hasSinglePeriod = (advancedAnalysis?.metadata.periods_count ?? entriesWithItems.length) <= 1;
+  const indicators = advancedAnalysis?.indicators;
+  const revenueValue = indicators?.revenue.value ?? fallbackTotals.revenue;
+  const netProfitValue = indicators?.net_profit.fallbackMessage ? fallbackTotals.result : indicators?.net_profit.value ?? fallbackTotals.result;
+  const netMarginValue = indicators?.net_margin.fallbackMessage ? fallbackTotals.margin : indicators?.net_margin.value ?? fallbackTotals.margin;
+  const grossMarginUnavailable = Boolean(indicators?.gross_margin.fallbackMessage);
+  const operationalEfficiency = revenueValue > 0 ? Math.round((netProfitValue / revenueValue) * 100) : 0;
 
-    entriesWithItems.forEach((entry) => {
-      if (entry.competence !== first && entry.competence !== last) return;
-      entry.items.filter((item) => item.line_type === "subcategory").forEach((item) => {
-        const itemCategoryType = effectiveCategoryType({ categoryType: item.category_type_snapshot, subcategoryIsReductive: item.subcategory_is_reductive ?? false });
-        const mapKey = `${itemCategoryType}:${item.category_name_snapshot}`;
-        const current = values.get(mapKey) ?? {
-          category: item.category_name_snapshot,
-          categoryType: itemCategoryType,
-          first: 0,
-          last: 0,
-        };
-        const key = entry.competence === first ? "first" : "last";
-        current[key] += Number(item.value || 0);
-        values.set(mapKey, current);
-      });
-    });
+  const chartData = useMemo<DashboardChartPoint[]>(() => {
+    if (advancedAnalysis) {
+      return advancedAnalysis.charts_data.revenue_vs_expenses.map((point, index) => ({
+        period: point.period,
+        revenue: point.revenue,
+        netIncome: point.net_income,
+        margin: advancedAnalysis.margins.net[index]?.value ?? 0,
+      }));
+    }
 
-    return Array.from(values.values()).map((value) => {
-      const difference = value.last - value.first;
+    return entriesWithItems.map((entry) => {
+      const totals = calculateEffectiveTotalsFromEntryItems(entry.items);
+      const revenue = totals.totalCredit;
+      const netIncome = totals.result;
       return {
-        category: value.category,
-        categoryType: value.categoryType,
-        previous: value.first,
-        current: value.last,
-        difference,
-        variation: variationPercentage(value.first, value.last),
-        type: difference >= 0 ? "positive" : "negative",
+        period: formatCompetence(entry.competence),
+        revenue,
+        netIncome,
+        margin: revenue > 0 ? (netIncome / revenue) * 100 : 0,
       };
-    }).sort((a, b) => Math.abs(b.difference) - Math.abs(a.difference));
-  }, [entriesWithItems, selectedCompetences]);
-
-  const periodAverages = useMemo(() => {
-    const totals = new Map<string, { category: string; categoryType: DreCategoryType; total: number }>();
-
-    entriesWithItems.forEach((entry) => {
-      entry.items.filter((item) => item.line_type === "subcategory").forEach((item) => {
-        const parentType = item.category_type_snapshot as DreCategoryType;
-        const isReductive = item.subcategory_is_reductive ?? false;
-        const mapKey = `${parentType}:${item.category_name_snapshot}`;
-        const current = totals.get(mapKey) ?? { category: item.category_name_snapshot, categoryType: parentType, total: 0 };
-        const value = Number(item.value || 0);
-        current.total += isReductive ? -value : value;
-        totals.set(mapKey, current);
-      });
     });
+  }, [advancedAnalysis, entriesWithItems]);
 
-    const periodCount = Math.max(1, selectedCompetences.length);
-    const revenueAverage = totals.size
-      ? Array.from(totals.values()).filter((item) => item.categoryType === "credit").reduce((sum, item) => sum + item.total, 0) / periodCount
-      : 0;
-
-    return Array.from(totals.values())
-      .map((item) => ({
-        category: item.category,
-        categoryType: item.categoryType,
-        average: item.total / periodCount,
-        percentageOfRevenue: item.categoryType === "debit" && revenueAverage > 0 ? (item.total / periodCount / revenueAverage) * 100 : null,
-      }))
+  const analyzedPeriod = chartData[0];
+  const topAlerts = useMemo(() => {
+    const levelOrder: Record<AlertLevel, number> = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+    return [...(advancedAnalysis?.alerts ?? [])]
       .sort((a, b) => {
-        if (a.categoryType !== b.categoryType) return a.categoryType === "credit" ? -1 : 1;
-        return b.average - a.average;
-      });
-  }, [entriesWithItems, selectedCompetences]);
+        if (levelOrder[a.level] !== levelOrder[b.level]) return levelOrder[a.level] - levelOrder[b.level];
+        return Math.abs(b.impact_value) - Math.abs(a.impact_value);
+      })
+      .slice(0, 3);
+  }, [advancedAnalysis]);
 
-  const biggestPositive = analysis.find((item) => item.difference > 0);
-  const biggestNegative = analysis.find((item) => item.difference < 0);
-
+  const modelNotice = selectedEntries.length > selectedEntriesForModel.length
+    ? "O dashboard considera o modelo mais recente entre as competencias selecionadas para manter consistencia com a analise detalhada."
+    : null;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="font-display text-3xl font-semibold">Dashboard</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Indicadores e comparativos dos DREs finalizados nas competencias selecionadas.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Indicadores acionáveis dos DREs finalizados nas competências selecionadas.</p>
         </div>
         <Button
           variant="outline"
-          onClick={() => exportDashboardPdf({
-            selectedCompetences,
-            totals,
-            chartData,
-            categoryImpact,
-            analysis,
-          })}
+          onClick={() => exportDashboardPdf({ selectedCompetences, revenueValue, netProfitValue, netMarginValue, grossMargin: indicators?.gross_margin.value ?? null, alerts: topAlerts })}
         >
           <Download className="h-4 w-4" />
           Exportar PDF
@@ -211,100 +200,182 @@ function DreDashboardContent({ userId }: { userId: string }) {
       <Card className="border-primary/10 bg-white/90">
         <CardContent className="grid gap-2 p-5 sm:max-w-sm">
           <CompetenceMultiFilter selected={selectedCompetences} onChange={(items) => setSelectedCompetences(items.length ? items : [currentCompetence()])} />
+          {modelNotice ? <p className="text-xs text-amber-700">{modelNotice}</p> : null}
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <IndicatorCard title="Faturamento Total" value={formatCurrency(totals.revenue)} />
-        <IndicatorCard title="Despesas Totais" value={formatCurrency(totals.totalDebit)} />
-        <IndicatorCard title="Lucro / Resultado" value={formatCurrency(totals.result)} tone={totals.result >= 0 ? "positive" : "negative"} />
-        <IndicatorCard title="Margem de Lucro" value={formatPercentage(totals.margin)} />
-        <IndicatorCard title="Maior variacao positiva" value={biggestPositive ? formatCurrency(biggestPositive.difference) : formatCurrency(0)} description={biggestPositive?.category ?? "Sem variacao positiva"} tone="positive" />
-        <IndicatorCard title="Maior variacao negativa" value={biggestNegative ? formatCurrency(biggestNegative.difference) : formatCurrency(0)} description={biggestNegative?.category ?? "Sem variacao negativa"} tone="negative" />
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <MetricCard
+          title="Faturamento"
+          value={formatCurrency(revenueValue)}
+          detail={<VariationDetail variation={hasSinglePeriod ? null : indicators?.revenue.variation ?? null} />}
+        />
+        <MetricCard
+          title="Lucro Líquido"
+          value={formatCurrency(netProfitValue)}
+          valueTone={netProfitValue >= 0 ? "positive" : "negative"}
+          detail={<VariationDetail variation={hasSinglePeriod ? null : indicators?.net_profit.variation ?? null} />}
+        />
+        <MetricCard
+          title="Margem de Lucro"
+          value={formatPercentage(netMarginValue)}
+          detail={indicators?.net_margin.level ? levelBadge(indicators.net_margin.level) : <span className="text-muted-foreground">—</span>}
+        />
+        <MetricCard
+          title="Margem Bruta"
+          value={grossMarginUnavailable ? "—" : formatPercentage(indicators?.gross_margin.value ?? 0)}
+          detail={grossMarginUnavailable ? <span className="text-amber-700">Ajuste o modelo de DRE</span> : indicators?.gross_margin.level ? levelBadge(indicators.gross_margin.level) : <span className="text-muted-foreground">—</span>}
+        />
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-2">
-        <ChartCard title="Evolução de faturamento, despesas e lucro">
-          <ChartContainer className="aspect-auto h-80 w-full" config={{ revenue: { label: "Faturamento", color: "#16a34a" }, debit: { label: "Débito", color: "#dc2626" }, result: { label: "Lucro Líquido", color: "#2563eb" } }}>
-            <LineChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-              <CartesianGrid vertical={false} />
-              <XAxis dataKey="competence" tickLine={false} axisLine={false} />
-              <YAxis tickFormatter={(value) => `${Number(value) / 1000}k`} width={48} />
-              <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />} />
-              <Line type="monotone" dataKey="revenue" stroke="var(--color-revenue)" strokeWidth={2} />
-              <Line type="monotone" dataKey="debit" stroke="var(--color-debit)" strokeWidth={2} />
-              <Line type="monotone" dataKey="result" stroke="var(--color-result)" strokeWidth={2} />
-            </LineChart>
-          </ChartContainer>
-        </ChartCard>
+      <div className={`grid gap-4 ${hasSinglePeriod ? "lg:grid-cols-2" : "lg:grid-cols-3"}`}>
+        <MetricCard
+          title="Eficiência operacional"
+          value={`De cada R$ 100 faturados, R$ ${operationalEfficiency} chegam ao lucro`}
+          compact
+        />
+        {hasSinglePeriod ? (
+          <MetricCard
+            title="Período analisado"
+            value={analyzedPeriod ? `${analyzedPeriod.period} · ${formatPercentage(analyzedPeriod.margin)}` : "—"}
+            compact
+          />
+        ) : (
+          <>
+            <MetricCard
+              title="Melhor mês"
+              value={indicators?.best_period.fallbackMessage ? "—" : `${indicators?.best_period.period ?? "—"} · ${formatPercentage(indicators?.best_period.margin ?? 0)}`}
+              compact
+            />
+            <MetricCard
+              title="Pior mês"
+              value={indicators?.worst_period.fallbackMessage ? "—" : `${indicators?.worst_period.period ?? "—"} · ${formatPercentage(indicators?.worst_period.margin ?? 0)}`}
+              compact
+            />
+          </>
+        )}
+      </div>
 
-        <ChartCard title="Comparativo crédito, débito e lucro">
-          <ChartContainer className="aspect-auto h-80 w-full" config={{ revenue: { label: "Faturamento", color: "#16a34a" }, debit: { label: "Débito", color: "#dc2626" }, result: { label: "Lucro Líquido", color: "#2563eb" } }}>
-            <BarChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+      <ChartCard title="Evolução da margem de lucro">
+        {chartData.length === 0 ? (
+          <EmptyState>Sem dados finalizados para exibir a evolução.</EmptyState>
+        ) : hasSinglePeriod ? (
+          <ChartContainer className="aspect-auto h-[150px] w-full sm:h-[200px]" config={{ margin: { label: "Margem", color: "#0f2b46" } }}>
+            <BarChart data={chartData} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
               <CartesianGrid vertical={false} />
-              <XAxis dataKey="competence" tickLine={false} axisLine={false} />
-              <YAxis tickFormatter={(value) => `${Number(value) / 1000}k`} width={48} />
-              <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />} />
-              <Bar dataKey="revenue" fill="var(--color-revenue)" radius={6} />
-              <Bar dataKey="debit" fill="var(--color-debit)" radius={6} />
-              <Bar dataKey="result" fill="var(--color-result)" radius={6} />
+              <XAxis dataKey="period" tickLine={false} axisLine={false} />
+              <YAxis tickFormatter={(value) => `${Number(value).toFixed(0)}%`} width={42} />
+              <ChartTooltip content={<MarginTooltip />} />
+              <Bar dataKey="margin" fill="var(--color-margin)" radius={6} />
             </BarChart>
           </ChartContainer>
-        </ChartCard>
-      </div>
-
-      <ChartCard title="Top categorias de despesa com maior impacto">
-        <ChartContainer className="aspect-auto h-80 w-full" config={{ value: { label: "Impacto", color: "#0f172a" } }}>
-          <BarChart data={categoryImpact} margin={{ top: 16, right: 12, left: 0, bottom: 0 }}>
-            <CartesianGrid vertical={false} />
-            <XAxis dataKey="category" tickLine={false} axisLine={false} interval={0} height={50} tick={{ fontSize: 11 }} />
-            <YAxis tickFormatter={(value) => `${Number(value) / 1000}k`} width={48} />
-            <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />} />
-            <Bar dataKey="value" fill="var(--color-value)" radius={6}>
-              <LabelList
-                dataKey="percentage"
-                position="top"
-                formatter={(value: number) => formatPercentage(Number(value))}
-                className="fill-foreground text-xs font-semibold"
-              />
-            </Bar>
-          </BarChart>
-        </ChartContainer>
+        ) : (
+          <ChartContainer className="aspect-auto h-[150px] w-full sm:h-[200px]" config={{ margin: { label: "Margem", color: "#0f2b46" } }}>
+            <AreaChart data={chartData} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="marginGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="var(--color-margin)" stopOpacity={0.22} />
+                  <stop offset="95%" stopColor="var(--color-margin)" stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey="period" tickLine={false} axisLine={false} />
+              <YAxis tickFormatter={(value) => `${Number(value).toFixed(0)}%`} width={42} />
+              <ChartTooltip content={<MarginTooltip />} />
+              <Area type="monotone" dataKey="margin" stroke="var(--color-margin)" strokeWidth={2.5} fill="url(#marginGradient)" dot={{ r: 3 }} activeDot={{ r: 5 }} />
+            </AreaChart>
+          </ChartContainer>
+        )}
       </ChartCard>
 
-      <Card className="border-primary/10 bg-white/90">
-        <CardHeader><CardTitle>Média do Período</CardTitle></CardHeader>
-        <CardContent className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Categoria</TableHead>
-                <TableHead className="text-right">Média do período</TableHead>
-                <TableHead className="text-right">% do faturamento</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {periodAverages.length === 0 ? (
-                <TableRow><TableCell colSpan={3} className="h-20 text-center text-muted-foreground">Sem dados finalizados para calcular médias.</TableCell></TableRow>
-              ) : periodAverages.map((item) => (
-                <TableRow key={`${item.categoryType}:${item.category}`}>
-                  <TableCell className="font-medium">{item.category}</TableCell>
-                  <TableCell className={`text-right font-semibold ${item.categoryType === "credit" ? "text-emerald-700" : "text-red-700"}`}>{formatCurrency(item.average)}</TableCell>
-                  <TableCell className="text-right">{item.percentageOfRevenue !== null ? formatPercentage(item.percentageOfRevenue) : "-"}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <ChartCard title="Alertas prioritários">
+        {topAlerts.length === 0 ? (
+          <EmptyState>Nenhum alerta identificado para os períodos selecionados.</EmptyState>
+        ) : (
+          <div className="space-y-3">
+            {topAlerts.map((alert) => (
+              <PriorityAlert key={alert.id} alert={alert} />
+            ))}
+          </div>
+        )}
+        <div className="mt-5 flex justify-center">
+          <Button variant="link" disabled={!analysisResult} onClick={() => setShowAdvancedAnalysis(true)} className="px-0">
+            Ver análise completa →
+          </Button>
+        </div>
+      </ChartCard>
 
+      {showAdvancedAnalysis && analysisResult && model ? (
+        <DreAdvancedAnalysisModal
+          result={analysisResult}
+          modelName={model.name}
+          onClose={() => setShowAdvancedAnalysis(false)}
+        />
+      ) : null}
     </div>
   );
 }
 
-function isGoodVariation(categoryType: DreCategoryType, difference: number) {
-  if (difference === 0) return true;
-  return categoryType === "credit" ? difference > 0 : difference < 0;
+function MetricCard({
+  title,
+  value,
+  detail,
+  valueTone = "neutral",
+  compact = false,
+}: {
+  title: string;
+  value: string;
+  detail?: React.ReactNode;
+  valueTone?: "neutral" | "positive" | "negative";
+  compact?: boolean;
+}) {
+  const toneClass = valueTone === "positive" ? "text-emerald-700" : valueTone === "negative" ? "text-red-700" : "text-foreground";
+
+  return (
+    <Card className="border-primary/10 bg-white/90 shadow-sm">
+      <CardHeader className="space-y-2 pb-3">
+        <p className="text-sm text-muted-foreground">{title}</p>
+        <CardTitle className={`${compact ? "text-lg leading-snug" : "text-xl sm:text-2xl"} ${toneClass}`}>{value}</CardTitle>
+      </CardHeader>
+      {detail ? <CardContent className="pt-0 text-xs">{detail}</CardContent> : null}
+    </Card>
+  );
+}
+
+function VariationDetail({ variation }: { variation: number | null }) {
+  if (variation === null) return <span className="text-muted-foreground">—</span>;
+  const isPositive = variation >= 0;
+  const Icon = isPositive ? ArrowUp : ArrowDown;
+  return (
+    <span className={`inline-flex items-center gap-1 font-semibold ${isPositive ? "text-emerald-700" : "text-red-700"}`}>
+      <Icon className="h-3.5 w-3.5" />
+      {isPositive ? "+" : ""}
+      {formatPercentage(variation)}
+    </span>
+  );
+}
+
+function levelBadge(level: AlertLevel) {
+  const map: Record<AlertLevel, { label: string; cls: string }> = {
+    HIGH: { label: "ALTO", cls: "bg-red-100 text-red-800 border-red-200" },
+    MEDIUM: { label: "MÉDIO", cls: "bg-amber-100 text-amber-800 border-amber-200" },
+    LOW: { label: "BAIXO", cls: "bg-emerald-100 text-emerald-800 border-emerald-200" },
+  };
+  const item = map[level];
+  return <Badge variant="outline" className={item.cls}>{item.label}</Badge>;
+}
+
+function PriorityAlert({ alert }: { alert: AdvancedAlert }) {
+  const icon = alert.level === "HIGH" ? "🔴" : alert.level === "MEDIUM" ? "🟡" : "🟢";
+  const levelLabel = alert.level === "HIGH" ? "ALTO" : alert.level === "MEDIUM" ? "MÉDIO" : "BAIXO";
+
+  return (
+    <div className="grid gap-1 rounded-lg border bg-white px-4 py-3 sm:grid-cols-[auto_1fr_auto] sm:items-center sm:gap-3">
+      <span className="text-sm font-semibold">{icon} {levelLabel}</span>
+      <p className="min-w-0 truncate font-medium">{alert.title}</p>
+      <p className="text-sm text-muted-foreground sm:text-right">{alert.impact_description}</p>
+    </div>
+  );
 }
 
 function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
@@ -316,19 +387,32 @@ function ChartCard({ title, children }: { title: string; children: React.ReactNo
   );
 }
 
+function EmptyState({ children }: { children: React.ReactNode }) {
+  return <div className="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">{children}</div>;
+}
+
+function MarginTooltip({ active, payload }: TooltipProps<number, string>) {
+  if (!active || !payload?.length) return null;
+  const point = payload[0]?.payload as DashboardChartPoint | undefined;
+  if (!point) return null;
+
+  return (
+    <div className="grid min-w-48 gap-1.5 rounded-lg border border-border/50 bg-background px-3 py-2 text-xs shadow-xl">
+      <p className="font-semibold">{point.period}</p>
+      <p className="flex justify-between gap-4"><span className="text-muted-foreground">Faturamento</span><span className="font-mono">{formatCurrency(point.revenue)}</span></p>
+      <p className="flex justify-between gap-4"><span className="text-muted-foreground">Lucro</span><span className="font-mono">{formatCurrency(point.netIncome)}</span></p>
+      <p className="flex justify-between gap-4"><span className="text-muted-foreground">Margem</span><span className="font-mono">{formatPercentage(point.margin)}</span></p>
+    </div>
+  );
+}
+
 function exportDashboardPdf(params: {
   selectedCompetences: string[];
-  totals: { revenue: number; totalDebit: number; result: number; margin: number };
-  chartData: Array<{ competence: string; revenue: number; debit: number; result: number }>;
-  categoryImpact: Array<{ category: string; value: number; percentage: number }>;
-  analysis: Array<{
-    category: string;
-    categoryType: DreCategoryType;
-    previous: number;
-    current: number;
-    difference: number;
-    variation: number;
-  }>;
+  revenueValue: number;
+  netProfitValue: number;
+  netMarginValue: number;
+  grossMargin: number | null;
+  alerts: AdvancedAlert[];
 }) {
   const reportWindow = window.open("", "_blank", "width=1100,height=800");
 
@@ -359,16 +443,8 @@ function exportDashboardPdf(params: {
           .card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; background: #fbfdff; }
           .card span { color: #64748b; display: block; font-size: 11px; margin-bottom: 8px; }
           .card strong { color: #0f172a; font-size: 18px; }
-          .positive { color: #047857 !important; }
-          .negative { color: #b91c1c !important; }
           h2 { color: #0f2b46; font-size: 18px; margin: 24px 0 10px; }
-          table { width: 100%; border-collapse: collapse; font-size: 12px; }
-          th { background: #0f2b46; color: white; text-align: left; padding: 9px; }
-          td { border-bottom: 1px solid #e2e8f0; padding: 9px; }
-          .right { text-align: right; }
-          .bar-row { display: grid; grid-template-columns: 180px 1fr 74px; align-items: center; gap: 10px; margin: 9px 0; font-size: 12px; }
-          .bar-track { height: 16px; border-radius: 999px; background: #e2e8f0; overflow: hidden; }
-          .bar-fill { height: 100%; border-radius: 999px; background: #0f2b46; }
+          .alert { border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; margin: 8px 0; }
           .footer { margin-top: 28px; color: #64748b; font-size: 11px; border-top: 1px solid #e2e8f0; padding-top: 12px; }
           @media print { body { background: #fff; } .page { padding: 0; } }
         </style>
@@ -388,51 +464,19 @@ function exportDashboardPdf(params: {
           </section>
 
           <section class="cards">
-            ${reportCard("Faturamento Total", formatCurrency(params.totals.revenue))}
-            ${reportCard("Despesas Totais", formatCurrency(params.totals.totalDebit))}
-            ${reportCard("Resultado", formatCurrency(params.totals.result), params.totals.result >= 0 ? "positive" : "negative")}
-            ${reportCard("Margem", formatPercentage(params.totals.margin))}
+            ${reportCard("Faturamento", formatCurrency(params.revenueValue))}
+            ${reportCard("Lucro Liquido", formatCurrency(params.netProfitValue))}
+            ${reportCard("Margem de Lucro", formatPercentage(params.netMarginValue))}
+            ${reportCard("Margem Bruta", params.grossMargin === null ? "Ajuste o modelo de DRE" : formatPercentage(params.grossMargin))}
           </section>
 
-          <h2>Evolucao por competencia</h2>
-          <table>
-            <thead><tr><th>Competencia</th><th class="right">Faturamento</th><th class="right">Debitos</th><th class="right">Lucro liquido</th></tr></thead>
-            <tbody>
-              ${params.chartData.map((item) => `
-                <tr>
-                  <td>${escapeHtml(item.competence)}</td>
-                  <td class="right">${formatCurrency(item.revenue)}</td>
-                  <td class="right">${formatCurrency(item.debit)}</td>
-                  <td class="right ${item.result >= 0 ? "positive" : "negative"}">${formatCurrency(item.result)}</td>
-                </tr>
-              `).join("")}
-            </tbody>
-          </table>
-
-          <h2>Top categorias de despesas com maior impacto</h2>
-          ${params.categoryImpact.length === 0 ? "<p>Sem despesas no periodo selecionado.</p>" : params.categoryImpact.map((item) => `
-            <div class="bar-row">
-              <strong>${escapeHtml(item.category)}</strong>
-              <div class="bar-track"><div class="bar-fill" style="width: ${Math.max(item.percentage, 2).toFixed(2)}%"></div></div>
-              <span class="right">${formatPercentage(item.percentage)}</span>
+          <h2>Alertas prioritarios</h2>
+          ${params.alerts.length === 0 ? "<p>Nenhum alerta identificado para os periodos selecionados.</p>" : params.alerts.map((alert) => `
+            <div class="alert">
+              <strong>${escapeHtml(alert.level)} - ${escapeHtml(alert.title)}</strong><br />
+              <span>${escapeHtml(alert.impact_description)}</span>
             </div>
           `).join("")}
-
-          <h2>Analise do Periodo</h2>
-          <table>
-            <thead><tr><th>Categoria</th><th class="right">Valor inicial</th><th class="right">Valor atual</th><th class="right">Diferenca</th><th class="right">Variacao</th></tr></thead>
-            <tbody>
-              ${params.analysis.length === 0 ? `<tr><td colspan="5">Sem dados finalizados para comparar.</td></tr>` : params.analysis.map((item) => `
-                <tr>
-                  <td>${escapeHtml(item.category)}</td>
-                  <td class="right">${formatCurrency(item.previous)}</td>
-                  <td class="right">${formatCurrency(item.current)}</td>
-                  <td class="right ${isGoodVariation(item.categoryType, item.difference) ? "positive" : "negative"}">${formatCurrency(item.difference)}</td>
-                  <td class="right">${formatPercentage(item.variation)}</td>
-                </tr>
-              `).join("")}
-            </tbody>
-          </table>
 
           <div class="footer">Relatorio gerado automaticamente pelo Gestor de DRE. Valores conforme filtros aplicados no dashboard.</div>
         </main>
@@ -448,8 +492,8 @@ function exportDashboardPdf(params: {
   reportWindow.document.close();
 }
 
-function reportCard(label: string, value: string, tone = "") {
-  return `<div class="card"><span>${escapeHtml(label)}</span><strong class="${tone}">${escapeHtml(value)}</strong></div>`;
+function reportCard(label: string, value: string) {
+  return `<div class="card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
 }
 
 function escapeHtml(value: string) {
