@@ -21,8 +21,10 @@ export default function DreDashboardPage() {
 
 function DreDashboardContent({ userId }: { userId: string }) {
   const [selectedCompetences, setSelectedCompetences] = useState(() => {
-    const year = new Date().getFullYear();
-    return Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`);
+    const now = new Date();
+    const year = now.getFullYear();
+    const lastMonth = Math.max(1, now.getMonth()); // mês anterior ao atual (1-12)
+    return Array.from({ length: lastMonth }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`);
   });
   const [entries, setEntries] = useState<DreEntryWithModel[]>([]);
   const [entriesWithItems, setEntriesWithItems] = useState<DreEntryWithItems[]>([]);
