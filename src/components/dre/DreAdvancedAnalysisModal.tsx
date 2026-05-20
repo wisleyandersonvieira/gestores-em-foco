@@ -113,6 +113,17 @@ function timelineLabel(t: "short" | "medium" | "long") {
 
 const chartTooltipStyle = { fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" };
 
+function bridgeLabel(v: AdvancedVariationItem) {
+  if (v.change_kind === "new") return `Surgimento de ${v.subcategory}`;
+  if (v.change_kind === "eliminated") return `Eliminação de ${v.subcategory}`;
+  if (v.type === "revenue") return `${v.financial_impact >= 0 ? "Aumento" : "Queda"} de ${v.subcategory}`;
+  return `${v.financial_impact >= 0 ? "Aumento" : "Redução"} de ${v.subcategory}`;
+}
+
+function typeLabel(type: AdvancedVariationItem["type"]) {
+  return type === "revenue" ? "Receita" : type === "deduction" ? "Dedução" : "Despesa";
+}
+
 // ── Indicator Card ─────────────────────────────────────────────────────────────
 
 function AdvancedIndicatorCard({
@@ -222,10 +233,18 @@ function IndicatorsSection({ data }: { data: AdvancedDreAnalysis }) {
         <AdvancedIndicatorCard title="Margem Líquida" value={ind.net_margin.value} formatted={formatPercentage(ind.net_margin.value)} variation={ind.net_margin.variation} level={ind.net_margin.level} trend={ind.net_margin.trend} fallbackMessage={ind.net_margin.fallbackMessage} />
         <AdvancedIndicatorCard title="Margem Bruta" value={ind.gross_margin.value} formatted={formatPercentage(ind.gross_margin.value)} variation={ind.gross_margin.variation} level={ind.gross_margin.level} trend={ind.gross_margin.trend} isEstimated={ind.gross_margin.is_estimated} fallbackMessage={ind.gross_margin.fallbackMessage} />
         <AdvancedIndicatorCard title="Margem Operacional" value={ind.operating_margin.value} formatted={formatPercentage(ind.operating_margin.value)} variation={ind.operating_margin.variation} level={ind.operating_margin.level} trend={ind.operating_margin.trend} isEstimated={ind.operating_margin.is_estimated} fallbackMessage={ind.operating_margin.fallbackMessage} />
-        <AdvancedIndicatorCard title="EBITDA (Margem)" value={ind.ebitda.value} formatted={formatPercentage(ind.ebitda.value)} variation={ind.ebitda.variation} level={ind.ebitda.level} trend={ind.ebitda.trend} isEstimated={ind.ebitda.is_estimated} fallbackMessage={ind.ebitda.fallbackMessage} />
+        {!ind.ebitda.fallbackMessage && (
+          <AdvancedIndicatorCard title="EBITDA (Margem)" value={ind.ebitda.value} formatted={formatPercentage(ind.ebitda.value)} variation={ind.ebitda.variation} level={ind.ebitda.level} trend={ind.ebitda.trend} isEstimated={ind.ebitda.is_estimated} />
+        )}
         <AdvancedIndicatorCard title="Total de Despesas" value={ind.total_expenses.value} formatted={formatCurrency(ind.total_expenses.value)} variation={ind.total_expenses.variation} level={ind.total_expenses.level} trend={ind.total_expenses.trend} isGoodWhenUp={false} fallbackMessage={ind.total_expenses.fallbackMessage} />
         <AdvancedIndicatorCard title="Índice de Eficiência" value={ind.efficiency_index.value} formatted={String(ind.efficiency_index.value.toFixed(2)) + "x"} variation={null} level={ind.efficiency_index.level} trend="stable" fallbackMessage={ind.efficiency_index.fallbackMessage} />
       </div>
+
+      {ind.ebitda.fallbackMessage && (
+        <div className="rounded-lg border bg-slate-50 p-3 text-xs text-muted-foreground">
+          {ind.ebitda.fallbackMessage}
+        </div>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-3">
         <Card className={`border-primary/10 bg-white ${ind.best_period.fallbackMessage ? "opacity-70" : ""}`}>
@@ -277,81 +296,91 @@ function IndicatorsSection({ data }: { data: AdvancedDreAnalysis }) {
 // ── Section 3: Variations ──────────────────────────────────────────────────────
 
 function VariationsSection({ data }: { data: AdvancedDreAnalysis }) {
-  const [showAll, setShowAll] = useState(false);
-  const vars = data.variations;
+  const [showReducedAll, setShowReducedAll] = useState(false);
+  const [showImprovedAll, setShowImprovedAll] = useState(false);
+  const bridge = data.result_bridge;
 
-  if (vars.length === 0) {
+  if (!bridge) {
     return <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">Selecione pelo menos 2 períodos para visualizar variações.</div>;
   }
 
-  const displayed = showAll ? vars : vars.slice(0, 20);
+  const reduced = showReducedAll ? data.variations.filter((v) => v.result_impact < 0).map((v) => ({ ...v, label: bridgeLabel(v) })) : bridge.reduced;
+  const improved = showImprovedAll ? data.variations.filter((v) => v.result_impact > 0).map((v) => ({ ...v, label: bridgeLabel(v) })) : bridge.improved;
 
   return (
-    <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">Comparação entre o primeiro e o último período selecionado, ordenada por maior impacto financeiro absoluto. Exibindo {displayed.length} de {vars.length} variações.</p>
-      <div className="overflow-x-auto rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/50">
-              <TableHead className="min-w-40">Categoria</TableHead>
-              <TableHead className="min-w-36">Subcategoria</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead className="text-right">Período inicial</TableHead>
-              <TableHead className="text-right">Período final</TableHead>
-              <TableHead className="text-right">Var. %</TableHead>
-              <TableHead className="text-right">Impacto R$</TableHead>
-              <TableHead className="text-right">Impacto Margem</TableHead>
-              <TableHead>Nível</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {displayed.map((v, i) => (
-              <VariationRow key={i} v={v} />
-            ))}
-          </TableBody>
-        </Table>
+    <div className="space-y-5">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Card className="border-primary/10 bg-white">
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Resultado inicial · {bridge.first_period.label}</p>
+            <p className="mt-1 text-xl font-bold tabular-nums">{formatCurrency(bridge.first_period.result)}</p>
+            <p className="text-xs text-muted-foreground">Margem {formatPercentage(bridge.first_period.margin)}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-primary/10 bg-white">
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Resultado final · {bridge.last_period.label}</p>
+            <p className="mt-1 text-xl font-bold tabular-nums">{formatCurrency(bridge.last_period.result)}</p>
+            <p className="text-xs text-muted-foreground">Margem {formatPercentage(bridge.last_period.margin)}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-primary/10 bg-white">
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Variação total</p>
+            <p className={`mt-1 text-xl font-bold tabular-nums ${bridge.total_variation < 0 ? "text-red-700" : "text-emerald-700"}`}>{bridge.total_variation > 0 ? "+" : ""}{formatCurrency(bridge.total_variation)}</p>
+            <p className="text-xs text-muted-foreground">Saldo das variações</p>
+          </CardContent>
+        </Card>
       </div>
-      {!showAll && vars.length > 20 && (
-        <Button variant="outline" size="sm" onClick={() => setShowAll(true)}>
-          Ver todas as {vars.length} variações
-        </Button>
-      )}
+
+      <BridgeBlock
+        title="O que reduziu o resultado"
+        total={bridge.reduced_total}
+        items={reduced}
+        tone="negative"
+      />
+      {!showReducedAll && bridge.hidden_reduced_count > 0 && <Button variant="outline" size="sm" onClick={() => setShowReducedAll(true)}>Ver mais {bridge.hidden_reduced_count} itens</Button>}
+
+      <BridgeBlock
+        title="O que melhorou o resultado"
+        total={bridge.improved_total}
+        items={improved}
+        tone="positive"
+      />
+      {!showImprovedAll && bridge.hidden_improved_count > 0 && <Button variant="outline" size="sm" onClick={() => setShowImprovedAll(true)}>Ver mais {bridge.hidden_improved_count} itens</Button>}
     </div>
   );
 }
 
-function VariationRow({ v }: { v: AdvancedVariationItem }) {
-  const impactColor = v.financial_impact > 0 && v.type === "expense"
-    ? "text-red-700" : v.financial_impact < 0 && v.type === "expense"
-      ? "text-emerald-700" : v.financial_impact > 0
-        ? "text-emerald-700" : "text-red-700";
-  const variationColor = v.variation_pct > 0 && v.type === "expense"
-    ? "text-red-600" : v.variation_pct < 0 && v.type === "expense"
-      ? "text-emerald-600" : v.variation_pct > 0
-        ? "text-emerald-600" : "text-red-600";
-
+function BridgeBlock({ title, total, items, tone }: {
+  title: string;
+  total: number;
+  items: Array<{ label: string; category: string; result_impact: number; previous_value: number; current_value: number; type: AdvancedVariationItem["type"] }>;
+  tone: "positive" | "negative";
+}) {
+  const toneCls = tone === "positive" ? "text-emerald-700" : "text-red-700";
   return (
-    <TableRow className={v.level === "HIGH" ? "bg-red-50/40" : ""}>
-      <TableCell className="text-sm font-medium">{v.category}</TableCell>
-      <TableCell className="text-sm">{v.subcategory}</TableCell>
-      <TableCell>
-        <Badge variant={v.type === "revenue" ? "default" : "secondary"} className="text-xs">
-          {v.type === "revenue" ? "Receita" : "Despesa"}
-        </Badge>
-      </TableCell>
-      <TableCell className="text-right tabular-nums text-sm">{formatCurrency(v.previous_value)}</TableCell>
-      <TableCell className="text-right tabular-nums text-sm">{formatCurrency(v.current_value)}</TableCell>
-      <TableCell className={`text-right tabular-nums text-sm font-semibold ${variationColor}`}>
-        {v.variation_pct > 0 ? "+" : ""}{formatPercentage(v.variation_pct)}
-      </TableCell>
-      <TableCell className={`text-right tabular-nums text-sm font-semibold ${impactColor}`}>
-        {v.financial_impact > 0 ? "+" : ""}{formatCurrency(v.financial_impact)}
-      </TableCell>
-      <TableCell className="text-right tabular-nums text-sm text-muted-foreground">
-        {v.margin_impact > 0 ? "+" : ""}{formatPercentage(v.margin_impact)} p.p.
-      </TableCell>
-      <TableCell>{levelBadge(v.level)}</TableCell>
-    </TableRow>
+    <div className="rounded-lg border bg-white">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/40 px-4 py-3">
+        <p className="font-semibold text-sm">{title}</p>
+        <p className={`text-sm font-bold tabular-nums ${toneCls}`}>Total: {total > 0 ? "+" : ""}{formatCurrency(total)}</p>
+      </div>
+      {items.length === 0 ? (
+        <p className="p-4 text-sm text-muted-foreground">Nenhuma variação relevante neste bloco.</p>
+      ) : (
+        <div className="divide-y">
+          {items.map((item, i) => (
+            <div key={`${item.label}-${i}`} className="grid gap-2 px-4 py-3 sm:grid-cols-[1fr_auto_auto] sm:items-center">
+              <div className="min-w-0">
+                <p className="text-sm font-medium">{item.label}</p>
+                <p className="text-xs text-muted-foreground">{item.category} · {typeLabel(item.type)} · {formatCurrency(item.previous_value)} → {formatCurrency(item.current_value)}</p>
+              </div>
+              <p className={`text-right text-sm font-bold tabular-nums ${item.result_impact < 0 ? "text-red-700" : "text-emerald-700"}`}>{item.result_impact > 0 ? "+" : ""}{formatCurrency(item.result_impact)}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

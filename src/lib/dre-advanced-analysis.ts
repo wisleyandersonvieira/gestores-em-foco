@@ -30,10 +30,35 @@ export type AdvancedVariationItem = {
   type: "revenue" | "expense" | "deduction";
   previous_value: number;
   current_value: number;
-  variation_pct: number;
+  variation_pct: number | null;
+  variation_label: string;
+  change_kind: "increase" | "decrease" | "new" | "eliminated";
   financial_impact: number;
+  result_impact: number;
   margin_impact: number;
   level: AlertLevel;
+};
+
+export type ResultBridgeItem = {
+  label: string;
+  category: string;
+  subcategory: string;
+  type: AdvancedVariationItem["type"];
+  previous_value: number;
+  current_value: number;
+  result_impact: number;
+};
+
+export type ResultBridge = {
+  first_period: { label: string; result: number; margin: number };
+  last_period: { label: string; result: number; margin: number };
+  total_variation: number;
+  reduced: ResultBridgeItem[];
+  improved: ResultBridgeItem[];
+  reduced_total: number;
+  improved_total: number;
+  hidden_reduced_count: number;
+  hidden_improved_count: number;
 };
 
 export type AbcItem = {
@@ -113,6 +138,7 @@ export type AdvancedDreAnalysis = {
     efficiency_index: { value: number; level: AlertLevel | null; interpretation: string; fallbackMessage?: string };
   };
   variations: AdvancedVariationItem[];
+  result_bridge: ResultBridge | null;
   abc_curve: {
     expenses: AbcItem[];
     revenue: AbcItem[];
@@ -212,6 +238,42 @@ function metricVariation(previous: number | undefined, current: number) {
   return previous !== undefined && previous !== 0 ? variationPercentage(previous, current) : 0;
 }
 
+function normalizeText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function isNewItem(previous: number, current: number) {
+  return previous === 0 && current > 0;
+}
+
+function isEliminatedItem(previous: number, current: number) {
+  return previous > 0 && current === 0;
+}
+
+function variationLabel(type: AdvancedVariationItem["type"], previous: number, current: number, variationPct: number | null) {
+  if (isNewItem(previous, current)) return type === "revenue" ? "Nova receita" : "Nova despesa";
+  if (isEliminatedItem(previous, current)) return type === "revenue" ? "Receita eliminada" : "Despesa eliminada";
+  return variationPct === null ? "—" : `${variationPct > 0 ? "+" : ""}${formatPercentage(variationPct)}`;
+}
+
+function variationSentence(v: AdvancedVariationItem) {
+  if (v.change_kind === "new") {
+    return `${v.subcategory} surgiu no período com ${formatCurrency(v.current_value)}, sem registro nos períodos anteriores`;
+  }
+  if (v.change_kind === "eliminated") {
+    return `${v.subcategory} foi eliminada no período; antes representava ${formatCurrency(v.previous_value)}`;
+  }
+  const verb = v.variation_pct !== null && v.variation_pct >= 0 ? "cresceu" : "reduziu";
+  return `${v.subcategory} ${verb} ${formatPercentage(Math.abs(v.variation_pct ?? 0))} (de ${formatCurrency(v.previous_value)} para ${formatCurrency(v.current_value)})`;
+}
+
+function resultImpactFor(type: AdvancedVariationItem["type"], financialImpact: number) {
+  return type === "revenue" ? financialImpact : -financialImpact;
+}
+
 function sumPeriodValues(periods: DreAnalysisPeriod[], getValue: (period: DreAnalysisPeriod) => number) {
   return roundCurrency(periods.reduce((sum, period) => sum + getValue(period), 0));
 }
@@ -275,20 +337,32 @@ export function computeVariations(
       const current = row.values[currentPeriod.id]?.amount ?? 0;
       const previous = row.values[comparisonPeriod.id]?.amount ?? 0;
       const impact = current - previous;
-      const varPct = variationPercentage(previous, current);
+      const type: AdvancedVariationItem["type"] = row.categoryType === "credit"
+        ? row.subcategoryIsReductive ? "deduction" : "revenue"
+        : "expense";
+      const varPct = previous > 0 && current > 0 ? variationPercentage(previous, current) : null;
       const marginImpact = currentRevenue > 0 ? roundCurrency((impact / currentRevenue) * 100) : 0;
       const reprPct = currentRevenue > 0 ? (current / currentRevenue) * 100 : 0;
-      const level = determineAlertLevel(Math.abs(varPct), Math.abs(marginImpact), reprPct);
+      const levelVariation = varPct === null ? (Math.abs(impact) > 0 ? 100 : 0) : Math.abs(varPct);
+      const level = determineAlertLevel(levelVariation, Math.abs(marginImpact), reprPct);
       const parentLabel = categoryLabels[row.parentKey ?? ""] ?? "";
+      const changeKind: AdvancedVariationItem["change_kind"] = isNewItem(previous, current)
+        ? "new"
+        : isEliminatedItem(previous, current)
+          ? "eliminated"
+          : impact >= 0 ? "increase" : "decrease";
 
       return {
         category: parentLabel,
         subcategory: row.label,
-        type: row.categoryType === "credit" ? "revenue" : "expense",
+        type,
         previous_value: previous,
         current_value: current,
         variation_pct: varPct,
+        variation_label: variationLabel(type, previous, current, varPct),
+        change_kind: changeKind,
         financial_impact: impact,
+        result_impact: resultImpactFor(type, impact),
         margin_impact: marginImpact,
         level,
       };
@@ -368,6 +442,50 @@ function buildWaterfallData(rows: DreAnalysisRow[], periods: DreAnalysisPeriod[]
   }
 
   return items;
+}
+
+function bridgeItemLabel(v: AdvancedVariationItem) {
+  if (v.change_kind === "new") return `Surgimento de ${v.subcategory}`;
+  if (v.change_kind === "eliminated") return `Eliminação de ${v.subcategory}`;
+  if (v.type === "revenue") return `${v.financial_impact >= 0 ? "Aumento" : "Queda"} de ${v.subcategory}`;
+  return `${v.financial_impact >= 0 ? "Aumento" : "Redução"} de ${v.subcategory}`;
+}
+
+function buildResultBridge(periods: DreAnalysisPeriod[], variations: AdvancedVariationItem[]): ResultBridge | null {
+  if (periods.length < 2) return null;
+
+  const first = periods[0];
+  const last = periods[periods.length - 1];
+  const toBridgeItem = (v: AdvancedVariationItem): ResultBridgeItem => ({
+    label: bridgeItemLabel(v),
+    category: v.category,
+    subcategory: v.subcategory,
+    type: v.type,
+    previous_value: v.previous_value,
+    current_value: v.current_value,
+    result_impact: roundCurrency(v.result_impact),
+  });
+
+  const reducedAll = variations
+    .filter((v) => v.result_impact < 0)
+    .sort((a, b) => Math.abs(b.result_impact) - Math.abs(a.result_impact))
+    .map(toBridgeItem);
+  const improvedAll = variations
+    .filter((v) => v.result_impact > 0)
+    .sort((a, b) => Math.abs(b.result_impact) - Math.abs(a.result_impact))
+    .map(toBridgeItem);
+
+  return {
+    first_period: { label: first.label, result: first.totals.result, margin: first.totals.marginPercentage },
+    last_period: { label: last.label, result: last.totals.result, margin: last.totals.marginPercentage },
+    total_variation: roundCurrency(last.totals.result - first.totals.result),
+    reduced: reducedAll.slice(0, 10),
+    improved: improvedAll.slice(0, 10),
+    reduced_total: roundCurrency(reducedAll.reduce((s, i) => s + i.result_impact, 0)),
+    improved_total: roundCurrency(improvedAll.reduce((s, i) => s + i.result_impact, 0)),
+    hidden_reduced_count: Math.max(0, reducedAll.length - 10),
+    hidden_improved_count: Math.max(0, improvedAll.length - 10),
+  };
 }
 
 // ── Alerts ─────────────────────────────────────────────────────────────────────
@@ -476,15 +594,22 @@ export function computeAlerts(params: {
   }
 
   // Alert: atypical expense growth (> 20%) without proportional revenue growth
-  const atypicalExpenses = variations.filter((v) => v.type === "expense" && v.variation_pct > 20 && v.current_value > 0);
+  const atypicalExpenses = variations.filter((v) =>
+    v.type === "expense"
+    && v.current_value > 0
+    && (v.change_kind === "new" || (v.variation_pct !== null && v.variation_pct > 20)),
+  );
   const revenueGrowth = prev && prev.revenue > 0 ? variationPercentage(prev.revenue, curr.revenue) : 0;
   for (const v of atypicalExpenses.slice(0, 2)) {
-    if (v.variation_pct > revenueGrowth + 10) {
+    const isRelevantGrowth = v.change_kind === "new" || (v.variation_pct !== null && v.variation_pct > revenueGrowth + 10);
+    if (isRelevantGrowth) {
       alerts.push({
         id: nid(),
         icon: "AlertTriangle",
         title: `Crescimento atípico em ${v.subcategory}`,
-        description: `"${v.subcategory}" cresceu ${formatPercentage(v.variation_pct)} (de ${formatCurrency(v.previous_value)} para ${formatCurrency(v.current_value)}) sem crescimento proporcional de receita (${formatPercentage(revenueGrowth)}). Impacto de ${formatCurrency(Math.abs(v.financial_impact))} na margem.`,
+        description: v.change_kind === "new"
+          ? `${v.subcategory} surgiu no período com ${formatCurrency(v.current_value)}, sem registro nos períodos anteriores. Verificar se é obrigação recorrente ou lançamento pontual. Impacto de ${formatCurrency(Math.abs(v.financial_impact))} na margem.`
+          : `"${v.subcategory}" cresceu ${formatPercentage(v.variation_pct ?? 0)} (de ${formatCurrency(v.previous_value)} para ${formatCurrency(v.current_value)}) sem crescimento proporcional de receita (${formatPercentage(revenueGrowth)}). Impacto de ${formatCurrency(Math.abs(v.financial_impact))} na margem.`,
         impact_value: Math.abs(v.financial_impact),
         impact_description: `${formatCurrency(Math.abs(v.financial_impact))} de impacto adicional`,
         level: "HIGH",
@@ -557,14 +682,19 @@ export function computeAlerts(params: {
   }
 
   // Check multiple MEDIUM variations in same direction → elevate to consolidated HIGH
-  const risingExpenses = variations.filter((v) => v.type === "expense" && v.level === "MEDIUM" && v.variation_pct > 0);
-  if (risingExpenses.length >= 4) {
+  const risingExpenses = variations.filter((v) =>
+    v.type === "expense"
+    && v.current_value > 500
+    && Math.abs(v.financial_impact) > 1000
+    && ((v.variation_pct !== null && v.variation_pct > 5) || v.change_kind === "new"),
+  );
+  if (risingExpenses.length >= 3) {
     const totalImpact = risingExpenses.reduce((s, v) => s + Math.abs(v.financial_impact), 0);
     alerts.push({
       id: nid(),
       icon: "AlertTriangle",
       title: "Múltiplas despesas em crescimento simultâneo",
-      description: `${risingExpenses.length} categorias de despesa apresentam crescimento simultâneo, com impacto combinado de ${formatCurrency(totalImpact)}. Mesmo que individualmente sejam MÉDIO, o efeito consolidado é ALTO.`,
+      description: `${risingExpenses.length} categorias de despesa apresentam crescimento simultâneo relevante, com impacto combinado de ${formatCurrency(totalImpact)}. O alerta considera apenas variações acima de 5%, impacto acima de R$ 1.000 e valor atual acima de R$ 500.`,
       impact_value: totalImpact,
       impact_description: `${formatCurrency(totalImpact)} de impacto combinado`,
       level: "HIGH",
@@ -607,36 +737,61 @@ export function computeRecommendations(
   alerts: AdvancedAlert[],
   variations: AdvancedVariationItem[],
   currentPeriod: DreAnalysisPeriod,
+  abcCurve?: AdvancedDreAnalysis["abc_curve"],
 ): AdvancedRecommendation[] {
   const recs: AdvancedRecommendation[] = [];
   const revenue = currentPeriod.totals.revenue;
+  const revenueClassByItem = new Map((abcCurve?.revenue ?? []).map((item) => [normalizeText(item.item), item.class]));
+  const expenseStrategy = (v: AdvancedVariationItem) => {
+    const text = normalizeText(`${v.category} ${v.subcategory}`);
+    if (/frete|logistic|transporte|entrega|rota/.test(text)) return "Renegociar contratos logísticos ou consolidar rotas de entrega";
+    if (/viagem|estadia|hotel|hospedagem|passagem/.test(text)) return "Avaliar se é despesa pontual ou recorrente. Se recorrente, implementar política de viagens com aprovação prévia e teto de gastos";
+    if (/imposto|tribut|cefem|cfem|icms|iss|pis|cofins|irpj|csll|ipi|inss/.test(text)) return "Verificar com a contabilidade se há benefícios fiscais aplicáveis ou se houve alteração de alíquota. Impostos geralmente não são negociáveis, mas a base de cálculo pode ser otimizada";
+    if (/energia|eletric/.test(text)) return "Avaliar migração para mercado livre de energia ou implementar medidas de eficiência energética";
+    if (/marketing|sell out|sellout|midia|propaganda|publicidade|campanha/.test(text)) return "Avaliar o retorno sobre investimento (ROI) de cada canal. Redirecionar verba para os canais com melhor conversão";
+    if (/manutenc|reparo|conserto/.test(text)) return "Verificar se o aumento é pontual (reparo emergencial) ou recorrente. Considerar planos de manutenção preventiva para reduzir custos reativos";
+    if (/salario|pessoal|folha|colaborador|funcionario|remuneracao|encargo/.test(text)) return "Avaliar produtividade por colaborador. Verificar se o quadro está adequado ao volume operacional atual";
+    if (/consultor|assessor|honorario/.test(text)) return "Avaliar se os projetos em andamento têm prazo definido e entrega mensurável";
+    if (/material|insumo|materia prima|embalagem|suprimento|compra/.test(text)) return "Verificar alternativas de fornecedores ou negociar compras em volume para obter melhores condições";
+    return null;
+  };
+  const isTaxExpense = (v: AdvancedVariationItem) => /imposto|tribut|cefem|cfem|icms|iss|pis|cofins|irpj|csll|ipi|inss/.test(normalizeText(`${v.category} ${v.subcategory}`));
 
   // From HIGH alerts with specific data
   const highExpenseVariations = variations
-    .filter((v) => v.type === "expense" && v.level === "HIGH" && v.variation_pct > 10 && v.financial_impact > 0)
+    .filter((v) => v.type === "expense" && v.level === "HIGH" && v.financial_impact > 0 && (v.change_kind === "new" || (v.variation_pct !== null && v.variation_pct > 10)))
     .slice(0, 3);
 
   highExpenseVariations.forEach((v) => {
-    const potentialSaving = Math.abs(v.financial_impact) * 0.5;
+    const tax = isTaxExpense(v);
+    const potentialSaving = Math.abs(v.financial_impact) * (tax ? 0.3 : 0.5);
     const marginRecovery = revenue > 0 ? roundCurrency((potentialSaving / revenue) * 100) : 0;
+    const strategy = expenseStrategy(v);
     recs.push({
       priority: recs.length + 1,
       title: `Renegociar ou otimizar custos em "${v.subcategory}"`,
-      justification: `"${v.subcategory}" cresceu ${formatPercentage(v.variation_pct)} (de ${formatCurrency(v.previous_value)} para ${formatCurrency(v.current_value)}) enquanto o faturamento não acompanhou proporcionalmente. Impacto direto de ${formatCurrency(Math.abs(v.financial_impact))} na margem.`,
-      estimated_impact: potentialSaving > 0 ? `Recuperação estimada de ${formatCurrency(potentialSaving)} (${formatPercentage(marginRecovery)} p.p. de margem) caso o crescimento seja contido em 50%.` : "Impacto a quantificar após diagnóstico operacional.",
+      justification: `${variationSentence(v)}. ${strategy ?? "Priorize diagnóstico operacional com responsável, causa, recorrência e plano de contenção."} Impacto direto de ${formatCurrency(Math.abs(v.financial_impact))} na margem.`,
+      estimated_impact: potentialSaving > 0
+        ? tax
+          ? `Se houver benefício fiscal aplicável, o impacto pode ser de até ${formatCurrency(potentialSaving)} (${formatPercentage(marginRecovery)} p.p. de margem).`
+          : `Recuperação estimada de ${formatCurrency(potentialSaving)} (${formatPercentage(marginRecovery)} p.p. de margem) caso o crescimento seja contido em 50%.`
+        : "Impacto a quantificar após diagnóstico operacional.",
       suggested_timeline: "short",
     });
   });
 
   // Revenue growth recommendation
-  const revenueVars = variations.filter((v) => v.type === "revenue" && v.variation_pct < -5);
+  const revenueVars = variations.filter((v) => v.type === "revenue" && v.financial_impact < 0 && (v.change_kind === "eliminated" || (v.variation_pct !== null && v.variation_pct < -5)));
   if (revenueVars.length > 0) {
     const topRevDrop = revenueVars[0];
+    const recovery = Math.abs(topRevDrop.financial_impact) * 0.3;
+    const marginRecovery = Math.abs(topRevDrop.margin_impact) * 0.3;
+    const isClassA = revenueClassByItem.get(normalizeText(topRevDrop.subcategory)) === "A";
     recs.push({
       priority: recs.length + 1,
       title: `Recuperar receita em "${topRevDrop.subcategory}"`,
-      justification: `A linha de receita "${topRevDrop.subcategory}" recuou ${formatPercentage(Math.abs(topRevDrop.variation_pct))} — uma redução de ${formatCurrency(Math.abs(topRevDrop.financial_impact))} que pressiona diretamente o resultado.`,
-      estimated_impact: `Recuperar 50% da perda representaria ${formatCurrency(Math.abs(topRevDrop.financial_impact) * 0.5)} adicionais no resultado e ${formatPercentage(Math.abs(topRevDrop.margin_impact) * 0.5)} p.p. de margem.`,
+      justification: `A linha de receita "${topRevDrop.subcategory}" ${topRevDrop.change_kind === "eliminated" ? `foi eliminada, reduzindo ${formatCurrency(Math.abs(topRevDrop.financial_impact))}` : `recuou ${formatPercentage(Math.abs(topRevDrop.variation_pct ?? 0))}, uma redução de ${formatCurrency(Math.abs(topRevDrop.financial_impact))}`}. ${isClassA ? "Investigar causas da queda: perda de clientes, redução de volume, pressão de preço. Receita principal em queda é o risco mais crítico para o resultado" : "Avaliar se a queda reflete sazonalidade ou perda estrutural de mercado"}.`,
+      estimated_impact: `Recuperar 30% da queda representaria ${formatCurrency(recovery)} adicionais no resultado e ${formatPercentage(marginRecovery)} p.p. de margem.`,
       suggested_timeline: "short",
     });
   }
@@ -716,12 +871,10 @@ function generateExecutiveSummary(params: {
 
   // Causes
   const topExpenseVariations = variations
-    .filter((v) => v.type === "expense" && v.variation_pct > 0 && (v.level === "HIGH" || v.level === "MEDIUM"))
+    .filter((v) => v.type === "expense" && v.financial_impact > 0 && (v.level === "HIGH" || v.level === "MEDIUM"))
     .slice(0, 3);
 
-  const causes: string[] = topExpenseVariations.map((v) =>
-    `${v.subcategory} cresceu ${formatPercentage(v.variation_pct)} (de ${formatCurrency(v.previous_value)} para ${formatCurrency(v.current_value)}), adicionando ${formatCurrency(Math.abs(v.financial_impact))} em custos`,
-  );
+  const causes: string[] = topExpenseVariations.map((v) => `${variationSentence(v)}, adicionando ${formatCurrency(Math.abs(v.financial_impact))} em custos`);
   if (causes.length === 0 && variations.length > 0) {
     causes.push("Variações distribuídas entre múltiplos itens sem um fator dominante identificado.");
   }
@@ -779,7 +932,10 @@ function generateMarginInsights(
   const currentNet = current.totals.marginPercentage;
   const gapGrossNet = roundCurrency(currentGross - currentNet);
   if (gapGrossNet > 20) {
-    insights.push(`A diferença de ${formatPercentage(gapGrossNet)} entre margem bruta e líquida indica que as despesas operacionais e financeiras consomem uma parcela significativa do faturamento.`);
+    const grossPer100 = Math.round(currentGross);
+    const netPer100 = Math.round(currentNet);
+    const consumedPer100 = Math.max(0, grossPer100 - netPer100);
+    insights.push(`De cada R$ 100 de receita líquida, R$ ${grossPer100} sobram após custos diretos (margem bruta), mas apenas R$ ${netPer100} chegam ao lucro líquido. Os R$ ${consumedPer100} restantes são consumidos por despesas operacionais, impostos e provisões.`);
   }
 
   if (currentNet < 3) {
@@ -791,7 +947,7 @@ function generateMarginInsights(
     const prevGross = grossByPeriod[prev.id] ?? 0;
     const gapChange = (currentGross - currentNet) - (prevGross - prev.totals.marginPercentage);
     if (gapChange > 2) {
-      insights.push(`A diferença entre margem bruta e líquida aumentou ${formatPercentage(gapChange)} — as despesas operacionais estão consumindo proporcionalmente mais do faturamento.`);
+      insights.push(`No período anterior, R$ ${Math.round(prev.totals.marginPercentage)} de cada R$ 100 chegavam ao lucro. A redução indica que as despesas operacionais estão crescendo proporcionalmente mais que os custos diretos.`);
     }
   }
 
@@ -901,6 +1057,9 @@ export function generateAdvancedDreAnalysis(
   const previousEbitdaMargin = previousPeriod && ebitdaByPeriod ? ebitdaByPeriod[previousPeriod.id] : undefined;
   const ebitdaVariation = ebitdaByPeriod ? metricVariation(previousEbitdaMargin, currentEbitdaMargin) : null;
   const ebitdaValues = periods.map((p) => ebitdaByPeriod?.[p.id] ?? 0);
+  const ebitdaUnavailableMessage = "EBITDA não disponível — configure categorias de Depreciação/Amortização e Juros no modelo de DRE para habilitar este indicador";
+  const ebitdaMatchesOperating = !!ebitdaByPeriod && !!operatingPerPeriod
+    && periods.every((p) => roundCurrency(ebitdaByPeriod[p.id] ?? 0) === roundCurrency(operatingPerPeriod[p.id] ?? 0));
 
   // Best/worst periods
   const sortedByMargin = netMarginByPeriod ? [...periods].sort((a, b) => (netMarginByPeriod[b.id] ?? 0) - (netMarginByPeriod[a.id] ?? 0)) : [];
@@ -929,6 +1088,7 @@ export function generateAdvancedDreAnalysis(
 
   // Variations
   const variations = computeVariations(subcategoryRows, currentPeriod, periodsCount > 1 ? firstPeriod : null, catLabels);
+  const result_bridge = buildResultBridge(periods, variations);
 
   // ABC Curve
   const abc_curve = computeAbcCurve(subcategoryRows, periods, catLabels);
@@ -946,7 +1106,7 @@ export function generateAdvancedDreAnalysis(
   });
 
   // Recommendations
-  const recommendations = computeRecommendations(alerts, variations, currentPeriod);
+  const recommendations = computeRecommendations(alerts, variations, currentPeriod, abc_curve);
 
   // Executive summary
   const executive_summary = generateExecutiveSummary({
@@ -1021,7 +1181,9 @@ export function generateAdvancedDreAnalysis(
         ? { value: selectedNetMargin, variation: netMarginVariation, level: marginLevel(selectedNetMargin, 10, 5), trend: trendDirection(netMarginValues), is_estimated: false }
         : fallbackMarginIndicator(modelFallback),
       ebitda: ebitdaByPeriod
-        ? { value: selectedEbitdaMargin, variation: ebitdaVariation, level: marginLevel(selectedEbitdaMargin, 15, 8), trend: trendDirection(ebitdaValues), is_estimated: true }
+        ? ebitdaMatchesOperating
+          ? { value: selectedEbitdaMargin, variation: null, level: null, trend: "stable", is_estimated: true, fallbackMessage: ebitdaUnavailableMessage }
+          : { value: selectedEbitdaMargin, variation: ebitdaVariation, level: marginLevel(selectedEbitdaMargin, 15, 8), trend: trendDirection(ebitdaValues), is_estimated: true }
         : fallbackMarginIndicator(modelFallback),
       total_expenses: totalExpensesByPeriod
         ? { value: selectedTotalExpenses, variation: expVariation, level: expenseIndicatorLevel, trend: trendDirection(expValues) }
@@ -1036,6 +1198,7 @@ export function generateAdvancedDreAnalysis(
       efficiency_index: periodsCount >= 2 ? { value: efficiencyRaw, level: efficiencyIndicatorLevel, interpretation: efficiencyInterp } : { value: 0, level: null, interpretation: "", fallbackMessage: periodFallback },
     },
     variations,
+    result_bridge,
     abc_curve,
     charts_data: {
       revenue_evolution,

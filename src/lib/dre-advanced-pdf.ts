@@ -122,6 +122,14 @@ function bodyText(doc: jsPDF, text: string, x: number, y: number, maxWidth: numb
   return y + lines.length * (fontSize * 0.45);
 }
 
+function ensureSpace(doc: jsPDF, y: number, needed: number, header: { title: string; subtitle: string; modelName: string; pageLabel?: string }) {
+  const H = doc.internal.pageSize.getHeight();
+  if (y + needed <= H - 22) return y;
+  doc.addPage();
+  drawHeader(doc, header);
+  return 52;
+}
+
 // ── Cover page ─────────────────────────────────────────────────────────────────
 
 function addCoverPage(doc: jsPDF, analysis: AdvancedDreAnalysis) {
@@ -241,7 +249,7 @@ function addIndicatorsPage(doc: jsPDF, analysis: AdvancedDreAnalysis, modelName:
     ["Margem Líquida", indicatorValue(formatPercentage(ind.net_margin.value), ind.net_margin.fallbackMessage), indicatorVariation(ind.net_margin.variation), indicatorLevel(ind.net_margin.level)],
     ["Margem Bruta", indicatorValue(formatPercentage(ind.gross_margin.value), ind.gross_margin.fallbackMessage), indicatorVariation(ind.gross_margin.variation), indicatorLevel(ind.gross_margin.level)],
     ["Margem Operacional", indicatorValue(formatPercentage(ind.operating_margin.value), ind.operating_margin.fallbackMessage), indicatorVariation(ind.operating_margin.variation), indicatorLevel(ind.operating_margin.level)],
-    ["EBITDA — Margem (est.)", indicatorValue(formatPercentage(ind.ebitda.value), ind.ebitda.fallbackMessage), indicatorVariation(ind.ebitda.variation), indicatorLevel(ind.ebitda.level)],
+    ...(!ind.ebitda.fallbackMessage ? [["EBITDA — Margem (est.)", formatPercentage(ind.ebitda.value), indicatorVariation(ind.ebitda.variation), indicatorLevel(ind.ebitda.level)]] : []),
     ["Total de Despesas", indicatorValue(formatCurrency(ind.total_expenses.value), ind.total_expenses.fallbackMessage), indicatorVariation(ind.total_expenses.variation), indicatorLevel(ind.total_expenses.level)],
     ["Melhor Período", ind.best_period.fallbackMessage ?? ind.best_period.period, ind.best_period.fallbackMessage ? "—" : formatPercentage(ind.best_period.margin), ind.best_period.fallbackMessage ? null : "LOW"],
     ["Pior Período", ind.worst_period.fallbackMessage ?? ind.worst_period.period, ind.worst_period.fallbackMessage ? "—" : formatPercentage(ind.worst_period.margin), ind.worst_period.fallbackMessage ? null : "HIGH"],
@@ -270,6 +278,11 @@ function addIndicatorsPage(doc: jsPDF, analysis: AdvancedDreAnalysis, modelName:
       }
     },
   });
+
+  if (ind.ebitda.fallbackMessage) {
+    const y = ((doc as any).lastAutoTable?.finalY ?? 52) + 8;
+    bodyText(doc, ind.ebitda.fallbackMessage, 14, y, W - 28, 8);
+  }
 }
 
 // ── Margins page ───────────────────────────────────────────────────────────────
@@ -306,10 +319,15 @@ function addMarginsPage(doc: jsPDF, analysis: AdvancedDreAnalysis, modelName: st
   y += 8;
 
   for (const insight of analysis.margins.insights) {
-    if (y > 250) break;
+    const lines = doc.splitTextToSize(`• ${insight}`, maxW - 8);
+    y = ensureSpace(doc, y, lines.length * 4 + 10, { title: "Análise de Margens", subtitle: "Evolução histórica das margens por período", modelName, pageLabel: "Seção 3" });
     doc.setFillColor(...C.lightGray);
-    doc.roundedRect(14, y - 3, maxW, 10, 2, 2, "F");
-    y = bodyText(doc, `• ${insight}`, 18, y + 3, maxW - 8) + 4;
+    doc.roundedRect(14, y - 3, maxW, lines.length * 4 + 6, 2, 2, "F");
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...C.text);
+    doc.text(lines, 18, y + 3);
+    y += lines.length * 4 + 8;
   }
 }
 
@@ -317,46 +335,64 @@ function addMarginsPage(doc: jsPDF, analysis: AdvancedDreAnalysis, modelName: st
 
 function addVariationsPage(doc: jsPDF, analysis: AdvancedDreAnalysis, modelName: string) {
   doc.addPage();
+  const W = doc.internal.pageSize.getWidth();
+  const maxW = W - 28;
 
-  drawHeader(doc, { title: "Principais Variações", subtitle: "Ordenado por maior impacto financeiro absoluto", modelName, pageLabel: "Seção 4" });
+  drawHeader(doc, { title: "Ponte de Resultado", subtitle: "O que reduziu e o que melhorou o lucro entre o primeiro e o último período", modelName, pageLabel: "Seção 4" });
 
-  const levelLabel: Record<AlertLevel, string> = { HIGH: "ALTO", MEDIUM: "MÉDIO", LOW: "BAIXO" };
-  const top15 = analysis.variations.slice(0, 15);
+  const bridge = analysis.result_bridge;
+  if (!bridge) return;
 
-  const rows = top15.map((v) => [
-    v.category,
-    v.subcategory,
-    v.type === "revenue" ? "Receita" : "Despesa",
-    formatCurrency(v.previous_value),
-    formatCurrency(v.current_value),
-    `${v.variation_pct > 0 ? "+" : ""}${formatPercentage(v.variation_pct)}`,
-    `${v.financial_impact > 0 ? "+" : ""}${formatCurrency(v.financial_impact)}`,
-    levelLabel[v.level],
-  ]);
+  let y = 52;
+  bodyText(doc, `Resultado do primeiro período (${bridge.first_period.label}): ${formatCurrency(bridge.first_period.result)} (margem ${formatPercentage(bridge.first_period.margin)})`, 14, y, maxW, 9);
+  y += 6;
+  bodyText(doc, `Resultado do último período (${bridge.last_period.label}): ${formatCurrency(bridge.last_period.result)} (margem ${formatPercentage(bridge.last_period.margin)})`, 14, y, maxW, 9);
+  y += 6;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(bridge.total_variation < 0 ? C.negative[0] : C.positive[0], bridge.total_variation < 0 ? C.negative[1] : C.positive[1], bridge.total_variation < 0 ? C.negative[2] : C.positive[2]);
+  doc.text(`Variação total: ${bridge.total_variation > 0 ? "+" : ""}${formatCurrency(bridge.total_variation)}`, 14, y + 2);
+  y += 12;
 
-  autoTable(doc, {
-    startY: 52,
-    margin: { left: 14, right: 14 },
-    head: [["Categoria", "Subcategoria", "Tipo", "Anterior", "Atual", "Var. %", "Impacto R$", "Nível"]],
-    body: rows,
-    theme: "plain",
-    styles: { fontSize: 7.5, cellPadding: { top: 2.5, right: 3, bottom: 2.5, left: 3 }, lineColor: C.border, lineWidth: 0.1 },
-    headStyles: { fillColor: C.primary, textColor: C.white, fontStyle: "bold", fontSize: 7.5 },
-    columnStyles: { 3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" }, 6: { halign: "right", fontStyle: "bold" }, 7: { halign: "center" } },
-    didParseCell(data) {
-      if (data.section === "body" && data.column.index === 7) {
-        const level = top15[data.row.index]?.level;
-        if (level) {
-          data.cell.styles.textColor = levelColor(level);
-          data.cell.styles.fontStyle = "bold";
-        }
-      }
-      if (data.section === "body") {
-        const level = top15[data.row.index]?.level;
-        if (level === "HIGH") data.cell.styles.fillColor = C.red50;
-      }
-    },
-  });
+  const drawBlock = (title: string, total: number, items: typeof bridge.reduced, color: [number, number, number], hidden: number) => {
+    y = ensureSpace(doc, y, 20, { title: "Ponte de Resultado", subtitle: "O que reduziu e o que melhorou o lucro entre o primeiro e o último período", modelName, pageLabel: "Seção 4" });
+    doc.setDrawColor(...C.border);
+    doc.line(14, y, W - 14, y);
+    y += 8;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(...C.text);
+    doc.text(title, 14, y);
+    doc.setTextColor(...color);
+    doc.text(`Total: ${total > 0 ? "+" : ""}${formatCurrency(total)}`, W - 14, y, { align: "right" });
+    y += 7;
+
+    for (const item of items) {
+      y = ensureSpace(doc, y, 9, { title: "Ponte de Resultado", subtitle: "O que reduziu e o que melhorou o lucro entre o primeiro e o último período", modelName, pageLabel: "Seção 4" });
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(...C.text);
+      const nameLines = doc.splitTextToSize(item.label, maxW - 48);
+      doc.text(nameLines, 18, y);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...color);
+      doc.text(`${item.result_impact > 0 ? "+" : ""}${formatCurrency(item.result_impact)}`, W - 14, y, { align: "right" });
+      y += Math.max(6, nameLines.length * 4);
+    }
+
+    if (hidden > 0) {
+      y = ensureSpace(doc, y, 7, { title: "Ponte de Resultado", subtitle: "O que reduziu e o que melhorou o lucro entre o primeiro e o último período", modelName, pageLabel: "Seção 4" });
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(8);
+      doc.setTextColor(...C.muted);
+      doc.text(`+ ${hidden} itens adicionais`, 18, y);
+      y += 7;
+    }
+    y += 4;
+  };
+
+  drawBlock("O que reduziu o resultado", bridge.reduced_total, bridge.reduced, C.negative, bridge.hidden_reduced_count);
+  drawBlock("O que melhorou o resultado", bridge.improved_total, bridge.improved, C.positive, bridge.hidden_improved_count);
 }
 
 // ── Alerts page ────────────────────────────────────────────────────────────────
@@ -365,17 +401,19 @@ function addAlertsPage(doc: jsPDF, analysis: AdvancedDreAnalysis, modelName: str
   doc.addPage();
   const W = doc.internal.pageSize.getWidth();
   const maxW = W - 28;
+  const header = { title: "Alertas Automáticos", subtitle: "Ordenados por nível e impacto financeiro", modelName, pageLabel: "Seção 5" };
 
-  drawHeader(doc, { title: "Alertas Automáticos", subtitle: "Ordenados por nível e impacto financeiro", modelName, pageLabel: "Seção 5" });
+  drawHeader(doc, header);
 
   const levelLabel: Record<AlertLevel, string> = { HIGH: "ALTO", MEDIUM: "MÉDIO", LOW: "BAIXO" };
   let y = 52;
 
-  for (const alert of analysis.alerts.slice(0, 8)) {
-    if (y > 250) break;
-
+  for (const alert of analysis.alerts) {
     const bgColor = levelBg(alert.level);
-    const h = 26;
+    const descLines = doc.splitTextToSize(alert.description, maxW - 10);
+    const recLines = doc.splitTextToSize(`Recomendação: ${alert.recommendation}`, maxW - 10);
+    const h = Math.max(26, 16 + descLines.length * 3.5 + recLines.length * 3.3);
+    y = ensureSpace(doc, y, h + 4, header);
     doc.setFillColor(...bgColor);
     doc.roundedRect(14, y, maxW, h, 2, 2, "F");
 
@@ -387,14 +425,12 @@ function addAlertsPage(doc: jsPDF, analysis: AdvancedDreAnalysis, modelName: str
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.5);
     doc.setTextColor(...C.text);
-    const descLines = doc.splitTextToSize(alert.description, maxW - 10);
-    doc.text(descLines.slice(0, 2), 18, y + 13);
+    doc.text(descLines, 18, y + 13);
 
     doc.setFont("helvetica", "italic");
     doc.setFontSize(7);
     doc.setTextColor(...C.muted);
-    const recLines = doc.splitTextToSize(`Recomendação: ${alert.recommendation}`, maxW - 10);
-    doc.text(recLines.slice(0, 1), 18, y + 23);
+    doc.text(recLines, 18, y + 15 + descLines.length * 3.5);
 
     y += h + 4;
   }
@@ -406,14 +442,18 @@ function addRecommendationsPage(doc: jsPDF, analysis: AdvancedDreAnalysis, model
   doc.addPage();
   const W = doc.internal.pageSize.getWidth();
   const maxW = W - 28;
+  const header = { title: "Recomendações Gerenciais", subtitle: "Priorizadas por impacto esperado", modelName, pageLabel: "Seção 6" };
 
-  drawHeader(doc, { title: "Recomendações Gerenciais", subtitle: "Priorizadas por impacto esperado", modelName, pageLabel: "Seção 6" });
+  drawHeader(doc, header);
 
   const timelineLabel: Record<string, string> = { short: "Curto prazo", medium: "Médio prazo", long: "Longo prazo" };
   let y = 52;
 
   for (const rec of analysis.recommendations) {
-    if (y > 255) break;
+    const justLines = doc.splitTextToSize(rec.justification, maxW - 14);
+    const impactLines = rec.estimated_impact ? doc.splitTextToSize(`Impacto estimado: ${rec.estimated_impact}`, maxW - 20) : [];
+    const needed = 22 + justLines.length * 4 + (impactLines.length ? impactLines.length * 4 + 10 : 0);
+    y = ensureSpace(doc, y, needed, header);
 
     // Number circle
     doc.setFillColor(...C.primary);
@@ -441,20 +481,18 @@ function addRecommendationsPage(doc: jsPDF, analysis: AdvancedDreAnalysis, model
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(...C.text);
-    const justLines = doc.splitTextToSize(rec.justification, maxW - 14);
-    doc.text(justLines.slice(0, 3), 26, y);
-    y += justLines.slice(0, 3).length * 4 + 2;
+    doc.text(justLines, 26, y);
+    y += justLines.length * 4 + 2;
 
     // Impact
     if (rec.estimated_impact) {
       doc.setFillColor(...C.green50);
-      const impactLines = doc.splitTextToSize(`Impacto estimado: ${rec.estimated_impact}`, maxW - 20);
-      const boxH = impactLines.slice(0, 2).length * 4 + 4;
+      const boxH = impactLines.length * 4 + 4;
       doc.roundedRect(26, y, maxW - 14, boxH, 1.5, 1.5, "F");
       doc.setFont("helvetica", "italic");
       doc.setFontSize(7.5);
       doc.setTextColor(...C.positive);
-      doc.text(impactLines.slice(0, 2), 30, y + 4);
+      doc.text(impactLines, 30, y + 4);
       y += boxH + 4;
     }
 

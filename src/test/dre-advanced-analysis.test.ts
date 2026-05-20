@@ -274,6 +274,28 @@ describe("computeVariations", () => {
     const vars = computeVariations(rows, periodFixture({ id: "p2" }), periodFixture({ id: "p1" }), {});
     expect(vars[0].type).toBe("revenue");
   });
+
+  it("uses labels instead of percentage when an expense appears from zero", () => {
+    const rows = [
+      rowFixture({ key: "k1", label: "CEFEM", categoryType: "debit", values: { p1: { amount: 0, verticalPercentage: 0 }, p2: { amount: 23545, verticalPercentage: 0 } } }),
+    ];
+    const vars = computeVariations(rows, periodFixture({ id: "p2" }), periodFixture({ id: "p1" }), {});
+
+    expect(vars[0].variation_pct).toBeNull();
+    expect(vars[0].variation_label).toBe("Nova despesa");
+    expect(vars[0].change_kind).toBe("new");
+  });
+
+  it("uses labels instead of -100% when an expense is eliminated", () => {
+    const rows = [
+      rowFixture({ key: "k1", label: "Fretes", categoryType: "debit", values: { p1: { amount: 1200, verticalPercentage: 0 }, p2: { amount: 0, verticalPercentage: 0 } } }),
+    ];
+    const vars = computeVariations(rows, periodFixture({ id: "p2" }), periodFixture({ id: "p1" }), {});
+
+    expect(vars[0].variation_pct).toBeNull();
+    expect(vars[0].variation_label).toBe("Despesa eliminada");
+    expect(vars[0].change_kind).toBe("eliminated");
+  });
 });
 
 // ── Tests: computeAlerts ───────────────────────────────────────────────────────
@@ -399,6 +421,41 @@ describe("computeAlerts", () => {
       expect(levelRank[levels[i]]).toBeLessThanOrEqual(levelRank[levels[i + 1]]);
     }
   });
+
+  it("filters simultaneous growth alert to financially relevant expense variations", () => {
+    const curr = periodFixture({ id: "p2" });
+    const prev = periodFixture({ id: "p1" });
+    const relevant = (subcategory: string, impact: number) => ({
+      category: "Despesas",
+      subcategory,
+      type: "expense" as const,
+      previous_value: 10000,
+      current_value: 10000 + impact,
+      variation_pct: 20,
+      variation_label: "+20,00%",
+      change_kind: "increase" as const,
+      financial_impact: impact,
+      result_impact: -impact,
+      margin_impact: 2,
+      level: "MEDIUM" as const,
+    });
+    const tiny = relevant("Taxa pequena", 40);
+    const lowValue = { ...relevant("Valor baixo", 600), previous_value: 100, current_value: 600, financial_impact: 500 };
+
+    const alerts = computeAlerts({
+      periods: [prev, curr],
+      currentPeriod: curr,
+      previousPeriod: prev,
+      currentExpenses: 50000,
+      previousExpenses: 40000,
+      subcategoryRows: [],
+      expenseRows: [],
+      variations: [relevant("Fretes", 2000), relevant("Energia", 3000), relevant("Viagem", 1500), tiny, lowValue],
+    });
+
+    const multi = alerts.find((a) => a.title.includes("Múltiplas despesas"));
+    expect(multi?.description).toContain("3 categorias");
+  });
 });
 
 // ── Tests: generateAdvancedDreAnalysis (integration) ──────────────────────────
@@ -450,7 +507,7 @@ describe("generateAdvancedDreAnalysis — 1 period", () => {
 
     expect(analysis.indicators.gross_margin.value).toBe(57.89);
     expect(analysis.indicators.operating_margin.value).toBe(42.11);
-    expect(analysis.indicators.ebitda.value).toBe(42.11);
+    expect(analysis.indicators.ebitda.fallbackMessage).toContain("EBITDA não disponível");
     expect(analysis.indicators.gross_margin.level).toBe("LOW");
     expect(analysis.indicators.operating_margin.level).toBe("LOW");
   });
@@ -644,6 +701,27 @@ describe("generateAdvancedDreAnalysis — 2 periods", () => {
     expect(analysis.alerts.some((a) => a.level === "HIGH")).toBe(true);
   });
 
+  it("builds a result bridge for the first and last selected periods", () => {
+    const model = makeModel();
+    const entries = [
+      makeEntry("2026-01", { sales: 100000, cpv: 40000, admin: 10000, freight: 5000 }),
+      makeEntry("2026-02", { sales: 90000, cpv: 30000, admin: 10000, freight: 8000 }),
+    ];
+    const result = buildDreAnalysisFromModel({
+      model,
+      periods: [
+        { id: "2026-01", label: "Jan/2026", year: "2026", months: ["2026-01"] },
+        { id: "2026-02", label: "Fev/2026", year: "2026", months: ["2026-02"] },
+      ],
+      entries,
+    });
+
+    const analysis = generateAdvancedDreAnalysis(result, { modelName: "M" });
+
+    expect(analysis.result_bridge?.reduced.some((item) => item.label.includes("Queda de Vendas"))).toBe(true);
+    expect(analysis.result_bridge?.improved.some((item) => item.label.includes("Redução de CPV"))).toBe(true);
+  });
+
   it("executive summary contains quantified data when 2 periods", () => {
     const model = makeModel();
     const entries = [
@@ -666,13 +744,13 @@ describe("generateAdvancedDreAnalysis — 2 periods", () => {
 });
 
 describe("generateAdvancedDreAnalysis — EBITDA", () => {
-  it("marks EBITDA as estimated when no D&A/interest categories are tagged", () => {
+  it("hides EBITDA when it duplicates operating margin", () => {
     const model = makeModel();
     const entry = makeEntry("2026-01", { sales: 100000, cpv: 40000, admin: 10000, freight: 5000 });
     const result = buildDreAnalysisFromModel({ model, periods: [{ id: "2026-01", label: "Jan/2026", year: "2026", months: ["2026-01"] }], entries: [entry] });
 
     const analysis = generateAdvancedDreAnalysis(result, { modelName: "M" });
-    expect(analysis.indicators.ebitda.is_estimated).toBe(true);
+    expect(analysis.indicators.ebitda.fallbackMessage).toContain("EBITDA não disponível");
   });
 });
 
