@@ -212,6 +212,15 @@ function metricVariation(previous: number | undefined, current: number) {
   return previous !== undefined && previous !== 0 ? variationPercentage(previous, current) : 0;
 }
 
+function sumPeriodValues(periods: DreAnalysisPeriod[], getValue: (period: DreAnalysisPeriod) => number) {
+  return roundCurrency(periods.reduce((sum, period) => sum + getValue(period), 0));
+}
+
+function sumMappedPeriodValues(values: Record<string, number> | null, periods: DreAnalysisPeriod[]) {
+  if (!values) return 0;
+  return sumPeriodValues(periods, (period) => values[period.id] ?? 0);
+}
+
 // ── Computation helpers ────────────────────────────────────────────────────────
 
 function getSubcategoryRows(rows: DreAnalysisRow[]) {
@@ -828,6 +837,12 @@ export function generateAdvancedDreAnalysis(
   const preTaxProfitValues = financialValuesByPeriod(getFinancialRow(userSumRows, "pre_tax_profit"), periods);
   const netProfitValues = financialValuesByPeriod(getFinancialRow(userSumRows, "net_profit"), periods);
   const ebitdaSourceValues = preTaxProfitValues ?? operatingResultValues;
+  const selectedRevenue = sumPeriodValues(periods, (p) => p.totals.revenue);
+  const selectedRevenueLine = sumMappedPeriodValues(revenueLineValues, periods);
+  const selectedNetProfit = sumMappedPeriodValues(netProfitValues, periods);
+  const selectedGrossProfit = sumMappedPeriodValues(grossProfitValues, periods);
+  const selectedOperatingResult = sumMappedPeriodValues(operatingResultValues, periods);
+  const selectedEbitdaSource = sumMappedPeriodValues(ebitdaSourceValues, periods);
 
   // Revenue indicator
   const currentRevenue = currentPeriod.totals.revenue;
@@ -906,6 +921,11 @@ export function generateAdvancedDreAnalysis(
   const revenueIndicatorLevel = revenueVariation === null ? null : indicatorLevel(revenueVariation, true);
   const netProfitIndicatorLevel = resultVariation === null ? null : indicatorLevel(resultVariation, true);
   const expenseIndicatorLevel = expVariation === null ? null : indicatorLevel(expVariation, false);
+  const selectedGrossMargin = safePercentage(selectedGrossProfit, selectedRevenueLine);
+  const selectedOperatingMargin = safePercentage(selectedOperatingResult, selectedRevenueLine);
+  const selectedNetMargin = safePercentage(selectedNetProfit, selectedRevenue);
+  const selectedEbitdaMargin = safePercentage(selectedEbitdaSource, selectedRevenueLine || selectedRevenue);
+  const selectedTotalExpenses = roundCurrency(selectedRevenue - selectedNetProfit);
 
   // Variations
   const variations = computeVariations(subcategoryRows, currentPeriod, previousPeriod, catLabels);
@@ -987,24 +1007,24 @@ export function generateAdvancedDreAnalysis(
   return {
     executive_summary,
     indicators: {
-      revenue: { value: currentRevenue, variation: revenueVariation, level: revenueIndicatorLevel, trend: trendDirection(revenueValues) },
+      revenue: { value: selectedRevenue, variation: revenueVariation, level: revenueIndicatorLevel, trend: trendDirection(revenueValues) },
       net_profit: netProfitValues
-        ? { value: currentResult, variation: resultVariation, level: netProfitIndicatorLevel, trend: trendDirection(periods.map((p) => netProfitValues[p.id] ?? 0)) }
+        ? { value: selectedNetProfit, variation: resultVariation, level: netProfitIndicatorLevel, trend: trendDirection(periods.map((p) => netProfitValues[p.id] ?? 0)) }
         : fallbackIndicator(modelFallback),
       gross_margin: grossPerPeriod
-        ? { value: currentGrossMargin, variation: grossMarginVariation, level: marginLevel(currentGrossMargin, 40, 25), trend: trendDirection(grossMarginValues), is_estimated: false }
+        ? { value: selectedGrossMargin, variation: grossMarginVariation, level: marginLevel(selectedGrossMargin, 40, 25), trend: trendDirection(grossMarginValues), is_estimated: false }
         : fallbackMarginIndicator(modelFallback),
       operating_margin: operatingPerPeriod
-        ? { value: currentOpMargin, variation: opMarginVariation, level: marginLevel(currentOpMargin, 15, 5), trend: trendDirection(opMarginValues), is_estimated: false }
+        ? { value: selectedOperatingMargin, variation: opMarginVariation, level: marginLevel(selectedOperatingMargin, 15, 5), trend: trendDirection(opMarginValues), is_estimated: false }
         : fallbackMarginIndicator(modelFallback),
       net_margin: netMarginByPeriod
-        ? { value: currentNetMargin, variation: netMarginVariation, level: marginLevel(currentNetMargin, 10, 5), trend: trendDirection(netMarginValues), is_estimated: false }
+        ? { value: selectedNetMargin, variation: netMarginVariation, level: marginLevel(selectedNetMargin, 10, 5), trend: trendDirection(netMarginValues), is_estimated: false }
         : fallbackMarginIndicator(modelFallback),
       ebitda: ebitdaByPeriod
-        ? { value: currentEbitdaMargin, variation: ebitdaVariation, level: marginLevel(currentEbitdaMargin, 15, 8), trend: trendDirection(ebitdaValues), is_estimated: true }
+        ? { value: selectedEbitdaMargin, variation: ebitdaVariation, level: marginLevel(selectedEbitdaMargin, 15, 8), trend: trendDirection(ebitdaValues), is_estimated: true }
         : fallbackMarginIndicator(modelFallback),
       total_expenses: totalExpensesByPeriod
-        ? { value: currentTotalExpenses, variation: expVariation, level: expenseIndicatorLevel, trend: trendDirection(expValues) }
+        ? { value: selectedTotalExpenses, variation: expVariation, level: expenseIndicatorLevel, trend: trendDirection(expValues) }
         : fallbackIndicator(modelFallback),
       best_period: periodsCount >= 2 && netMarginByPeriod && best
         ? { period: best.label, value: netProfitValues?.[best.id] ?? best.totals.result, margin: netMarginByPeriod[best.id] ?? 0 }

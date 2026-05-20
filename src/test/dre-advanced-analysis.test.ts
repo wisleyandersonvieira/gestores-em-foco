@@ -496,6 +496,30 @@ describe("generateAdvancedDreAnalysis — 1 period", () => {
 });
 
 describe("generateAdvancedDreAnalysis — 2 periods", () => {
+  it("uses the sum of selected periods for indicator card values", () => {
+    const model = makeModel();
+    const entries = [
+      makeEntry("2026-01", { sales: 100000, cpv: 40000, admin: 10000, freight: 5000 }),
+      makeEntry("2026-02", { sales: 120000, cpv: 50000, admin: 12000, freight: 3000 }),
+    ];
+    const result = buildDreAnalysisFromModel({
+      model,
+      periods: [
+        { id: "2026-01", label: "Jan/2026", year: "2026", months: ["2026-01"] },
+        { id: "2026-02", label: "Fev/2026", year: "2026", months: ["2026-02"] },
+      ],
+      entries,
+    });
+
+    const analysis = generateAdvancedDreAnalysis(result, { modelName: "M" });
+
+    expect(analysis.indicators.revenue.value).toBe(220000);
+    expect(analysis.indicators.net_profit.value).toBe(100000);
+    expect(analysis.indicators.total_expenses.value).toBe(120000);
+    expect(analysis.indicators.gross_margin.value).toBe(59.09);
+    expect(analysis.indicators.operating_margin.value).toBe(45.45);
+  });
+
   it("computes variations between current and previous period", () => {
     const model = makeModel();
     const entries = [
