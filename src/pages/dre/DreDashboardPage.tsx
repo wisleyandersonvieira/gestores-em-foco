@@ -271,34 +271,31 @@ function DreDashboardContent({ userId }: { userId: string }) {
       </ChartCard>
 
       <Card className="border-primary/10 bg-white/90">
-        <CardHeader><CardTitle>Análise do Período</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Média do Período</CardTitle></CardHeader>
         <CardContent className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Categoria</TableHead>
-                <TableHead className="text-right">Valor inicial</TableHead>
-                <TableHead className="text-right">Valor atual</TableHead>
-                <TableHead className="text-right">Diferença</TableHead>
-                <TableHead className="text-right">Variação</TableHead>
+                <TableHead className="text-right">Média do período</TableHead>
+                <TableHead className="text-right">% do faturamento</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {analysis.length === 0 ? (
-                <TableRow><TableCell colSpan={5} className="h-20 text-center text-muted-foreground">Sem dados finalizados para comparar.</TableCell></TableRow>
-              ) : analysis.map((item) => (
-                <TableRow key={item.category}>
+              {periodAverages.length === 0 ? (
+                <TableRow><TableCell colSpan={3} className="h-20 text-center text-muted-foreground">Sem dados finalizados para calcular médias.</TableCell></TableRow>
+              ) : periodAverages.map((item) => (
+                <TableRow key={`${item.categoryType}:${item.category}`}>
                   <TableCell className="font-medium">{item.category}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(item.previous)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(item.current)}</TableCell>
-                  <TableCell className={`text-right font-semibold ${isGoodVariation(item.categoryType, item.difference) ? "text-emerald-700" : "text-red-700"}`}>{formatCurrency(item.difference)}</TableCell>
-                  <TableCell className="text-right">{formatPercentage(item.variation)}</TableCell>
+                  <TableCell className={`text-right font-semibold ${item.categoryType === "credit" ? "text-emerald-700" : "text-red-700"}`}>{formatCurrency(item.average)}</TableCell>
+                  <TableCell className="text-right">{item.percentageOfRevenue !== null ? formatPercentage(item.percentageOfRevenue) : "-"}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
+
     </div>
   );
 }
