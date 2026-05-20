@@ -20,7 +20,10 @@ export default function DreDashboardPage() {
 }
 
 function DreDashboardContent({ userId }: { userId: string }) {
-  const [selectedCompetences, setSelectedCompetences] = useState([currentCompetence()]);
+  const [selectedCompetences, setSelectedCompetences] = useState(() => {
+    const year = new Date().getFullYear();
+    return Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`);
+  });
   const [entries, setEntries] = useState<DreEntryWithModel[]>([]);
   const [entriesWithItems, setEntriesWithItems] = useState<DreEntryWithItems[]>([]);
   const [isLoadingEntries, setIsLoadingEntries] = useState(true);
