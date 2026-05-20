@@ -191,9 +191,6 @@ function buildRowsFromModel(
 
   return [
     ...rows,
-    buildTotalRow("total-revenue", "Faturamento", "credit", 900000, periods, (period) => period.totals.revenue),
-    buildTotalRow("total-debit", "Total de Debitos", "debit", 900001, periods, (period) => period.totals.totalDebit),
-    buildTotalRow("result", "Resultado", "result", 900002, periods, (period) => period.totals.result),
     buildTotalRow("margin", "Margem de Lucro", "margin", 900003, periods, (period) => period.totals.marginPercentage),
   ];
 }

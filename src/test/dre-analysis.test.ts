@@ -51,12 +51,24 @@ describe("DRE analysis from model", () => {
       periods: [{ id: "2026-03", label: "Marco/2026", year: "2026", months: ["2026-03"] }],
       entries: [entryFixture("2026-03", { sales: 1000, returns: 100, costs: 300 })],
     });
-    const revenueRow = result.rows.find((row) => row.label === "Faturamento");
     const netIncomeRow = result.rows.find((row) => row.label === "Lucro Bruto");
 
     expect(result.summary.revenue).toBe(900);
-    expect(revenueRow?.values["2026-03"].amount).toBe(900);
     expect(netIncomeRow?.values["2026-03"].verticalPercentage).toBe(66.67);
+  });
+
+  it("keeps only the profit margin total row after the configured DRE structure", () => {
+    const result = buildDreAnalysisFromModel({
+      model: modelFixture(),
+      periods: [{ id: "2026-03", label: "Marco/2026", year: "2026", months: ["2026-03"] }],
+      entries: [entryFixture("2026-03", { sales: 1000, returns: 100, costs: 300 })],
+    });
+
+    expect(result.rows.map((row) => row.label)).not.toContain("Faturamento");
+    expect(result.rows.map((row) => row.label)).not.toContain("Total de Debitos");
+    expect(result.rows.map((row) => row.label)).not.toContain("Resultado");
+    expect(result.rows.at(-1)?.label).toBe("Margem de Lucro");
+    expect(result.rows.at(-1)?.values["2026-03"].amount).toBe(66.67);
   });
 
   it("keeps vertical analysis stable when period revenue is zero", () => {
@@ -100,10 +112,9 @@ describe("DRE analysis from model", () => {
     });
 
     expect(result.summary.totalDebit).toBe(250);
-    expect(result.rows.find((row) => row.label === "Total de Debitos")?.values["2026-04"].amount).toBe(250);
     expect(result.summary.result).toBe(750);
     expect(result.summary.averageMargin).toBe(75);
-    expect(dreAnalysisTableHtml(result, false, false)).toContain("250,00");
+    expect(dreAnalysisTableHtml(result, false, false)).not.toContain("Total de Debitos");
   });
 });
 
