@@ -130,10 +130,12 @@ function DreDashboardContent({ userId }: { userId: string }) {
 
     entriesWithItems.forEach((entry) => {
       entry.items.filter((item) => item.line_type === "subcategory").forEach((item) => {
-        const itemCategoryType = effectiveCategoryType({ categoryType: item.category_type_snapshot, subcategoryIsReductive: item.subcategory_is_reductive ?? false });
-        const mapKey = `${itemCategoryType}:${item.category_name_snapshot}`;
-        const current = totals.get(mapKey) ?? { category: item.category_name_snapshot, categoryType: itemCategoryType, total: 0 };
-        current.total += Number(item.value || 0);
+        const parentType = item.category_type_snapshot as DreCategoryType;
+        const isReductive = item.subcategory_is_reductive ?? false;
+        const mapKey = `${parentType}:${item.category_name_snapshot}`;
+        const current = totals.get(mapKey) ?? { category: item.category_name_snapshot, categoryType: parentType, total: 0 };
+        const value = Number(item.value || 0);
+        current.total += isReductive ? -value : value;
         totals.set(mapKey, current);
       });
     });
