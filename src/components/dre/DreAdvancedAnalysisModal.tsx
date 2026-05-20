@@ -90,6 +90,11 @@ function variationDisplay(variation: number, isGoodWhenPositive = true) {
   return <span className={`text-xs font-semibold ${cls}`}>{variation > 0 ? "+" : ""}{formatPercentage(variation)}</span>;
 }
 
+function fallbackText(message?: string) {
+  if (!message) return null;
+  return <p className="flex min-h-16 items-center justify-center text-center text-sm text-muted-foreground">{message}</p>;
+}
+
 function alertIcon(iconName: string) {
   const map: Record<string, React.ReactNode> = {
     TrendingUp: <TrendingUp className="h-5 w-5" />,
@@ -119,33 +124,41 @@ function AdvancedIndicatorCard({
   trend,
   isGoodWhenUp = true,
   isEstimated = false,
+  fallbackMessage,
 }: {
   title: string;
   value: number;
   formatted: string;
-  variation: number;
-  level: AlertLevel;
+  variation: number | null;
+  level: AlertLevel | null;
   trend: "up" | "down" | "stable";
   isGoodWhenUp?: boolean;
   isEstimated?: boolean;
+  fallbackMessage?: string;
 }) {
   return (
-    <Card className="border-primary/10 bg-white shadow-sm">
+    <Card className={`border-primary/10 bg-white shadow-sm ${fallbackMessage ? "opacity-70" : ""}`}>
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-2">
           <p className="text-sm text-muted-foreground leading-tight">
             {title}
-            {isEstimated ? <span className="ml-1 text-[10px] text-amber-600">(estimado)</span> : null}
+            {isEstimated && !fallbackMessage ? <span className="ml-1 text-[10px] text-amber-600">(estimado)</span> : null}
           </p>
-          <div className="flex items-center gap-1 shrink-0">
-            {trendIcon(trend, isGoodWhenUp)}
-            {levelBadge(level)}
-          </div>
+          {!fallbackMessage && level ? (
+            <div className="flex items-center gap-1 shrink-0">
+              {variation !== null ? trendIcon(trend, isGoodWhenUp) : null}
+              {levelBadge(level)}
+            </div>
+          ) : null}
         </div>
-        <p className={`mt-2 text-2xl font-bold tabular-nums ${value < 0 ? "text-red-700" : value > 0 ? "text-foreground" : "text-muted-foreground"}`}>
-          {formatted}
-        </p>
-        <div className="mt-1">{variationDisplay(variation, isGoodWhenUp)}</div>
+        {fallbackMessage ? fallbackText(fallbackMessage) : (
+          <>
+            <p className={`mt-2 text-2xl font-bold tabular-nums ${value < 0 ? "text-red-700" : value > 0 ? "text-foreground" : "text-muted-foreground"}`}>
+              {formatted}
+            </p>
+            <div className="mt-1">{variation !== null ? variationDisplay(variation, isGoodWhenUp) : null}</div>
+          </>
+        )}
       </CardContent>
     </Card>
   );
@@ -204,38 +217,50 @@ function IndicatorsSection({ data }: { data: AdvancedDreAnalysis }) {
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        <AdvancedIndicatorCard title="Faturamento" value={ind.revenue.value} formatted={formatCurrency(ind.revenue.value)} variation={ind.revenue.variation} level={ind.revenue.level} trend={ind.revenue.trend} />
-        <AdvancedIndicatorCard title="Lucro Líquido" value={ind.net_profit.value} formatted={formatCurrency(ind.net_profit.value)} variation={ind.net_profit.variation} level={ind.net_profit.level} trend={ind.net_profit.trend} />
-        <AdvancedIndicatorCard title="Margem Líquida" value={ind.net_margin.value} formatted={formatPercentage(ind.net_margin.value)} variation={ind.net_margin.variation} level={ind.net_margin.level} trend={ind.net_margin.trend} />
-        <AdvancedIndicatorCard title="Margem Bruta" value={ind.gross_margin.value} formatted={formatPercentage(ind.gross_margin.value)} variation={ind.gross_margin.variation} level={ind.gross_margin.level} trend={ind.gross_margin.trend} isEstimated={ind.gross_margin.is_estimated} />
-        <AdvancedIndicatorCard title="Margem Operacional" value={ind.operating_margin.value} formatted={formatPercentage(ind.operating_margin.value)} variation={ind.operating_margin.variation} level={ind.operating_margin.level} trend={ind.operating_margin.trend} isEstimated={ind.operating_margin.is_estimated} />
-        <AdvancedIndicatorCard title="EBITDA (Margem)" value={ind.ebitda.value} formatted={formatPercentage(ind.ebitda.value)} variation={ind.ebitda.variation} level={ind.ebitda.level} trend={ind.ebitda.trend} isEstimated={ind.ebitda.is_estimated} />
-        <AdvancedIndicatorCard title="Total de Despesas" value={ind.total_expenses.value} formatted={formatCurrency(ind.total_expenses.value)} variation={ind.total_expenses.variation} level={ind.total_expenses.level} trend={ind.total_expenses.trend} isGoodWhenUp={false} />
-        <AdvancedIndicatorCard title="Índice de Eficiência" value={ind.efficiency_index.value} formatted={String(ind.efficiency_index.value.toFixed(2)) + "x"} variation={0} level={ind.efficiency_index.level} trend="stable" />
+        <AdvancedIndicatorCard title="Faturamento" value={ind.revenue.value} formatted={formatCurrency(ind.revenue.value)} variation={ind.revenue.variation} level={ind.revenue.level} trend={ind.revenue.trend} fallbackMessage={ind.revenue.fallbackMessage} />
+        <AdvancedIndicatorCard title="Lucro Líquido" value={ind.net_profit.value} formatted={formatCurrency(ind.net_profit.value)} variation={ind.net_profit.variation} level={ind.net_profit.level} trend={ind.net_profit.trend} fallbackMessage={ind.net_profit.fallbackMessage} />
+        <AdvancedIndicatorCard title="Margem Líquida" value={ind.net_margin.value} formatted={formatPercentage(ind.net_margin.value)} variation={ind.net_margin.variation} level={ind.net_margin.level} trend={ind.net_margin.trend} fallbackMessage={ind.net_margin.fallbackMessage} />
+        <AdvancedIndicatorCard title="Margem Bruta" value={ind.gross_margin.value} formatted={formatPercentage(ind.gross_margin.value)} variation={ind.gross_margin.variation} level={ind.gross_margin.level} trend={ind.gross_margin.trend} isEstimated={ind.gross_margin.is_estimated} fallbackMessage={ind.gross_margin.fallbackMessage} />
+        <AdvancedIndicatorCard title="Margem Operacional" value={ind.operating_margin.value} formatted={formatPercentage(ind.operating_margin.value)} variation={ind.operating_margin.variation} level={ind.operating_margin.level} trend={ind.operating_margin.trend} isEstimated={ind.operating_margin.is_estimated} fallbackMessage={ind.operating_margin.fallbackMessage} />
+        <AdvancedIndicatorCard title="EBITDA (Margem)" value={ind.ebitda.value} formatted={formatPercentage(ind.ebitda.value)} variation={ind.ebitda.variation} level={ind.ebitda.level} trend={ind.ebitda.trend} isEstimated={ind.ebitda.is_estimated} fallbackMessage={ind.ebitda.fallbackMessage} />
+        <AdvancedIndicatorCard title="Total de Despesas" value={ind.total_expenses.value} formatted={formatCurrency(ind.total_expenses.value)} variation={ind.total_expenses.variation} level={ind.total_expenses.level} trend={ind.total_expenses.trend} isGoodWhenUp={false} fallbackMessage={ind.total_expenses.fallbackMessage} />
+        <AdvancedIndicatorCard title="Índice de Eficiência" value={ind.efficiency_index.value} formatted={String(ind.efficiency_index.value.toFixed(2)) + "x"} variation={null} level={ind.efficiency_index.level} trend="stable" fallbackMessage={ind.efficiency_index.fallbackMessage} />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <Card className="border-primary/10 bg-white">
+        <Card className={`border-primary/10 bg-white ${ind.best_period.fallbackMessage ? "opacity-70" : ""}`}>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Melhor período</p>
-            <p className="font-bold mt-1">{ind.best_period.period}</p>
-            <p className="text-sm text-emerald-700">{formatCurrency(ind.best_period.value)} · {formatPercentage(ind.best_period.margin)}</p>
+            {ind.best_period.fallbackMessage ? fallbackText(ind.best_period.fallbackMessage) : (
+              <>
+                <p className="font-bold mt-1">{ind.best_period.period}</p>
+                <p className="text-sm text-emerald-700">{formatCurrency(ind.best_period.value)} · {formatPercentage(ind.best_period.margin)}</p>
+              </>
+            )}
           </CardContent>
         </Card>
-        <Card className="border-primary/10 bg-white">
+        <Card className={`border-primary/10 bg-white ${ind.worst_period.fallbackMessage ? "opacity-70" : ""}`}>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Pior período</p>
-            <p className="font-bold mt-1">{ind.worst_period.period}</p>
-            <p className="text-sm text-red-700">{formatCurrency(ind.worst_period.value)} · {formatPercentage(ind.worst_period.margin)}</p>
+            {ind.worst_period.fallbackMessage ? fallbackText(ind.worst_period.fallbackMessage) : (
+              <>
+                <p className="font-bold mt-1">{ind.worst_period.period}</p>
+                <p className="text-sm text-red-700">{formatCurrency(ind.worst_period.value)} · {formatPercentage(ind.worst_period.margin)}</p>
+              </>
+            )}
           </CardContent>
         </Card>
-        <Card className="border-primary/10 bg-white">
+        <Card className={`border-primary/10 bg-white ${ind.cumulative_variation.fallbackMessage ? "opacity-70" : ""}`}>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Variação acumulada (receita)</p>
-            <p className={`font-bold text-xl mt-1 tabular-nums ${ind.cumulative_variation.value >= 0 ? "text-emerald-700" : "text-red-700"}`}>
-              {ind.cumulative_variation.value >= 0 ? "+" : ""}{formatPercentage(ind.cumulative_variation.value)}
-            </p>
-            {levelBadge(ind.cumulative_variation.level, "mt-1")}
+            {ind.cumulative_variation.fallbackMessage ? fallbackText(ind.cumulative_variation.fallbackMessage) : (
+              <>
+                <p className={`font-bold text-xl mt-1 tabular-nums ${ind.cumulative_variation.value >= 0 ? "text-emerald-700" : "text-red-700"}`}>
+                  {ind.cumulative_variation.value >= 0 ? "+" : ""}{formatPercentage(ind.cumulative_variation.value)}
+                </p>
+                {ind.cumulative_variation.level ? levelBadge(ind.cumulative_variation.level, "mt-1") : null}
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

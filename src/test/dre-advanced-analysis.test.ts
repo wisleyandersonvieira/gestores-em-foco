@@ -27,13 +27,15 @@ function makeModel(): DreModelWithLines {
       modelLine({ id: "l-rev-cat", category_id: "rev", line_type: "category", display_order: 0, category: cat("rev", "Receita Bruta", "credit", true) }),
       modelLine({ id: "l-sales", category_id: "rev", subcategory_id: "sales", line_type: "subcategory", parent_category_id: "rev", display_order: 1, category: cat("rev", "Receita Bruta", "credit", true), subcategory: sub("sales", "Vendas", false) }),
       modelLine({ id: "l-returns", category_id: "rev", subcategory_id: "returns", line_type: "subcategory", parent_category_id: "rev", display_order: 2, category: cat("rev", "Receita Bruta", "credit", true), subcategory: sub("returns", "Devolucoes", true) }),
-      modelLine({ id: "l-gross", category_id: null, subcategory_id: null, line_type: "sum", sum_label: "Receita Liquida", display_order: 1000 }),
+      modelLine({ id: "l-revenue", category_id: null, subcategory_id: null, line_type: "sum", sum_label: "Receita Liquida", financial_type: "revenue", display_order: 1000 }),
       modelLine({ id: "l-cost-cat", category_id: "costs", line_type: "category", display_order: 2000, category: cat("costs", "Custos", "debit", false) }),
       modelLine({ id: "l-cpv", category_id: "costs", subcategory_id: "cpv", line_type: "subcategory", parent_category_id: "costs", display_order: 2001, category: cat("costs", "Custos", "debit", false), subcategory: sub("cpv", "CPV", false) }),
+      modelLine({ id: "l-gross", category_id: null, subcategory_id: null, line_type: "sum", sum_label: "Lucro Bruto", financial_type: "gross_profit", display_order: 2500 }),
       modelLine({ id: "l-exp-cat", category_id: "exp", line_type: "category", display_order: 3000, category: cat("exp", "Despesas Operacionais", "debit", false) }),
       modelLine({ id: "l-admin", category_id: "exp", subcategory_id: "admin", line_type: "subcategory", parent_category_id: "exp", display_order: 3001, category: cat("exp", "Despesas Operacionais", "debit", false), subcategory: sub("admin", "Administrativo", false) }),
       modelLine({ id: "l-freight", category_id: "exp", subcategory_id: "freight", line_type: "subcategory", parent_category_id: "exp", display_order: 3002, category: cat("exp", "Despesas Operacionais", "debit", false), subcategory: sub("freight", "Fretes", false) }),
-      modelLine({ id: "l-net", category_id: null, subcategory_id: null, line_type: "sum", sum_label: "Lucro Liquido", display_order: 4000, is_net_income: true }),
+      modelLine({ id: "l-operating", category_id: null, subcategory_id: null, line_type: "sum", sum_label: "Resultado Operacional", financial_type: "operating_result", display_order: 3500 }),
+      modelLine({ id: "l-net", category_id: null, subcategory_id: null, line_type: "sum", sum_label: "Lucro Liquido", financial_type: "net_profit", display_order: 4000 }),
     ],
   } as DreModelWithLines;
 }
@@ -81,7 +83,7 @@ function item(overrides: Partial<DreEntryItem>): DreEntryItem {
 }
 
 function rowFixture(overrides: Partial<DreAnalysisRow>): DreAnalysisRow {
-  return { key: "k", lineId: "k", label: "Item", lineType: "subcategory", categoryType: "debit", level: 1, displayOrder: 1, isSumLine: false, isNetIncome: false, values: {}, ...overrides };
+  return { key: "k", lineId: "k", label: "Item", lineType: "subcategory", categoryType: "debit", financialType: null, level: 1, displayOrder: 1, isSumLine: false, isNetIncome: false, values: {}, ...overrides };
 }
 
 function periodFixture(overrides: Partial<DreAnalysisPeriod>): DreAnalysisPeriod {
@@ -427,6 +429,60 @@ describe("generateAdvancedDreAnalysis — 1 period", () => {
     expect(analysis.indicators.net_profit.value).toBe(40000);
   });
 
+  it("computes margins from financial_type sum lines", () => {
+    const model = makeModel();
+    const entry = makeEntry("2026-01", { sales: 100000, returns: 5000, cpv: 40000, admin: 10000, freight: 5000 });
+    const result = buildDreAnalysisFromModel({ model, periods: [{ id: "2026-01", label: "Jan/2026", year: "2026", months: ["2026-01"] }], entries: [entry] });
+
+    const analysis = generateAdvancedDreAnalysis(result, { modelName: "Modelo Teste" });
+
+    expect(analysis.indicators.gross_margin.value).toBe(57.89);
+    expect(analysis.indicators.operating_margin.value).toBe(42.11);
+    expect(analysis.indicators.ebitda.value).toBe(42.11);
+    expect(analysis.indicators.gross_margin.level).toBe("LOW");
+    expect(analysis.indicators.operating_margin.level).toBe("LOW");
+  });
+
+  it("classifies negative margins as HIGH risk", () => {
+    const model = makeModel();
+    const entry = makeEntry("2026-01", { sales: 100000, cpv: 120000, admin: 10000, freight: 5000 });
+    const result = buildDreAnalysisFromModel({ model, periods: [{ id: "2026-01", label: "Jan/2026", year: "2026", months: ["2026-01"] }], entries: [entry] });
+
+    const analysis = generateAdvancedDreAnalysis(result, { modelName: "Modelo Teste" });
+
+    expect(analysis.indicators.gross_margin.value).toBe(-20);
+    expect(analysis.indicators.gross_margin.level).toBe("HIGH");
+    expect(analysis.indicators.net_margin.level).toBe("HIGH");
+  });
+
+  it("returns indicator fallbacks when required financial_type flags are missing", () => {
+    const model = {
+      ...makeModel(),
+      lines: makeModel().lines.map((line) => ({ ...line, financial_type: null, is_net_income: false })),
+    } as DreModelWithLines;
+    const entry = makeEntry("2026-01", { sales: 100000, cpv: 40000, admin: 10000, freight: 5000 });
+    const result = buildDreAnalysisFromModel({ model, periods: [{ id: "2026-01", label: "Jan/2026", year: "2026", months: ["2026-01"] }], entries: [entry] });
+
+    const analysis = generateAdvancedDreAnalysis(result, { modelName: "Modelo Teste" });
+
+    expect(analysis.indicators.net_profit.fallbackMessage).toBe("Ajuste o modelo de DRE para exibir este indicador");
+    expect(analysis.indicators.gross_margin.fallbackMessage).toBe("Ajuste o modelo de DRE para exibir este indicador");
+    expect(analysis.indicators.total_expenses.fallbackMessage).toBe("Ajuste o modelo de DRE para exibir este indicador");
+  });
+
+  it("uses single-period fallbacks for comparison-only cards", () => {
+    const model = makeModel();
+    const entry = makeEntry("2026-01", { sales: 100000, cpv: 40000, admin: 10000, freight: 5000 });
+    const result = buildDreAnalysisFromModel({ model, periods: [{ id: "2026-01", label: "Jan/2026", year: "2026", months: ["2026-01"] }], entries: [entry] });
+
+    const analysis = generateAdvancedDreAnalysis(result, { modelName: "Modelo Teste" });
+
+    expect(analysis.indicators.best_period.fallbackMessage).toBe("Selecione 2 ou mais períodos");
+    expect(analysis.indicators.worst_period.fallbackMessage).toBe("Selecione 2 ou mais períodos");
+    expect(analysis.indicators.cumulative_variation.fallbackMessage).toBe("Selecione 2 ou mais períodos");
+    expect(analysis.indicators.efficiency_index.fallbackMessage).toBe("Selecione 2 ou mais períodos");
+  });
+
   it("handles reductive subcategories correctly in revenue calculation", () => {
     const model = makeModel();
     const entry = makeEntry("2026-01", { sales: 100000, returns: 10000, cpv: 30000, admin: 5000, freight: 5000 });
@@ -605,8 +661,8 @@ describe("generateAdvancedDreAnalysis — DRE model rule compliance", () => {
     const analysis = generateAdvancedDreAnalysis(result, { modelName: "M" });
 
     // Net income = revenue(95000) - cpv(40000) - admin(10000) - freight(5000) = 40000
-    // "Receita Liquida" sum line = 95000 (first sum, not net income)
-    // "Lucro Liquido" = 40000 (is_net_income = true)
+    // "Receita Liquida" sum line = 95000 (financial_type = revenue, not net income)
+    // "Lucro Liquido" = 40000 (financial_type = net_profit)
     expect(analysis.indicators.net_profit.value).toBe(40000);
   });
 });

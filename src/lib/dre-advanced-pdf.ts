@@ -27,6 +27,19 @@ function levelColor(level: AlertLevel): [number, number, number] {
   return level === "HIGH" ? C.negative : level === "MEDIUM" ? C.amber : C.positive;
 }
 
+function indicatorValue(value: string, fallbackMessage?: string) {
+  return fallbackMessage ?? value;
+}
+
+function indicatorVariation(variation: number | null) {
+  if (variation === null || variation === 0) return "—";
+  return `${variation > 0 ? "+" : ""}${formatPercentage(variation)}`;
+}
+
+function indicatorLevel(level: AlertLevel | null) {
+  return level ?? null;
+}
+
 function levelBg(level: AlertLevel): [number, number, number] {
   return level === "HIGH" ? C.red50 : level === "MEDIUM" ? C.amber50 : C.green50;
 }
@@ -152,8 +165,8 @@ function addCoverPage(doc: jsPDF, analysis: AdvancedDreAnalysis) {
   const cardY = 112;
   const cardData = [
     { label: "Faturamento", value: formatCurrency(ind.revenue.value), color: C.primary },
-    { label: "Lucro Líquido", value: formatCurrency(ind.net_profit.value), color: ind.net_profit.value >= 0 ? C.positive : C.negative },
-    { label: "Margem Líquida", value: formatPercentage(ind.net_margin.value), color: ind.net_margin.value >= 8 ? C.positive : ind.net_margin.value >= 3 ? C.amber : C.negative },
+    { label: "Lucro Líquido", value: indicatorValue(formatCurrency(ind.net_profit.value), ind.net_profit.fallbackMessage), color: ind.net_profit.value >= 0 ? C.positive : C.negative },
+    { label: "Margem Líquida", value: indicatorValue(formatPercentage(ind.net_margin.value), ind.net_margin.fallbackMessage), color: ind.net_margin.value >= 8 ? C.positive : ind.net_margin.value >= 3 ? C.amber : C.negative },
   ];
   cardData.forEach((card, i) => {
     const x = 14 + i * (cardW + 4);
@@ -168,7 +181,7 @@ function addCoverPage(doc: jsPDF, analysis: AdvancedDreAnalysis) {
     doc.text(card.label, x + 6, cardY + 9);
 
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(13);
+    doc.setFontSize(card.value.length > 28 ? 7 : 13);
     doc.setTextColor(...card.color);
     doc.text(card.value, x + 6, cardY + 21);
   });
@@ -223,17 +236,17 @@ function addIndicatorsPage(doc: jsPDF, analysis: AdvancedDreAnalysis, modelName:
 
   const ind = analysis.indicators;
   const rows = [
-    ["Faturamento", formatCurrency(ind.revenue.value), ind.revenue.variation !== 0 ? `${ind.revenue.variation > 0 ? "+" : ""}${formatPercentage(ind.revenue.variation)}` : "—", ind.revenue.level],
-    ["Lucro Líquido", formatCurrency(ind.net_profit.value), ind.net_profit.variation !== 0 ? `${ind.net_profit.variation > 0 ? "+" : ""}${formatPercentage(ind.net_profit.variation)}` : "—", ind.net_profit.level],
-    ["Margem Líquida", formatPercentage(ind.net_margin.value), ind.net_margin.variation !== 0 ? `${ind.net_margin.variation > 0 ? "+" : ""}${formatPercentage(ind.net_margin.variation)}` : "—", ind.net_margin.level],
-    ["Margem Bruta (est.)", formatPercentage(ind.gross_margin.value), ind.gross_margin.variation !== 0 ? `${ind.gross_margin.variation > 0 ? "+" : ""}${formatPercentage(ind.gross_margin.variation)}` : "—", ind.gross_margin.level],
-    ["Margem Operacional (est.)", formatPercentage(ind.operating_margin.value), "—", ind.operating_margin.level],
-    ["EBITDA — Margem (est.)", formatPercentage(ind.ebitda.value), "—", ind.ebitda.level],
-    ["Total de Despesas", formatCurrency(ind.total_expenses.value), ind.total_expenses.variation !== 0 ? `${ind.total_expenses.variation > 0 ? "+" : ""}${formatPercentage(ind.total_expenses.variation)}` : "—", ind.total_expenses.level],
-    ["Melhor Período", ind.best_period.period, formatPercentage(ind.best_period.margin), "LOW"],
-    ["Pior Período", ind.worst_period.period, formatPercentage(ind.worst_period.margin), "HIGH"],
-    ["Variação Acumulada (receita)", `${ind.cumulative_variation.value >= 0 ? "+" : ""}${formatPercentage(ind.cumulative_variation.value)}`, "—", ind.cumulative_variation.level],
-    ["Índice de Eficiência", `${ind.efficiency_index.value.toFixed(2)}x`, "—", ind.efficiency_index.level],
+    ["Faturamento", indicatorValue(formatCurrency(ind.revenue.value), ind.revenue.fallbackMessage), indicatorVariation(ind.revenue.variation), indicatorLevel(ind.revenue.level)],
+    ["Lucro Líquido", indicatorValue(formatCurrency(ind.net_profit.value), ind.net_profit.fallbackMessage), indicatorVariation(ind.net_profit.variation), indicatorLevel(ind.net_profit.level)],
+    ["Margem Líquida", indicatorValue(formatPercentage(ind.net_margin.value), ind.net_margin.fallbackMessage), indicatorVariation(ind.net_margin.variation), indicatorLevel(ind.net_margin.level)],
+    ["Margem Bruta", indicatorValue(formatPercentage(ind.gross_margin.value), ind.gross_margin.fallbackMessage), indicatorVariation(ind.gross_margin.variation), indicatorLevel(ind.gross_margin.level)],
+    ["Margem Operacional", indicatorValue(formatPercentage(ind.operating_margin.value), ind.operating_margin.fallbackMessage), indicatorVariation(ind.operating_margin.variation), indicatorLevel(ind.operating_margin.level)],
+    ["EBITDA — Margem (est.)", indicatorValue(formatPercentage(ind.ebitda.value), ind.ebitda.fallbackMessage), indicatorVariation(ind.ebitda.variation), indicatorLevel(ind.ebitda.level)],
+    ["Total de Despesas", indicatorValue(formatCurrency(ind.total_expenses.value), ind.total_expenses.fallbackMessage), indicatorVariation(ind.total_expenses.variation), indicatorLevel(ind.total_expenses.level)],
+    ["Melhor Período", ind.best_period.fallbackMessage ?? ind.best_period.period, ind.best_period.fallbackMessage ? "—" : formatPercentage(ind.best_period.margin), ind.best_period.fallbackMessage ? null : "LOW"],
+    ["Pior Período", ind.worst_period.fallbackMessage ?? ind.worst_period.period, ind.worst_period.fallbackMessage ? "—" : formatPercentage(ind.worst_period.margin), ind.worst_period.fallbackMessage ? null : "HIGH"],
+    ["Variação Acumulada (receita)", ind.cumulative_variation.fallbackMessage ?? `${ind.cumulative_variation.value >= 0 ? "+" : ""}${formatPercentage(ind.cumulative_variation.value)}`, "—", indicatorLevel(ind.cumulative_variation.level)],
+    ["Índice de Eficiência", ind.efficiency_index.fallbackMessage ?? `${ind.efficiency_index.value.toFixed(2)}x`, "—", indicatorLevel(ind.efficiency_index.level)],
   ];
 
   const levelLabel: Record<AlertLevel, string> = { HIGH: "ALTO", MEDIUM: "MÉDIO", LOW: "BAIXO" };
@@ -242,16 +255,18 @@ function addIndicatorsPage(doc: jsPDF, analysis: AdvancedDreAnalysis, modelName:
     startY: 52,
     margin: { left: 14, right: 14 },
     head: [["Indicador", "Valor", "Variação", "Nível"]],
-    body: rows.map(([a, b, c, d]) => [a, b, c, levelLabel[d as AlertLevel]]),
+    body: rows.map(([a, b, c, d]) => [a, b, c, d ? levelLabel[d as AlertLevel] : "—"]),
     theme: "plain",
     styles: { fontSize: 9, cellPadding: { top: 3, right: 4, bottom: 3, left: 4 }, lineColor: C.border, lineWidth: 0.1 },
     headStyles: { fillColor: C.primary, textColor: C.white, fontStyle: "bold", fontSize: 8.5 },
     columnStyles: { 1: { halign: "right", fontStyle: "bold" }, 2: { halign: "right" }, 3: { halign: "center" } },
     didParseCell(data) {
       if (data.section === "body" && data.column.index === 3) {
-        const level = rows[data.row.index]?.[3] as AlertLevel;
-        data.cell.styles.textColor = levelColor(level);
-        data.cell.styles.fontStyle = "bold";
+        const level = rows[data.row.index]?.[3] as AlertLevel | null;
+        if (level) {
+          data.cell.styles.textColor = levelColor(level);
+          data.cell.styles.fontStyle = "bold";
+        }
       }
     },
   });

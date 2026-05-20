@@ -12,6 +12,7 @@ import {
   variationPercentage,
 } from "@/lib/dre-calculations";
 import type { DreCategoryType, DreDraftLine, DreEntryWithItems, DreModelWithLines } from "@/types/dre";
+import type { DreFinancialType } from "@/types/dre";
 
 export type DreAnalysisType = "monthly" | "quarterly" | "semester";
 
@@ -45,6 +46,7 @@ export type DreAnalysisRow = {
   label: string;
   lineType: "category" | "subcategory" | "sum" | "total";
   categoryType: DreCategoryType | "result" | "margin";
+  financialType?: DreFinancialType | null;
   level: 0 | 1;
   displayOrder: number;
   parentKey?: string;
@@ -180,6 +182,7 @@ function buildRowsFromModel(
       label: line.lineType === "category" || line.lineType === "sum" ? line.categoryName : line.subcategoryName ?? "",
       lineType: line.lineType,
       categoryType: line.isNetIncome ? "result" : line.categoryType,
+      financialType: line.financialType ?? null,
       level: line.lineType === "subcategory" ? 1 : 0,
       displayOrder: line.displayOrder,
       parentKey: line.lineType === "subcategory" ? modelLineKey(line.categoryId, null, "category", Math.floor(line.displayOrder / 1000) * 1000) : undefined,
