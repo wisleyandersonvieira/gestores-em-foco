@@ -59,12 +59,16 @@ export function effectiveCategoryType(line: Pick<DreDraftLine, "categoryType" | 
   return resolveFinancialBehavior(line.categoryType, line.subcategoryIsReductive);
 }
 
-export function getNetIncomeLine<T extends { is_net_income?: boolean | null; line_type?: string | null }>(modelLines: T[]) {
-  return modelLines.find((line) => line.is_net_income === true && line.line_type === "sum");
+export function isNetProfitLine(line: { financial_type?: string | null; is_net_income?: boolean | null; line_type?: string | null }) {
+  return line.line_type === "sum" && (line.financial_type === "net_profit" || line.is_net_income === true);
 }
 
-export function assertSingleNetIncomeLine(modelLines: Array<Pick<DreModelLine, "is_net_income" | "line_type">>) {
-  const markedLines = modelLines.filter((line) => line.is_net_income === true);
+export function getNetIncomeLine<T extends { financial_type?: string | null; is_net_income?: boolean | null; line_type?: string | null }>(modelLines: T[]) {
+  return modelLines.find(isNetProfitLine);
+}
+
+export function assertSingleNetIncomeLine(modelLines: Array<Pick<DreModelLine, "financial_type" | "is_net_income" | "line_type">>) {
+  const markedLines = modelLines.filter(isNetProfitLine);
   if (markedLines.some((line) => line.line_type !== "sum")) {
     throw new Error("Apenas linhas de soma podem representar o lucro liquido.");
   }
@@ -166,6 +170,7 @@ export function entryItemsToDraftLines(items: DreEntryItem[]): DreDraftLine[] {
     subcategoryName: item.subcategory_name_snapshot,
     categoryType: item.category_type_snapshot,
     categoryIsRevenue: item.category_is_revenue ?? false,
+    financialType: null,
     isNetIncome: item.is_net_income ?? false,
     subcategoryIsReductive: item.subcategory_is_reductive ?? false,
     lineType: item.line_type,

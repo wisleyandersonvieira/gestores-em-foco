@@ -134,7 +134,7 @@ function modelFixture(): DreModelWithLines {
       modelLine({ id: "line-net-revenue", category_id: null, subcategory_id: null, line_type: "sum", sum_label: "Receita Liquida", display_order: 1000 }),
       modelLine({ id: "line-costs", category_id: "costs", line_type: "category", display_order: 2000, category: category("costs", "Custos", "debit", false) }),
       modelLine({ id: "line-cpv", category_id: "costs", subcategory_id: "cpv", line_type: "subcategory", parent_category_id: "costs", display_order: 2001, category: category("costs", "Custos", "debit", false), subcategory: subcategory("cpv", "CPV", false) }),
-      modelLine({ id: "line-net-income", category_id: null, subcategory_id: null, line_type: "sum", sum_label: "Lucro Bruto", display_order: 3000, is_net_income: true }),
+      modelLine({ id: "line-net-income", category_id: null, subcategory_id: null, line_type: "sum", sum_label: "Lucro Bruto", financial_type: "net_profit", display_order: 3000 }),
       modelLine({ id: "line-last", category_id: null, subcategory_id: null, line_type: "sum", sum_label: "Outra soma", display_order: 4000 }),
     ],
   } as DreModelWithLines;
@@ -179,7 +179,7 @@ function expenseReductiveModelFixture(): DreModelWithLines {
       modelLine({ id: "line-expenses", category_id: "expenses", line_type: "category", display_order: 1000, category: category("expenses", "Outras Despesas e Receitas", "debit", false) }),
       modelLine({ id: "line-expense", category_id: "expenses", subcategory_id: "expense", line_type: "subcategory", parent_category_id: "expenses", display_order: 1001, category: category("expenses", "Outras Despesas e Receitas", "debit", false), subcategory: subcategory("expense", "Despesas", false) }),
       modelLine({ id: "line-reductions", category_id: "expenses", subcategory_id: "expense-reductions", line_type: "subcategory", parent_category_id: "expenses", display_order: 1002, category: category("expenses", "Outras Despesas e Receitas", "debit", false), subcategory: subcategory("expense-reductions", "Recebimento de Brindes", true) }),
-      modelLine({ id: "line-net-income", category_id: null, subcategory_id: null, line_type: "sum", sum_label: "Lucro Liquido", display_order: 2000, is_net_income: true }),
+      modelLine({ id: "line-net-income", category_id: null, subcategory_id: null, line_type: "sum", sum_label: "Lucro Liquido", financial_type: "net_profit", display_order: 2000 }),
     ],
   } as DreModelWithLines;
 }
@@ -218,6 +218,7 @@ function modelLine(overrides: Record<string, unknown>) {
     parent_category_id: null,
     line_type: "sum",
     sum_label: null,
+    financial_type: null,
     is_net_income: false,
     display_order: 0,
     created_at: "",

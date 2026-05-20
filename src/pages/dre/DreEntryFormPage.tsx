@@ -46,6 +46,7 @@ function DreEntryFormContent({ userId }: { userId: string }) {
           subcategoryName: item.subcategory_name_snapshot,
           categoryType: item.category_type_snapshot,
           categoryIsRevenue: item.category_is_revenue ?? false,
+          financialType: null,
           isNetIncome: item.is_net_income ?? false,
           subcategoryIsReductive: item.subcategory_is_reductive ?? false,
           lineType: item.line_type,

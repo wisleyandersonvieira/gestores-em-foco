@@ -13,8 +13,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { deleteOrDeactivateDreModel, getDreModelWithLines, listDreCategories, listDreModels, listDreSubcategories, saveDreModel } from "@/lib/dre-service";
-import type { DreCategory, DreModel, DreModelBuilderLine, DreRecordStatus, DreSubcategoryWithCategory } from "@/types/dre";
+import {
+  deleteOrDeactivateDreModel,
+  DRE_FINANCIAL_TYPE_OPTIONS,
+  getDreFinancialTypeLabel,
+  getDreModelWithLines,
+  listDreCategories,
+  listDreModels,
+  listDreSubcategories,
+  saveDreModel,
+} from "@/lib/dre-service";
+import type { DreCategory, DreFinancialType, DreModel, DreModelBuilderLine, DreRecordStatus, DreSubcategoryWithCategory } from "@/types/dre";
 
 type ModelForm = { id?: string; name: string; description: string; status: DreRecordStatus; structure: DreModelBuilderLine[] };
 
@@ -51,7 +60,8 @@ function DreModelsContent({ userId }: { userId: string }) {
         .filter((line) => line.line_type === "category" || line.line_type === "sum")
         .map((line) => {
           if (line.line_type === "sum") {
-            return { kind: "sum" as const, id: line.id, label: line.sum_label ?? "Subtotal", isNetIncome: line.is_net_income ?? false };
+            const financialType = line.financial_type ?? (line.is_net_income ? "net_profit" : null);
+            return { kind: "sum" as const, id: line.id, label: line.sum_label ?? "Subtotal", financialType, isNetIncome: financialType === "net_profit" };
           }
 
           return {
@@ -198,7 +208,7 @@ function DreModelsContent({ userId }: { userId: string }) {
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => setForm({ ...form, structure: [...form.structure, { kind: "sum", id: crypto.randomUUID(), label: "Subtotal", isNetIncome: false }] })}
+                    onClick={() => setForm({ ...form, structure: [...form.structure, { kind: "sum", id: crypto.randomUUID(), label: "Subtotal", financialType: null, isNetIncome: false }] })}
                   >
                     <PlusCircle className="h-4 w-4" />
                     Inserir soma
@@ -213,7 +223,7 @@ function DreModelsContent({ userId }: { userId: string }) {
                             <Label>
                               <span className="flex items-center gap-2">
                                 Linha de somatorio
-                                {item.isNetIncome ? <Badge variant="secondary">LUCRO LÍQUIDO</Badge> : null}
+                                {item.financialType ? <Badge variant="secondary">{getDreFinancialTypeLabel(item.financialType).toUpperCase()}</Badge> : null}
                               </span>
                               <Input
                                 className="mt-2"
@@ -223,20 +233,42 @@ function DreModelsContent({ userId }: { userId: string }) {
                                   structure: form.structure.map((line, lineIndex) => lineIndex === index && line.kind === "sum" ? { ...line, label: event.target.value } : line),
                                 })}
                               />
-                              <label className="mt-3 flex items-center gap-2 text-sm font-normal">
-                                <Checkbox
-                                  checked={item.isNetIncome}
-                                  onCheckedChange={(checked) => setForm({
-                                    ...form,
-                                    structure: form.structure.map((line, lineIndex) => {
-                                      if (line.kind !== "sum") return line;
-                                      if (lineIndex === index) return { ...line, isNetIncome: Boolean(checked) };
-                                      return checked ? { ...line, isNetIncome: false } : line;
-                                    }),
-                                  })}
-                                />
-                                Esta linha representa o Lucro Líquido
-                              </label>
+                              <div className="mt-3 grid gap-2">
+                                <span className="text-sm font-medium">Esta linha representa:</span>
+                                <Select
+                                  value={item.financialType ?? "none"}
+                                  onValueChange={(value) => {
+                                    const financialType = value === "none" ? null : value as DreFinancialType;
+                                    const assignedLine = financialType ? getAssignedFinancialTypeLine(form.structure, financialType, index) : null;
+                                    if (assignedLine) {
+                                      toast.error(`Este indicador já está atribuído à linha ${assignedLine}`);
+                                      return;
+                                    }
+
+                                    setForm({
+                                      ...form,
+                                      structure: form.structure.map((line, lineIndex) => lineIndex === index && line.kind === "sum"
+                                        ? { ...line, financialType, isNetIncome: financialType === "net_profit" }
+                                        : line),
+                                    });
+                                  }}
+                                >
+                                  <SelectTrigger className="max-w-sm bg-white">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">Nenhum (não é indicador)</SelectItem>
+                                    {DRE_FINANCIAL_TYPE_OPTIONS.map((option) => {
+                                      const assignedLine = getAssignedFinancialTypeLine(form.structure, option.value, index);
+                                      return (
+                                        <SelectItem key={option.value} value={option.value} disabled={Boolean(assignedLine)}>
+                                          {option.label}{assignedLine ? " (já atribuído)" : ""}
+                                        </SelectItem>
+                                      );
+                                    })}
+                                  </SelectContent>
+                                </Select>
+                              </div>
                             </Label>
                           ) : (
                             <>
@@ -336,4 +368,9 @@ function selectAllCategoryStructure(
     })),
     ...sumLines,
   ];
+}
+
+function getAssignedFinancialTypeLine(structure: DreModelBuilderLine[], financialType: DreFinancialType, currentIndex: number) {
+  const assigned = structure.find((line, index) => index !== currentIndex && line.kind === "sum" && line.financialType === financialType);
+  return assigned?.kind === "sum" ? assigned.label.trim() || "Subtotal" : null;
 }

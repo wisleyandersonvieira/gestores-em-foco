@@ -331,6 +331,7 @@ function buildExcelSheets(data: ExportData): ExcelSheet[] {
       Subcategoria: subcategoryName.get(item.subcategory_id) ?? "",
       "Categoria pai": categoryName.get(item.parent_category_id) ?? "",
       "Rotulo de soma": item.sum_label ?? "",
+      "Tipo financeiro": item.financial_type ?? "",
       Ordem: item.display_order ?? "",
     }))),
     sheet("DREs", entries.map((item) => ({

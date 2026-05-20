@@ -1235,6 +1235,9 @@ export type Database = {
           category_id: string | null
           created_at: string
           display_order: number
+          financial_type:
+            | Database["public"]["Enums"]["dre_model_line_financial_type"]
+            | null
           id: string
           is_net_income: boolean
           line_type: Database["public"]["Enums"]["dre_model_line_type"]
@@ -1248,6 +1251,9 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           display_order?: number
+          financial_type?:
+            | Database["public"]["Enums"]["dre_model_line_financial_type"]
+            | null
           id?: string
           is_net_income?: boolean
           line_type: Database["public"]["Enums"]["dre_model_line_type"]
@@ -1261,6 +1267,9 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           display_order?: number
+          financial_type?:
+            | Database["public"]["Enums"]["dre_model_line_financial_type"]
+            | null
           id?: string
           is_net_income?: boolean
           line_type?: Database["public"]["Enums"]["dre_model_line_type"]
@@ -2312,6 +2321,12 @@ export type Database = {
       app_role: "admin" | "client"
       dre_category_type: "credit" | "debit"
       dre_entry_status: "draft" | "finalized"
+      dre_model_line_financial_type:
+        | "revenue"
+        | "gross_profit"
+        | "operating_result"
+        | "pre_tax_profit"
+        | "net_profit"
       dre_model_line_type: "category" | "subcategory" | "sum"
       dre_record_status: "active" | "inactive"
       link_status: "active" | "expired" | "cancelled"
@@ -2464,6 +2479,13 @@ export const Constants = {
       app_role: ["admin", "client"],
       dre_category_type: ["credit", "debit"],
       dre_entry_status: ["draft", "finalized"],
+      dre_model_line_financial_type: [
+        "revenue",
+        "gross_profit",
+        "operating_result",
+        "pre_tax_profit",
+        "net_profit",
+      ],
       dre_model_line_type: ["category", "subcategory", "sum"],
       dre_record_status: ["active", "inactive"],
       link_status: ["active", "expired", "cancelled"],

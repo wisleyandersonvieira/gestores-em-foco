@@ -13,6 +13,7 @@ export type DreEntryItem = Tables<"dre_entry_items"> & {
 export type ProductSubscription = Tables<"product_subscriptions">;
 
 export type DreCategoryType = DreCategory["type"];
+export type DreFinancialType = NonNullable<DreModelLine["financial_type"]>;
 export type DreRecordStatus = DreCategory["status"];
 export type DreEntryStatus = DreEntry["status"];
 
@@ -47,6 +48,7 @@ export type DreModelBuilderSum = {
   kind: "sum";
   id: string;
   label: string;
+  financialType: DreFinancialType | null;
   isNetIncome: boolean;
 };
 
@@ -59,6 +61,7 @@ export type DreDraftLine = {
   subcategoryName: string | null;
   categoryType: DreCategoryType;
   categoryIsRevenue: boolean;
+  financialType?: DreFinancialType | null;
   isNetIncome: boolean;
   subcategoryIsReductive: boolean;
   lineType: "category" | "subcategory" | "sum";

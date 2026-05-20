@@ -65,7 +65,7 @@ function makeEntry(competence: string, values: { sales: number; returns?: number
 }
 
 function modelLine(overrides: Record<string, unknown>) {
-  return { id: "line", user_id: "user", model_id: "model", category_id: null, subcategory_id: null, parent_category_id: null, line_type: "sum", sum_label: null, is_net_income: false, display_order: 0, created_at: "", updated_at: "", category: null, subcategory: null, ...overrides };
+  return { id: "line", user_id: "user", model_id: "model", category_id: null, subcategory_id: null, parent_category_id: null, line_type: "sum", sum_label: null, financial_type: null, is_net_income: false, display_order: 0, created_at: "", updated_at: "", category: null, subcategory: null, ...overrides };
 }
 
 function cat(id: string, name: string, type: "credit" | "debit", isRevenue: boolean) {

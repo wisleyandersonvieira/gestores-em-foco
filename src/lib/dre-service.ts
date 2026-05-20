@@ -9,6 +9,7 @@ import {
   calculateRevenueFromEntryItems,
   calculateRevenueFromLines,
   calculateSumLineValue,
+  isNetProfitLine,
   roundCurrency,
   validateRevenueCategory,
 } from "@/lib/dre-calculations";
@@ -18,6 +19,7 @@ import type {
   DreEntryStatus,
   DreEntryWithItems,
   DreEntryWithModel,
+  DreFinancialType,
   DreModelBuilderLine,
   DreModelWithLines,
   DreRecordStatus,
@@ -29,6 +31,18 @@ type DefaultDreStructureResult = {
   created: boolean;
   model_id: string | null;
 };
+
+export const DRE_FINANCIAL_TYPE_OPTIONS: Array<{ value: DreFinancialType; label: string; description: string }> = [
+  { value: "revenue", label: "Receita Líquida", description: "Faturamento menos deduções e devoluções" },
+  { value: "gross_profit", label: "Lucro Bruto", description: "Receita líquida menos custos diretos (CMV)" },
+  { value: "operating_result", label: "Resultado Operacional", description: "Lucro bruto menos despesas operacionais" },
+  { value: "pre_tax_profit", label: "Lucro Antes de Impostos", description: "Resultado antes de impostos e provisões" },
+  { value: "net_profit", label: "Lucro Líquido", description: "Resultado final" },
+];
+
+export function getDreFinancialTypeLabel(value: DreFinancialType) {
+  return DRE_FINANCIAL_TYPE_OPTIONS.find((option) => option.value === value)?.label ?? value;
+}
 
 /**
  * O PostgREST do Supabase limita cada resposta a no máximo 1000 linhas.
@@ -235,6 +249,12 @@ export async function saveDreModel(params: {
 }) {
   const name = params.name.trim();
   if (!name) throw new Error("Informe o nome do modelo.");
+  assertUniqueFinancialTypes(params.structure);
+  assertSingleNetIncomeLine(params.structure.map((line) => ({
+    line_type: line.kind === "sum" ? "sum" : "category",
+    financial_type: line.kind === "sum" ? line.financialType : null,
+    is_net_income: line.kind === "sum" ? line.financialType === "net_profit" || line.isNetIncome : false,
+  })));
 
   const modelPayload = {
     user_id: params.userId,
@@ -248,10 +268,6 @@ export async function saveDreModel(params: {
     : await supabase.from("dre_models").insert(modelPayload).select("*").single();
 
   if (error || !model) throw new Error("Nao foi possivel salvar o modelo.");
-  assertSingleNetIncomeLine(params.structure.map((line) => ({
-    line_type: line.kind === "sum" ? "sum" : "category",
-    is_net_income: line.kind === "sum" ? line.isNetIncome : false,
-  })));
 
   const linePayloads = params.structure.flatMap((line, lineIndex) => {
     const lineOrder = lineIndex * 1000;
@@ -264,7 +280,8 @@ export async function saveDreModel(params: {
         subcategory_id: null,
         parent_category_id: null,
         sum_label: line.label.trim() || "Subtotal",
-        is_net_income: line.isNetIncome,
+        financial_type: line.financialType,
+        is_net_income: line.financialType === "net_profit",
         display_order: lineOrder,
       }];
     }
@@ -278,6 +295,7 @@ export async function saveDreModel(params: {
         subcategory_id: null,
         parent_category_id: null,
         sum_label: null,
+        financial_type: null,
         is_net_income: false,
         display_order: lineOrder,
       },
@@ -289,6 +307,7 @@ export async function saveDreModel(params: {
         subcategory_id: subcategoryId,
         parent_category_id: line.categoryId,
         sum_label: null,
+        financial_type: null,
         is_net_income: false,
         display_order: lineOrder + subcategoryIndex + 1,
       })),
@@ -319,6 +338,21 @@ export async function deleteOrDeactivateDreModel(userId: string, modelId: string
   return "deleted" as const;
 }
 
+function assertUniqueFinancialTypes(structure: DreModelBuilderLine[]) {
+  const assigned = new Map<DreFinancialType, string>();
+
+  structure.forEach((line) => {
+    if (line.kind !== "sum" || !line.financialType) return;
+
+    const existingLineLabel = assigned.get(line.financialType);
+    if (existingLineLabel) {
+      throw new Error(`Este indicador já está atribuído à linha ${existingLineLabel}`);
+    }
+
+    assigned.set(line.financialType, line.label.trim() || "Subtotal");
+  });
+}
+
 export function buildDraftLinesFromModel(model: DreModelWithLines): DreDraftLine[] {
   return model.lines.map((line) => ({
     categoryId: line.category_id,
@@ -327,7 +361,8 @@ export function buildDraftLinesFromModel(model: DreModelWithLines): DreDraftLine
     subcategoryName: line.subcategory?.name ?? null,
     categoryType: line.category?.type ?? "debit",
     categoryIsRevenue: line.category?.is_revenue ?? false,
-    isNetIncome: line.is_net_income ?? false,
+    financialType: line.financial_type ?? null,
+    isNetIncome: isNetProfitLine(line),
     subcategoryIsReductive: line.subcategory?.is_reductive ?? false,
     lineType: line.line_type,
     displayOrder: line.display_order,
@@ -508,17 +543,17 @@ export async function getDreEntry(userId: string, entryId: string): Promise<DreE
       );
       categories.forEach((category) => revenueByCategory.set(category.id, category.is_revenue));
     }
-    const netIncomeLines = await fetchAllPaginated<Pick<DreModelWithLines["lines"][number], "display_order" | "is_net_income">>((from, to) =>
+    const netIncomeLines = await fetchAllPaginated<Pick<DreModelWithLines["lines"][number], "display_order" | "financial_type" | "is_net_income" | "line_type">>((from, to) =>
       supabase
         .from("dre_model_lines")
-        .select("display_order,is_net_income")
+        .select("display_order,financial_type,is_net_income,line_type")
         .eq("user_id", userId)
         .eq("model_id", entry.model_id)
         .eq("line_type", "sum")
-        .eq("is_net_income", true)
+        .or("financial_type.eq.net_profit,is_net_income.eq.true")
         .range(from, to),
     );
-    netIncomeLines.forEach((line) => netIncomeDisplayOrders.add(line.display_order));
+    netIncomeLines.filter(isNetProfitLine).forEach((line) => netIncomeDisplayOrders.add(line.display_order));
 
     items = rawItems.map((item) => ({
       ...item,
@@ -609,17 +644,17 @@ async function recalculateEntrySummaries(userId: string, entries: DreEntryWithMo
     categories.forEach((category) => revenueByCategory.set(category.id, category.is_revenue));
   }
   if (modelIds.length) {
-    const netIncomeLines = await fetchAllPaginated<Pick<DreModelWithLines["lines"][number], "model_id" | "display_order">>((from, to) =>
+    const netIncomeLines = await fetchAllPaginated<Pick<DreModelWithLines["lines"][number], "model_id" | "display_order" | "financial_type" | "is_net_income" | "line_type">>((from, to) =>
       supabase
         .from("dre_model_lines")
-        .select("model_id,display_order")
+        .select("model_id,display_order,financial_type,is_net_income,line_type")
         .eq("user_id", userId)
         .in("model_id", modelIds)
         .eq("line_type", "sum")
-        .eq("is_net_income", true)
+        .or("financial_type.eq.net_profit,is_net_income.eq.true")
         .range(from, to),
     );
-    netIncomeLines.forEach((line) => {
+    netIncomeLines.filter(isNetProfitLine).forEach((line) => {
       netIncomeDisplayOrderByModel.set(line.model_id, new Set([...(netIncomeDisplayOrderByModel.get(line.model_id) ?? []), line.display_order]));
     });
   }
