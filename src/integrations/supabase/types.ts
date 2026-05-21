@@ -1158,6 +1158,13 @@ export type Database = {
             referencedRelation: "dre_models"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "dre_entries_model_same_user"
+            columns: ["model_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "dre_models"
+            referencedColumns: ["id", "user_id"]
+          },
         ]
       }
       dre_entry_items: {
@@ -1215,6 +1222,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "dre_entry_items_category_same_user"
+            columns: ["category_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "dre_categories"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
             foreignKeyName: "dre_entry_items_dre_entry_id_fkey"
             columns: ["dre_entry_id"]
             isOneToOne: false
@@ -1222,11 +1236,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "dre_entry_items_entry_same_user"
+            columns: ["dre_entry_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "dre_entries"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
             foreignKeyName: "dre_entry_items_subcategory_id_fkey"
             columns: ["subcategory_id"]
             isOneToOne: false
             referencedRelation: "dre_subcategories"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dre_entry_items_subcategory_same_user"
+            columns: ["subcategory_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "dre_subcategories"
+            referencedColumns: ["id", "user_id"]
           },
         ]
       }
@@ -1288,11 +1316,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "dre_model_lines_category_same_user"
+            columns: ["category_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "dre_categories"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
             foreignKeyName: "dre_model_lines_model_id_fkey"
             columns: ["model_id"]
             isOneToOne: false
             referencedRelation: "dre_models"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dre_model_lines_model_same_user"
+            columns: ["model_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "dre_models"
+            referencedColumns: ["id", "user_id"]
           },
           {
             foreignKeyName: "dre_model_lines_parent_category_id_fkey"
@@ -1302,11 +1344,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "dre_model_lines_parent_category_same_user"
+            columns: ["parent_category_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "dre_categories"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
             foreignKeyName: "dre_model_lines_subcategory_id_fkey"
             columns: ["subcategory_id"]
             isOneToOne: false
             referencedRelation: "dre_subcategories"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dre_model_lines_subcategory_same_user"
+            columns: ["subcategory_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "dre_subcategories"
+            referencedColumns: ["id", "user_id"]
           },
         ]
       }
@@ -1382,7 +1438,41 @@ export type Database = {
             referencedRelation: "dre_categories"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "dre_subcategories_category_same_user"
+            columns: ["category_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "dre_categories"
+            referencedColumns: ["id", "user_id"]
+          },
         ]
+      }
+      edge_rate_limits: {
+        Row: {
+          function_name: string
+          key: string
+          request_count: number
+          subject: string
+          updated_at: string
+          window_start: string
+        }
+        Insert: {
+          function_name: string
+          key: string
+          request_count?: number
+          subject: string
+          updated_at?: string
+          window_start?: string
+        }
+        Update: {
+          function_name?: string
+          key?: string
+          request_count?: number
+          subject?: string
+          updated_at?: string
+          window_start?: string
+        }
+        Relationships: []
       }
       privacy_requests: {
         Row: {
@@ -1647,21 +1737,45 @@ export type Database = {
       }
       stripe_webhook_events: {
         Row: {
+          checkout_session_id: string | null
+          customer_id: string | null
           id: string
-          payload: Json
+          livemode: boolean | null
+          object_id: string | null
+          payload: Json | null
+          payload_minimized: Json | null
+          payment_intent_id: string | null
           processed_at: string
+          status: string | null
+          subscription_id: string | null
           type: string
         }
         Insert: {
+          checkout_session_id?: string | null
+          customer_id?: string | null
           id: string
-          payload: Json
+          livemode?: boolean | null
+          object_id?: string | null
+          payload?: Json | null
+          payload_minimized?: Json | null
+          payment_intent_id?: string | null
           processed_at?: string
+          status?: string | null
+          subscription_id?: string | null
           type: string
         }
         Update: {
+          checkout_session_id?: string | null
+          customer_id?: string | null
           id?: string
-          payload?: Json
+          livemode?: boolean | null
+          object_id?: string | null
+          payload?: Json | null
+          payload_minimized?: Json | null
+          payment_intent_id?: string | null
           processed_at?: string
+          status?: string | null
+          subscription_id?: string | null
           type?: string
         }
         Relationships: []
@@ -2238,9 +2352,47 @@ export type Database = {
           model_id: string
         }[]
       }
-      default_dre_subcategory_id: {
-        Args: { p_category_id: string; p_name: string; p_user_id: string }
+      create_default_dre_structure_for_user: {
+        Args: { p_user_id: string }
+        Returns: {
+          created: boolean
+          model_id: string
+        }[]
+      }
+      default_dre_category_id: {
+        Args: {
+          p_display_order: number
+          p_is_revenue?: boolean
+          p_name: string
+          p_type: Database["public"]["Enums"]["dre_category_type"]
+          p_user_id: string
+        }
         Returns: string
+      }
+      default_dre_subcategory_id:
+        | {
+            Args: { p_category_id: string; p_name: string; p_user_id: string }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_category_id: string
+              p_display_order: number
+              p_name: string
+              p_user_id: string
+            }
+            Returns: string
+          }
+      find_dre_ownership_violations: {
+        Args: never
+        Returns: {
+          record_id: string
+          record_user_id: string
+          referenced_id: string
+          referenced_user_id: string
+          relationship: string
+          table_name: string
+        }[]
       }
       get_community_topic_comments: {
         Args: { p_topic_id: string }
