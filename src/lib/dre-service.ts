@@ -20,6 +20,7 @@ import type {
   DreEntryWithItems,
   DreEntryWithModel,
   DreFinancialType,
+  DreModel,
   DreModelBuilderLine,
   DreModelWithLines,
   DreRecordStatus,
@@ -42,6 +43,31 @@ export const DRE_FINANCIAL_TYPE_OPTIONS: Array<{ value: DreFinancialType; label:
 
 export function getDreFinancialTypeLabel(value: DreFinancialType) {
   return DRE_FINANCIAL_TYPE_OPTIONS.find((option) => option.value === value)?.label ?? value;
+}
+
+const dreCategoriesCache = new Map<string, DreCategory[]>();
+const dreSubcategoriesCache = new Map<string, DreSubcategoryWithCategory[]>();
+const dreModelsCache = new Map<string, DreModelWithLines>();
+const dreModelListCache = new Map<string, DreModel[]>();
+
+function modelCacheKey(userId: string, modelId: string) {
+  return `${userId}:${modelId}`;
+}
+
+function modelListCacheKey(userId: string, status?: DreRecordStatus) {
+  return `${userId}:${status ?? "all"}`;
+}
+
+function invalidateDreStructureCache(userId: string | null | undefined) {
+  if (!userId) return;
+  dreCategoriesCache.delete(userId);
+  dreSubcategoriesCache.delete(userId);
+  for (const key of dreModelsCache.keys()) {
+    if (key.startsWith(`${userId}:`)) dreModelsCache.delete(key);
+  }
+  for (const key of dreModelListCache.keys()) {
+    if (key.startsWith(`${userId}:`)) dreModelListCache.delete(key);
+  }
 }
 
 /**
@@ -87,8 +113,11 @@ export async function createDefaultDreCategories(userId: string) {
 }
 
 export async function listDreCategories(userId: string) {
+  const cached = dreCategoriesCache.get(userId);
+  if (cached) return cached;
+
   try {
-    return await fetchAllPaginated<DreCategory>((from, to) =>
+    const categories = await fetchAllPaginated<DreCategory>((from, to) =>
       supabase
         .from("dre_categories")
         .select("*")
@@ -97,6 +126,8 @@ export async function listDreCategories(userId: string) {
         .order("name", { ascending: true })
         .range(from, to),
     );
+    dreCategoriesCache.set(userId, categories);
+    return categories;
   } catch {
     throw new Error("Nao foi possivel carregar categorias.");
   }
@@ -118,11 +149,13 @@ export async function saveDreCategory(payload: TablesInsert<"dre_categories"> | 
   if ("id" in payload && payload.id) {
     const { error } = await supabase.from("dre_categories").update(categoryPayload).eq("id", payload.id);
     if (error) throw new Error("Nao foi possivel atualizar a categoria.");
+    invalidateDreStructureCache(payload.user_id as string | null | undefined);
     return;
   }
 
   const { error } = await supabase.from("dre_categories").insert(categoryPayload as TablesInsert<"dre_categories">);
   if (error) throw new Error("Nao foi possivel criar a categoria.");
+  invalidateDreStructureCache(payload.user_id as string | null | undefined);
 }
 
 export async function deleteOrDeactivateDreCategory(category: DreCategory) {
@@ -135,17 +168,22 @@ export async function deleteOrDeactivateDreCategory(category: DreCategory) {
   if (inUse) {
     const { error } = await supabase.from("dre_categories").update({ status: "inactive" }).eq("id", category.id).eq("user_id", category.user_id);
     if (error) throw new Error("Categoria em uso. Nao foi possivel inativar.");
+    invalidateDreStructureCache(category.user_id);
     return "inactivated" as const;
   }
 
   const { error } = await supabase.from("dre_categories").delete().eq("id", category.id).eq("user_id", category.user_id);
   if (error) throw new Error("Nao foi possivel excluir a categoria.");
+  invalidateDreStructureCache(category.user_id);
   return "deleted" as const;
 }
 
 export async function listDreSubcategories(userId: string) {
+  const cached = dreSubcategoriesCache.get(userId);
+  if (cached) return cached;
+
   try {
-    return (await fetchAllPaginated<DreSubcategoryWithCategory>((from, to) =>
+    const subcategories = (await fetchAllPaginated<DreSubcategoryWithCategory>((from, to) =>
       supabase
         .from("dre_subcategories")
         .select("*, category:dre_categories(id,name,type,status,is_revenue)")
@@ -154,6 +192,8 @@ export async function listDreSubcategories(userId: string) {
         .order("name", { ascending: true })
         .range(from, to),
     )) as DreSubcategoryWithCategory[];
+    dreSubcategoriesCache.set(userId, subcategories);
+    return subcategories;
   } catch {
     throw new Error("Nao foi possivel carregar subcategorias.");
   }
@@ -176,11 +216,13 @@ export async function saveDreSubcategory(payload: TablesInsert<"dre_subcategorie
   if ("id" in payload && payload.id) {
     const { error } = await supabase.from("dre_subcategories").update(subcategoryPayload).eq("id", payload.id);
     if (error) throw new Error("Nao foi possivel atualizar a subcategoria.");
+    invalidateDreStructureCache(payload.user_id as string | null | undefined);
     return;
   }
 
   const { error } = await supabase.from("dre_subcategories").insert(subcategoryPayload as TablesInsert<"dre_subcategories">);
   if (error) throw new Error("Nao foi possivel criar a subcategoria.");
+  invalidateDreStructureCache(payload.user_id as string | null | undefined);
 }
 
 export async function deleteOrDeactivateDreSubcategory(subcategory: DreSubcategory) {
@@ -192,17 +234,22 @@ export async function deleteOrDeactivateDreSubcategory(subcategory: DreSubcatego
   if (inUse) {
     const { error } = await supabase.from("dre_subcategories").update({ status: "inactive" }).eq("id", subcategory.id).eq("user_id", subcategory.user_id);
     if (error) throw new Error("Subcategoria em uso. Nao foi possivel inativar.");
+    invalidateDreStructureCache(subcategory.user_id);
     return "inactivated" as const;
   }
 
   const { error } = await supabase.from("dre_subcategories").delete().eq("id", subcategory.id).eq("user_id", subcategory.user_id);
   if (error) throw new Error("Nao foi possivel excluir a subcategoria.");
+  invalidateDreStructureCache(subcategory.user_id);
   return "deleted" as const;
 }
 
 export async function listDreModels(userId: string, status?: DreRecordStatus) {
+  const cached = dreModelListCache.get(modelListCacheKey(userId, status));
+  if (cached) return cached;
+
   try {
-    return await fetchAllPaginated((from, to) => {
+    const models = await fetchAllPaginated((from, to) => {
       let q = supabase
         .from("dre_models")
         .select("*")
@@ -212,12 +259,17 @@ export async function listDreModels(userId: string, status?: DreRecordStatus) {
       if (status) q = q.eq("status", status);
       return q;
     });
+    dreModelListCache.set(modelListCacheKey(userId, status), models);
+    return models;
   } catch {
     throw new Error("Nao foi possivel carregar modelos.");
   }
 }
 
 export async function getDreModelWithLines(userId: string, modelId: string): Promise<DreModelWithLines> {
+  const cached = dreModelsCache.get(modelCacheKey(userId, modelId));
+  if (cached) return cached;
+
   const { data: model, error: modelError } = await supabase.from("dre_models").select("*").eq("user_id", userId).eq("id", modelId).single();
   if (modelError) throw new Error("Modelo nao encontrado.");
 
@@ -236,7 +288,9 @@ export async function getDreModelWithLines(userId: string, modelId: string): Pro
     if (import.meta.env.DEV) console.error("Erro ao carregar estrutura do modelo DRE:", linesError);
     throw new Error("Nao foi possivel carregar a estrutura do modelo.");
   }
-  return { ...model, lines };
+  const modelWithLines = { ...model, lines };
+  dreModelsCache.set(modelCacheKey(userId, modelId), modelWithLines);
+  return modelWithLines;
 }
 
 export async function saveDreModel(params: {
@@ -321,6 +375,7 @@ export async function saveDreModel(params: {
     if (linesError) throw new Error("Modelo salvo, mas a estrutura nao pode ser atualizada.");
   }
 
+  invalidateDreStructureCache(params.userId);
   return model;
 }
 
@@ -330,11 +385,13 @@ export async function deleteOrDeactivateDreModel(userId: string, modelId: string
   if (inUse) {
     const { error } = await supabase.from("dre_models").update({ status: "inactive" }).eq("id", modelId).eq("user_id", userId);
     if (error) throw new Error("Modelo em uso. Nao foi possivel inativar.");
+    invalidateDreStructureCache(userId);
     return "inactivated" as const;
   }
 
   const { error } = await supabase.from("dre_models").delete().eq("id", modelId).eq("user_id", userId);
   if (error) throw new Error("Nao foi possivel excluir o modelo.");
+  invalidateDreStructureCache(userId);
   return "deleted" as const;
 }
 
@@ -495,76 +552,48 @@ export async function listDreEntriesByModelAndYears(params: {
 }
 
 export async function getDreEntry(userId: string, entryId: string): Promise<DreEntryWithItems> {
-  const { data: entry, error } = await supabase
-    .from("dre_entries")
-    .select("*, model:dre_models(id,name)")
-    .eq("user_id", userId)
-    .eq("id", entryId)
-    .single();
+  const [entry] = await getDreEntriesWithItems(userId, [entryId]);
+  if (!entry) throw new Error("DRE nao encontrado.");
+  return entry;
+}
 
-  if (error || !entry) throw new Error("DRE nao encontrado.");
+export async function getDreEntriesWithItems(userId: string, entryIds: string[]): Promise<DreEntryWithItems[]> {
+  const uniqueEntryIds = Array.from(new Set(entryIds)).filter(Boolean);
+  if (uniqueEntryIds.length === 0) return [];
 
-  let items: DreEntryWithItems["items"];
   try {
+    const entries = (await fetchAllPaginated((from, to) =>
+      supabase
+        .from("dre_entries")
+        .select("*, model:dre_models(id,name)")
+        .eq("user_id", userId)
+        .in("id", uniqueEntryIds)
+        .range(from, to),
+    )) as DreEntryWithModel[];
+
+    if (entries.length === 0) return [];
+
     const rawItems = (await fetchAllPaginated((from, to) =>
       supabase
         .from("dre_entry_items")
         .select("*")
         .eq("user_id", userId)
-        .eq("dre_entry_id", entryId)
+        .in("dre_entry_id", uniqueEntryIds)
+        .order("dre_entry_id", { ascending: true })
         .order("display_order", { ascending: true })
         .range(from, to),
     )) as DreEntryWithItems["items"];
-    const subcategoryIds = Array.from(new Set(rawItems.map((item) => item.subcategory_id).filter((id): id is string => Boolean(id))));
-    const categoryIds = Array.from(new Set(rawItems.map((item) => item.category_id).filter((id): id is string => Boolean(id))));
-    const reductiveBySubcategory = new Map<string, boolean>();
-    const revenueByCategory = new Map<string, boolean>();
-    const netIncomeDisplayOrders = new Set<number>();
 
-    if (subcategoryIds.length) {
-      const subcategories = await fetchAllPaginated<Pick<DreSubcategory, "id" | "is_reductive">>((from, to) =>
-        supabase
-          .from("dre_subcategories")
-          .select("id,is_reductive")
-          .eq("user_id", userId)
-          .in("id", subcategoryIds)
-          .range(from, to),
-      );
-      subcategories.forEach((subcategory) => reductiveBySubcategory.set(subcategory.id, subcategory.is_reductive));
-    }
-    if (categoryIds.length) {
-      const categories = await fetchAllPaginated<Pick<DreCategory, "id" | "is_revenue">>((from, to) =>
-        supabase
-          .from("dre_categories")
-          .select("id,is_revenue")
-          .eq("user_id", userId)
-          .in("id", categoryIds)
-          .range(from, to),
-      );
-      categories.forEach((category) => revenueByCategory.set(category.id, category.is_revenue));
-    }
-    const netIncomeLines = await fetchAllPaginated<Pick<DreModelWithLines["lines"][number], "display_order" | "financial_type" | "is_net_income" | "line_type">>((from, to) =>
-      supabase
-        .from("dre_model_lines")
-        .select("display_order,financial_type,is_net_income,line_type")
-        .eq("user_id", userId)
-        .eq("model_id", entry.model_id)
-        .eq("line_type", "sum")
-        .or("financial_type.eq.net_profit,is_net_income.eq.true")
-        .range(from, to),
-    );
-    netIncomeLines.filter(isNetProfitLine).forEach((line) => netIncomeDisplayOrders.add(line.display_order));
+    const itemsByEntry = await enrichItemsByEntry(userId, entries, rawItems);
+    const byId = new Map(entries.map((entry) => [
+      entry.id,
+      { ...(calculateEntryWithItems(entry, itemsByEntry.get(entry.id) ?? [])), items: itemsByEntry.get(entry.id) ?? [] },
+    ]));
 
-    items = rawItems.map((item) => ({
-      ...item,
-      category_is_revenue: item.category_id ? revenueByCategory.get(item.category_id) ?? false : false,
-      is_net_income: item.line_type === "sum" && netIncomeDisplayOrders.has(item.display_order),
-      subcategory_is_reductive: item.subcategory_id ? reductiveBySubcategory.get(item.subcategory_id) ?? false : false,
-    }));
+    return uniqueEntryIds.map((id) => byId.get(id)).filter((entry): entry is DreEntryWithItems => Boolean(entry));
   } catch {
-    throw new Error("Nao foi possivel carregar os itens do DRE.");
+    throw new Error("Nao foi possivel carregar os DREs selecionados.");
   }
-  return { ...(calculateEntryWithItems(entry as DreEntryWithModel, items)), items };
 }
 
 export async function deleteDreEntry(userId: string, entryId: string) {
@@ -613,6 +642,12 @@ async function recalculateEntrySummaries(userId: string, entries: DreEntryWithMo
       .in("dre_entry_id", entryIds)
       .range(from, to),
   )) as DreEntryWithItems["items"];
+  const itemsByEntry = await enrichItemsByEntry(userId, entries, rawItems);
+
+  return entries.map((entry) => calculateEntryWithItems(entry, itemsByEntry.get(entry.id) ?? []));
+}
+
+async function enrichItemsByEntry(userId: string, entries: DreEntryWithModel[], rawItems: DreEntryWithItems["items"]) {
   const subcategoryIds = Array.from(new Set(rawItems.map((item) => item.subcategory_id).filter((id): id is string => Boolean(id))));
   const categoryIds = Array.from(new Set(rawItems.map((item) => item.category_id).filter((id): id is string => Boolean(id))));
   const reductiveBySubcategory = new Map<string, boolean>();
@@ -671,5 +706,5 @@ async function recalculateEntrySummaries(userId: string, entries: DreEntryWithMo
     itemsByEntry.set(item.dre_entry_id, [...(itemsByEntry.get(item.dre_entry_id) ?? []), enriched]);
   });
 
-  return entries.map((entry) => calculateEntryWithItems(entry, itemsByEntry.get(entry.id) ?? []));
+  return itemsByEntry;
 }

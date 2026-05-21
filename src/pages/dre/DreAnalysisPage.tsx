@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { BarChart2, ChevronDown, Download, FileSpreadsheet, Minus, Plus, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
@@ -26,13 +26,16 @@ import {
   type DreAnalysisRow,
   type DreAnalysisType,
 } from "@/lib/dre-analysis";
-import { getDreEntry, getDreModelWithLines, listDreEntriesByModelAndYears, listDreModels } from "@/lib/dre-service";
-import { DreAdvancedAnalysisModal } from "@/components/dre/DreAdvancedAnalysisModal";
+import { getDreEntriesWithItems, getDreModelWithLines, listDreEntriesByModelAndYears, listDreModels } from "@/lib/dre-service";
 import type { DreEntryWithModel, DreModel } from "@/types/dre";
 
 type AnalysisType = DreAnalysisType;
 type SelectablePeriod = DreAnalysisPeriodInput;
 type AnalysisResult = DreAnalysisResult;
+
+const DreAdvancedAnalysisModal = lazy(() =>
+  import("@/components/dre/DreAdvancedAnalysisModal").then((module) => ({ default: module.DreAdvancedAnalysisModal })),
+);
 
 export default function DreAnalysisPage() {
   return <DreLayout>{(user) => <DreAnalysisContent userId={user.id} />}</DreLayout>;
@@ -51,6 +54,7 @@ function DreAnalysisContent({ userId }: { userId: string }) {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [showAdvancedAnalysis, setShowAdvancedAnalysis] = useState(false);
+  const [exportingFormat, setExportingFormat] = useState<"pdf" | "pdf-synthetic" | "excel" | null>(null);
 
   useEffect(() => {
     void listDreModels(userId, "active")
@@ -98,12 +102,11 @@ function DreAnalysisContent({ userId }: { userId: string }) {
 
     setLoading(true);
     try {
-      const detailedEntries = await Promise.all(
-        selectedPeriods.flatMap((period) => period.months)
-          .map((competence) => availableEntries.find((entry) => entry.competence === competence))
-          .filter((entry): entry is DreEntryWithModel => Boolean(entry))
-          .map((entry) => getDreEntry(userId, entry.id)),
-      );
+      const entryIds = selectedPeriods.flatMap((period) => period.months)
+        .map((competence) => availableEntries.find((entry) => entry.competence === competence))
+        .filter((entry): entry is DreEntryWithModel => Boolean(entry))
+        .map((entry) => entry.id);
+      const detailedEntries = await getDreEntriesWithItems(userId, entryIds);
       const model = await getDreModelWithLines(userId, modelId);
       setResult(buildDreAnalysisFromModel({ model, periods: selectedPeriods, entries: detailedEntries }));
     } catch (error) {
@@ -123,6 +126,23 @@ function DreAnalysisContent({ userId }: { userId: string }) {
     setAvailableEntries([]);
     setSelectedIds([]);
     setResult(null);
+  }
+
+  async function runExport(format: "pdf" | "pdf-synthetic" | "excel") {
+    if (!result || exportingFormat) return;
+    setExportingFormat(format);
+    try {
+      await new Promise<void>((resolve) => {
+        window.requestAnimationFrame(() => {
+          if (format === "pdf") exportAnalysisPdf(result, showVariation, showVerticalAnalysis);
+          if (format === "pdf-synthetic") exportAnalysisPdfSynthetic(result, showVariation, showVerticalAnalysis);
+          if (format === "excel") exportAnalysisExcel(result, showVariation, showVerticalAnalysis);
+          resolve();
+        });
+      });
+    } finally {
+      setExportingFormat(null);
+    }
   }
 
   return (
@@ -216,14 +236,14 @@ function DreAnalysisContent({ userId }: { userId: string }) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => result && exportAnalysisPdf(result, showVariation, showVerticalAnalysis)}>
-                  <Download className="h-4 w-4" />Exportar PDF (Analitica)
+                <DropdownMenuItem disabled={Boolean(exportingFormat)} onClick={() => void runExport("pdf")}>
+                  <Download className="h-4 w-4" />{exportingFormat === "pdf" ? "Gerando PDF..." : "Exportar PDF (Analitica)"}
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => result && exportAnalysisPdfSynthetic(result, showVariation, showVerticalAnalysis)}>
-                  <Download className="h-4 w-4" />Exportar PDF (Sintetica)
+                <DropdownMenuItem disabled={Boolean(exportingFormat)} onClick={() => void runExport("pdf-synthetic")}>
+                  <Download className="h-4 w-4" />{exportingFormat === "pdf-synthetic" ? "Gerando PDF..." : "Exportar PDF (Sintetica)"}
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => result && exportAnalysisExcel(result, showVariation, showVerticalAnalysis)}>
-                  <FileSpreadsheet className="h-4 w-4" />Exportar Excel
+                <DropdownMenuItem disabled={Boolean(exportingFormat)} onClick={() => void runExport("excel")}>
+                  <FileSpreadsheet className="h-4 w-4" />{exportingFormat === "excel" ? "Gerando Excel..." : "Exportar Excel"}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -238,11 +258,13 @@ function DreAnalysisContent({ userId }: { userId: string }) {
       </Card>
 
       {showAdvancedAnalysis && result ? (
-        <DreAdvancedAnalysisModal
-          result={result}
-          modelName={models.find((m) => m.id === modelId)?.name ?? ""}
-          onClose={() => setShowAdvancedAnalysis(false)}
-        />
+        <Suspense fallback={null}>
+          <DreAdvancedAnalysisModal
+            result={result}
+            modelName={models.find((m) => m.id === modelId)?.name ?? ""}
+            onClose={() => setShowAdvancedAnalysis(false)}
+          />
+        </Suspense>
       ) : null}
 
       {result ? (

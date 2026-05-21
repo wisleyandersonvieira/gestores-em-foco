@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import type React from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import type { TooltipProps } from "recharts";
@@ -8,7 +8,6 @@ import { Link } from "react-router-dom";
 
 import { DreLayout } from "@/components/dre/dre-layout";
 import { CompetenceMultiFilter, formatCurrency } from "@/components/dre/dre-ui";
-import { DreAdvancedAnalysisModal } from "@/components/dre/DreAdvancedAnalysisModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,7 +15,7 @@ import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
 import { buildDreAnalysisFromModel, type DreAnalysisResult } from "@/lib/dre-analysis";
 import { calculateEffectiveTotalsFromEntryItems, currentCompetence, formatCompetence, formatPercentage } from "@/lib/dre-calculations";
 import { generateAdvancedDreAnalysis, type AdvancedAlert, type AdvancedDreAnalysis, type AlertLevel } from "@/lib/dre-advanced-analysis";
-import { getDreEntry, getDreModelWithLines, listDreEntries } from "@/lib/dre-service";
+import { getDreEntriesWithItems, getDreModelWithLines, listDreEntries } from "@/lib/dre-service";
 import type { DreEntryWithItems, DreEntryWithModel, DreModelWithLines } from "@/types/dre";
 
 type DashboardChartPoint = {
@@ -25,6 +24,10 @@ type DashboardChartPoint = {
   netIncome: number;
   margin: number;
 };
+
+const DreAdvancedAnalysisModal = lazy(() =>
+  import("@/components/dre/DreAdvancedAnalysisModal").then((module) => ({ default: module.DreAdvancedAnalysisModal })),
+);
 
 export default function DreDashboardPage() {
   return <DreLayout>{(user) => <DreDashboardContent userId={user.id} />}</DreLayout>;
@@ -71,7 +74,7 @@ function DreDashboardContent({ userId }: { userId: string }) {
     if (selectedEntriesForModel.length === 0) return;
 
     async function loadItems() {
-      const detailed = await Promise.all(selectedEntriesForModel.map((entry) => getDreEntry(userId, entry.id)));
+      const detailed = await getDreEntriesWithItems(userId, selectedEntriesForModel.map((entry) => entry.id));
       setEntriesWithItems(detailed.sort((a, b) => a.competence.localeCompare(b.competence)));
     }
 
@@ -306,11 +309,13 @@ function DreDashboardContent({ userId }: { userId: string }) {
       </ChartCard>
 
       {showAdvancedAnalysis && analysisResult && model ? (
-        <DreAdvancedAnalysisModal
-          result={analysisResult}
-          modelName={model.name}
-          onClose={() => setShowAdvancedAnalysis(false)}
-        />
+        <Suspense fallback={null}>
+          <DreAdvancedAnalysisModal
+            result={analysisResult}
+            modelName={model.name}
+            onClose={() => setShowAdvancedAnalysis(false)}
+          />
+        </Suspense>
       ) : null}
     </div>
   );

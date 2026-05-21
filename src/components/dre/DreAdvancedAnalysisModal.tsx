@@ -46,7 +46,6 @@ import {
   type AlertLevel,
 } from "@/lib/dre-advanced-analysis";
 import type { DreAnalysisResult } from "@/lib/dre-analysis";
-import { exportAdvancedDrePdf } from "@/lib/dre-advanced-pdf";
 
 // ── Color palette ──────────────────────────────────────────────────────────────
 
@@ -862,6 +861,7 @@ type DreAdvancedAnalysisModalProps = {
 
 export function DreAdvancedAnalysisModal({ result, modelName, onClose }: DreAdvancedAnalysisModalProps) {
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [activeTab, setActiveTab] = useState("summary");
 
   const analysis = useMemo(() => {
     try {
@@ -875,6 +875,7 @@ export function DreAdvancedAnalysisModal({ result, modelName, onClose }: DreAdva
     if (!analysis) return;
     setExportingPdf(true);
     try {
+      const { exportAdvancedDrePdf } = await import("@/lib/dre-advanced-pdf");
       await exportAdvancedDrePdf(analysis);
     } finally {
       setExportingPdf(false);
@@ -919,7 +920,7 @@ export function DreAdvancedAnalysisModal({ result, modelName, onClose }: DreAdva
         {!analysis ? (
           <AnalysisSkeleton />
         ) : (
-          <Tabs defaultValue="summary" className="flex min-h-0 flex-1 flex-col">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex min-h-0 flex-1 flex-col">
             <div className="border-b px-6 shrink-0">
               <TabsList className="h-auto flex-wrap gap-1 bg-transparent p-0 py-2">
                 {tabs.map((tab) => (
@@ -941,14 +942,14 @@ export function DreAdvancedAnalysisModal({ result, modelName, onClose }: DreAdva
 
             <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
               <div className="p-6">
-                <TabsContent value="summary" className="mt-0"><ExecutiveSummarySection data={analysis} /></TabsContent>
-                <TabsContent value="indicators" className="mt-0"><IndicatorsSection data={analysis} /></TabsContent>
-                <TabsContent value="variations" className="mt-0"><VariationsSection data={analysis} /></TabsContent>
-                <TabsContent value="abc" className="mt-0"><AbcCurveSection data={analysis} /></TabsContent>
-                <TabsContent value="charts" className="mt-0"><ChartsSection data={analysis} /></TabsContent>
-                <TabsContent value="margins" className="mt-0"><MarginsSection data={analysis} /></TabsContent>
-                <TabsContent value="alerts" className="mt-0"><AlertsSection data={analysis} /></TabsContent>
-                <TabsContent value="recommendations" className="mt-0"><RecommendationsSection data={analysis} /></TabsContent>
+                <TabsContent value="summary" className="mt-0">{activeTab === "summary" ? <ExecutiveSummarySection data={analysis} /> : null}</TabsContent>
+                <TabsContent value="indicators" className="mt-0">{activeTab === "indicators" ? <IndicatorsSection data={analysis} /> : null}</TabsContent>
+                <TabsContent value="variations" className="mt-0">{activeTab === "variations" ? <VariationsSection data={analysis} /> : null}</TabsContent>
+                <TabsContent value="abc" className="mt-0">{activeTab === "abc" ? <AbcCurveSection data={analysis} /> : null}</TabsContent>
+                <TabsContent value="charts" className="mt-0">{activeTab === "charts" ? <ChartsSection data={analysis} /> : null}</TabsContent>
+                <TabsContent value="margins" className="mt-0">{activeTab === "margins" ? <MarginsSection data={analysis} /> : null}</TabsContent>
+                <TabsContent value="alerts" className="mt-0">{activeTab === "alerts" ? <AlertsSection data={analysis} /> : null}</TabsContent>
+                <TabsContent value="recommendations" className="mt-0">{activeTab === "recommendations" ? <RecommendationsSection data={analysis} /> : null}</TabsContent>
               </div>
             </div>
           </Tabs>
