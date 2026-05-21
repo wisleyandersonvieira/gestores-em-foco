@@ -2359,6 +2359,13 @@ export type Database = {
           model_id: string
         }[]
       }
+      create_default_dre_structure_for_user_unchecked: {
+        Args: { p_user_id: string }
+        Returns: {
+          created: boolean
+          model_id: string
+        }[]
+      }
       default_dre_category_id: {
         Args: {
           p_display_order: number

@@ -511,7 +511,7 @@ export async function listDreEntries(userId: string) {
     const entries = (await fetchAllPaginated((from, to) =>
       supabase
         .from("dre_entries")
-        .select("*, model:dre_models(id,name)")
+        .select("*, model:dre_models!dre_entries_model_id_fkey(id,name)")
         .eq("user_id", userId)
         .order("competence", { ascending: false })
         .range(from, to),
@@ -536,7 +536,7 @@ export async function listDreEntriesByModelAndYears(params: {
     const entries = (await fetchAllPaginated((from, to) => {
       let q = supabase
         .from("dre_entries")
-        .select("*, model:dre_models(id,name)")
+        .select("*, model:dre_models!dre_entries_model_id_fkey(id,name)")
         .eq("user_id", params.userId)
         .eq("model_id", params.modelId)
         .in("competence", competences)
@@ -565,7 +565,7 @@ export async function getDreEntriesWithItems(userId: string, entryIds: string[])
     const entries = (await fetchAllPaginated((from, to) =>
       supabase
         .from("dre_entries")
-        .select("*, model:dre_models(id,name)")
+        .select("*, model:dre_models!dre_entries_model_id_fkey(id,name)")
         .eq("user_id", userId)
         .in("id", uniqueEntryIds)
         .range(from, to),
