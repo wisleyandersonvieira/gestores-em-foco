@@ -2,6 +2,7 @@ import type { User } from "@supabase/supabase-js";
 
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
+import { escapeExcelFormula } from "@/lib/export-security";
 
 export type PrivacyRequest = Tables<"privacy_requests">;
 export type PrivacyRequestType = "export" | "account_deletion";
@@ -64,10 +65,10 @@ export async function cancelPrivacyRequest(userId: string, requestId: string) {
   return data;
 }
 
-export async function deleteOwnAccount() {
+export async function deleteOwnAccount(confirmation: string) {
   const { error } = await supabase.functions.invoke("delete-account", {
     method: "POST",
-    body: {},
+    body: { confirmation },
   });
 
   if (error) {
@@ -462,7 +463,8 @@ function worksheetXml(rows: AnyRecord[]) {
 
 function cellXml(row: number, column: number, value: unknown, style: number) {
   const ref = `${columnName(column)}${row}`;
-  return `<c r="${ref}" t="inlineStr" s="${style}"><is><t>${escapeXml(String(value ?? ""))}</t></is></c>`;
+  const safeValue = typeof value === "string" ? escapeExcelFormula(value) : String(value ?? "");
+  return `<c r="${ref}" t="inlineStr" s="${style}"><is><t>${escapeXml(safeValue)}</t></is></c>`;
 }
 
 function contentTypesXml(sheetCount: number) {

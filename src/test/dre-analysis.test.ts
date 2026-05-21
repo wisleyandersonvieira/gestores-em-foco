@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildDreAnalysisFromModel, dreAnalysisTableHtml } from "@/lib/dre-analysis";
+import { escapeExcelFormula } from "@/lib/export-security";
 import type { DreEntryItem, DreEntryWithItems, DreModelWithLines } from "@/types/dre";
 
 describe("DRE analysis from model", () => {
@@ -104,6 +105,17 @@ describe("DRE analysis from model", () => {
     expect(dreAnalysisTableHtml(result, false, false)).toContain("Devolucoes (redutora)");
   });
 
+  it("escapes formula-like labels only when Excel sanitization is requested", () => {
+    const result = buildDreAnalysisFromModel({
+      model: formulaLabelModelFixture(),
+      periods: [{ id: "2026-03", label: "Marco/2026", year: "2026", months: ["2026-03"] }],
+      entries: [formulaLabelEntryFixture("2026-03", 1000)],
+    });
+
+    expect(dreAnalysisTableHtml(result, false, false)).toContain("=Receita");
+    expect(dreAnalysisTableHtml(result, false, false, { sanitizeText: escapeExcelFormula })).toContain("&#039;=Receita");
+  });
+
   it("subtracts reductive expense subcategories from comparative total debits without changing result or margin", () => {
     const result = buildDreAnalysisFromModel({
       model: expenseReductiveModelFixture(),
@@ -117,6 +129,40 @@ describe("DRE analysis from model", () => {
     expect(dreAnalysisTableHtml(result, false, false)).not.toContain("Total de Debitos");
   });
 });
+
+function formulaLabelModelFixture(): DreModelWithLines {
+  return {
+    id: "formula-model",
+    user_id: "user",
+    name: "Modelo",
+    description: null,
+    status: "active",
+    created_at: "",
+    updated_at: "",
+    lines: [
+      modelLine({ id: "formula-line", category_id: "formula-category", line_type: "category", display_order: 0, category: category("formula-category", "=Receita", "credit", true) }),
+    ],
+  } as DreModelWithLines;
+}
+
+function formulaLabelEntryFixture(competence: string, value: number): DreEntryWithItems {
+  return {
+    id: `entry-${competence}`,
+    user_id: "user",
+    model_id: "formula-model",
+    competence,
+    status: "finalized",
+    total_credit: value,
+    total_debit: 0,
+    result: value,
+    margin_percentage: 100,
+    created_at: "",
+    updated_at: "",
+    items: [
+      item({ category_id: "formula-category", category_name_snapshot: "=Receita", category_type_snapshot: "credit", category_is_revenue: true, value }),
+    ],
+  } as DreEntryWithItems;
+}
 
 function modelFixture(): DreModelWithLines {
   return {

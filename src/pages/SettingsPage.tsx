@@ -377,12 +377,12 @@ function SettingsContent({ user }: { user: User }) {
   }
 
   async function handleDeleteAccount() {
-    if (deleteAccountLockRef.current || deleteConfirmation !== "EXCLUIR") return;
+    if (deleteAccountLockRef.current || deleteConfirmation !== "EXCLUIR MINHA CONTA") return;
 
     deleteAccountLockRef.current = true;
     setIsRequestingDeletion(true);
     try {
-      await deleteOwnAccount();
+      await deleteOwnAccount(deleteConfirmation);
       await supabase.auth.signOut({ scope: "local" });
       setDeleteDialogOpen(false);
       setDeleteConfirmation("");
@@ -723,11 +723,11 @@ function SettingsContent({ user }: { user: User }) {
             <p className="rounded-lg border border-[var(--danger-border)] bg-[var(--danger-bg)] p-3 text-sm font-medium text-[var(--danger-color)]">
               Essa ação não poderá ser desfeita.
             </p>
-            <Label>Digite EXCLUIR para confirmar.<Input className="mt-2" value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} disabled={isRequestingDeletion} /></Label>
+            <Label>Digite EXCLUIR MINHA CONTA para confirmar.<Input className="mt-2" value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} disabled={isRequestingDeletion} /></Label>
           </div>
           <DialogFooter>
             <Button variant="outline" disabled={isRequestingDeletion} onClick={() => setDeleteDialogOpen(false)}>Cancelar</Button>
-            <Button variant="destructive" disabled={deleteConfirmation !== "EXCLUIR" || isRequestingDeletion} onClick={() => void handleDeleteAccount()}>
+            <Button variant="destructive" disabled={deleteConfirmation !== "EXCLUIR MINHA CONTA" || isRequestingDeletion} onClick={() => void handleDeleteAccount()}>
               {isRequestingDeletion ? "Excluindo conta..." : "Excluir definitivamente"}
             </Button>
           </DialogFooter>

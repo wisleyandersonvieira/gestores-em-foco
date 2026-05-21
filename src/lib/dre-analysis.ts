@@ -307,9 +307,16 @@ export function buildSelectableDreAnalysisPeriods(type: DreAnalysisType, years: 
   }));
 }
 
-export function dreAnalysisTableHtml(result: DreAnalysisResult, showVariation: boolean, showVerticalAnalysis: boolean) {
-  return `<table><thead><tr><th>Categoria / Subcategoria</th>${result.periods.map((period, index) => `<th>${escapeHtml(period.label)}</th>${showVariation && index > 0 ? "<th>Var. anterior</th>" : ""}`).join("")}</tr></thead><tbody>
-    ${result.rows.map((row) => `<tr class="${row.lineType === "category" ? "cat" : row.lineType === "subcategory" ? "sub" : "total"}"><td>${escapeHtml(formatDreAnalysisRowLabel(row))}${row.isNetIncome ? " - LUCRO LIQUIDO" : ""}</td>${result.periods.map((period, index) => {
+export function dreAnalysisTableHtml(
+  result: DreAnalysisResult,
+  showVariation: boolean,
+  showVerticalAnalysis: boolean,
+  options: { sanitizeText?: (value: string) => string } = {},
+) {
+  const text = (value: string) => escapeHtml(options.sanitizeText ? options.sanitizeText(value) : value);
+
+  return `<table><thead><tr><th>Categoria / Subcategoria</th>${result.periods.map((period, index) => `<th>${text(period.label)}</th>${showVariation && index > 0 ? "<th>Var. anterior</th>" : ""}`).join("")}</tr></thead><tbody>
+    ${result.rows.map((row) => `<tr class="${row.lineType === "category" ? "cat" : row.lineType === "subcategory" ? "sub" : "total"}"><td>${text(formatDreAnalysisRowLabel(row))}${row.isNetIncome ? " - LUCRO LIQUIDO" : ""}</td>${result.periods.map((period, index) => {
       const current = row.values[period.id]?.amount ?? 0;
       const previous = index > 0 ? result.rows.find((candidate) => candidate.key === row.key)?.values[result.periods[index - 1].id]?.amount ?? 0 : 0;
       const variation = current - previous;

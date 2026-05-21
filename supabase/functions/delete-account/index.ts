@@ -1,25 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { clientIp, corsHeaders, rateLimitGuard } from "../_shared/security.ts";
 
-const allowedOrigins = new Set([
-  "https://gestoresemfoco.com.br",
-  "https://www.gestoresemfoco.com.br",
-  "http://localhost:5173",
-  "http://localhost:8080",
-  "http://127.0.0.1:5173",
-  "http://127.0.0.1:8080",
-]);
-
-function corsHeaders(request: Request) {
-  const origin = request.headers.get("origin") ?? "";
-  const allowOrigin = allowedOrigins.has(origin) ? origin : "https://gestoresemfoco.com.br";
-
-  return {
-    "Access-Control-Allow-Origin": allowOrigin,
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Vary": "Origin",
-  };
-}
+const DELETE_CONFIRMATION = "EXCLUIR MINHA CONTA";
 
 function jsonResponse(request: Request, status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), {
@@ -87,8 +69,54 @@ Deno.serve(async (request) => {
 
   const userId = user.id;
   const now = new Date().toISOString();
+  const ip = clientIp(request);
+
+  let payload: { confirmation?: string };
+  try {
+    payload = await request.json();
+  } catch (_error) {
+    return jsonResponse(request, 400, { error: "invalid_json" });
+  }
+
+  const rateLimit = await rateLimitGuard(supabaseAdmin, {
+    functionName: "delete-account",
+    userId,
+    ip,
+    maxRequests: 3,
+    windowSeconds: 3600,
+  });
+
+  if (!rateLimit.allowed) {
+    return jsonResponse(request, 429, { error: "rate_limit_exceeded" });
+  }
+
+  if (payload.confirmation !== DELETE_CONFIRMATION) {
+    await supabaseAdmin.from("audit_logs").insert({
+      actor_user_id: userId,
+      action: "delete_account_failed",
+      entity_type: "auth.users",
+      entity_id: userId,
+      metadata: {
+        reason: "invalid_confirmation",
+        ip,
+        requested_at: now,
+      },
+    });
+    return jsonResponse(request, 400, { error: "invalid_confirmation" });
+  }
 
   try {
+    await supabaseAdmin.from("audit_logs").insert({
+      actor_user_id: userId,
+      action: "delete_account_requested",
+      entity_type: "auth.users",
+      entity_id: userId,
+      metadata: {
+        ip,
+        requested_at: now,
+      },
+    });
+
     await supabaseAdmin.from("privacy_requests").insert({
       user_id: userId,
       request_type: "account_deletion",
@@ -99,12 +127,12 @@ Deno.serve(async (request) => {
 
     await supabaseAdmin.from("audit_logs").insert({
       actor_user_id: userId,
-      action: "account_deleted_by_user",
+      action: "delete_account_completed",
       entity_type: "auth.users",
       entity_id: userId,
       metadata: {
-        user_id: userId,
-        requested_at: now,
+        completed_at: new Date().toISOString(),
+        ip,
       },
     });
 
@@ -151,6 +179,17 @@ Deno.serve(async (request) => {
 
     return jsonResponse(request, 200, { success: true });
   } catch (error) {
+    await supabaseAdmin.from("audit_logs").insert({
+      actor_user_id: userId,
+      action: "delete_account_failed",
+      entity_type: "auth.users",
+      entity_id: userId,
+      metadata: {
+        reason: error instanceof Error ? error.message : "unknown_error",
+        ip,
+        failed_at: new Date().toISOString(),
+      },
+    });
     console.error("delete-account failed", {
       user_id: userId,
       message: error instanceof Error ? error.message : "unknown_error",

@@ -21,9 +21,49 @@ function normalizeSubscriptionStatus(status: string) {
   return "inactive";
 }
 
-function getObjectId(value: string | Stripe.Customer | Stripe.Subscription | Stripe.Price | null | undefined) {
+function getObjectId(value: string | Stripe.Customer | Stripe.Subscription | Stripe.Price | Stripe.PaymentIntent | null | undefined) {
   if (!value) return null;
   return typeof value === "string" ? value : value.id;
+}
+
+function getRecordValue(record: Record<string, unknown>, key: string) {
+  const value = record[key];
+  return typeof value === "string" ? value : null;
+}
+
+function minimizedWebhookPayload(event: Stripe.Event) {
+  const object = event.data.object as Record<string, unknown>;
+  const objectId = getRecordValue(object, "id");
+  const objectType = getRecordValue(object, "object");
+  const customerId = getObjectId(object.customer as Stripe.Customer | string | null | undefined);
+  const subscriptionId = getObjectId(object.subscription as Stripe.Subscription | string | null | undefined)
+    ?? (objectType === "subscription" ? objectId : null);
+  const checkoutSessionId = objectType === "checkout.session" ? objectId : null;
+  const paymentIntentId = getObjectId(object.payment_intent as string | Stripe.PaymentIntent | null | undefined);
+  const status = getRecordValue(object, "status");
+
+  return {
+    livemode: event.livemode,
+    object_id: objectId,
+    customer_id: customerId,
+    subscription_id: subscriptionId,
+    checkout_session_id: checkoutSessionId,
+    payment_intent_id: paymentIntentId,
+    status,
+    payload_minimized: {
+      event_id: event.id,
+      event_type: event.type,
+      created: event.created,
+      livemode: event.livemode,
+      object_type: objectType,
+      object_id: objectId,
+      customer_id: customerId,
+      subscription_id: subscriptionId,
+      checkout_session_id: checkoutSessionId,
+      payment_intent_id: paymentIntentId,
+      status,
+    },
+  };
 }
 
 async function upsertBillingCustomer(
@@ -284,7 +324,7 @@ Deno.serve(async (request) => {
     .insert({
       id: event.id,
       type: event.type,
-      payload: event as unknown as Record<string, unknown>,
+      ...minimizedWebhookPayload(event),
     });
 
   if (eventInsertError) {
