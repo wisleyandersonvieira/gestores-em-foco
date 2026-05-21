@@ -45,37 +45,105 @@ create index if not exists stripe_webhook_events_customer_id_idx
   on public.stripe_webhook_events(customer_id)
   where customer_id is not null;
 
-alter table public.site_access_logs
-  drop constraint if exists site_access_logs_product_slug_length,
-  drop constraint if exists site_access_logs_route_path_length,
-  drop constraint if exists site_access_logs_access_type_length,
-  drop constraint if exists site_access_logs_session_id_length,
-  drop constraint if exists site_access_logs_referrer_length,
-  drop constraint if exists site_access_logs_user_agent_length,
-  drop constraint if exists site_access_logs_event_type_length;
+do $$
+declare
+  policy_check text := 'user_id = auth.uid()';
+begin
+  if to_regclass('public.site_access_logs') is null then
+    return;
+  end if;
 
-alter table public.site_access_logs
-  add constraint site_access_logs_product_slug_length check (product_slug is null or length(product_slug) <= 80) not valid,
-  add constraint site_access_logs_route_path_length check (route_path is null or length(route_path) <= 300) not valid,
-  add constraint site_access_logs_access_type_length check (access_type is null or length(access_type) <= 40) not valid,
-  add constraint site_access_logs_session_id_length check (session_id is null or length(session_id) <= 120) not valid,
-  add constraint site_access_logs_referrer_length check (referrer is null or length(referrer) <= 500) not valid,
-  add constraint site_access_logs_user_agent_length check (user_agent is null or length(user_agent) <= 500) not valid,
-  add constraint site_access_logs_event_type_length check (event_type is null or length(event_type) <= 40) not valid;
+  alter table public.site_access_logs
+    drop constraint if exists site_access_logs_product_slug_length,
+    drop constraint if exists site_access_logs_route_path_length,
+    drop constraint if exists site_access_logs_path_length,
+    drop constraint if exists site_access_logs_access_type_length,
+    drop constraint if exists site_access_logs_session_id_length,
+    drop constraint if exists site_access_logs_referrer_length,
+    drop constraint if exists site_access_logs_user_agent_length,
+    drop constraint if exists site_access_logs_event_type_length;
 
-drop policy if exists "Clients can create own site access logs" on public.site_access_logs;
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'site_access_logs' and column_name = 'product_slug'
+  ) then
+    alter table public.site_access_logs
+      add constraint site_access_logs_product_slug_length
+      check (product_slug is null or char_length(product_slug) <= 80) not valid;
+    policy_check := policy_check || ' and (product_slug is null or char_length(product_slug) <= 80)';
+  end if;
 
-create policy "Authenticated clients can create own site access logs"
-  on public.site_access_logs
-  for insert
-  to authenticated
-  with check (
-    user_id = auth.uid()
-    and (product_slug is null or length(product_slug) <= 80)
-    and (path is null or length(path) <= 300)
-    and (access_type is null or length(access_type) <= 40)
-    and (session_id is null or length(session_id) <= 120)
-    and (referrer is null or length(referrer) <= 500)
-    and (user_agent is null or length(user_agent) <= 500)
-    and (event_type is null or length(event_type) <= 40)
-  );
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'site_access_logs' and column_name = 'path'
+  ) then
+    alter table public.site_access_logs
+      add constraint site_access_logs_path_length
+      check (path is null or char_length(path) <= 300) not valid;
+    policy_check := policy_check || ' and (path is null or char_length(path) <= 300)';
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'site_access_logs' and column_name = 'access_type'
+  ) then
+    alter table public.site_access_logs
+      add constraint site_access_logs_access_type_length
+      check (access_type is null or char_length(access_type) <= 40) not valid;
+    policy_check := policy_check || ' and (access_type is null or char_length(access_type) <= 40)';
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'site_access_logs' and column_name = 'session_id'
+  ) then
+    alter table public.site_access_logs
+      add constraint site_access_logs_session_id_length
+      check (session_id is null or char_length(session_id) <= 120) not valid;
+    policy_check := policy_check || ' and (session_id is null or char_length(session_id) <= 120)';
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'site_access_logs' and column_name = 'referrer'
+  ) then
+    alter table public.site_access_logs
+      add constraint site_access_logs_referrer_length
+      check (referrer is null or char_length(referrer) <= 500) not valid;
+    policy_check := policy_check || ' and (referrer is null or char_length(referrer) <= 500)';
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'site_access_logs' and column_name = 'user_agent'
+  ) then
+    alter table public.site_access_logs
+      add constraint site_access_logs_user_agent_length
+      check (user_agent is null or char_length(user_agent) <= 500) not valid;
+    policy_check := policy_check || ' and (user_agent is null or char_length(user_agent) <= 500)';
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'site_access_logs' and column_name = 'event_type'
+  ) then
+    alter table public.site_access_logs
+      add constraint site_access_logs_event_type_length
+      check (event_type is null or char_length(event_type) <= 40) not valid;
+    policy_check := policy_check || ' and (event_type is null or char_length(event_type) <= 40)';
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'site_access_logs' and column_name = 'user_id'
+  ) then
+    drop policy if exists "Anyone can create site access logs" on public.site_access_logs;
+    drop policy if exists "Clients can create own site access logs" on public.site_access_logs;
+    drop policy if exists "Authenticated clients can create own site access logs" on public.site_access_logs;
+
+    execute format(
+      'create policy "Authenticated clients can create own site access logs" on public.site_access_logs for insert to authenticated with check (%s)',
+      policy_check
+    );
+  end if;
+end $$;
