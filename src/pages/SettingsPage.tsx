@@ -535,20 +535,20 @@ function SettingsContent({ user }: { user: User }) {
                   onChange={setPasswordConfirmation}
                 />
                 <p className="text-sm text-muted-foreground">A senha deve ter no minimo 8 caracteres, incluindo letras e numeros.</p>
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <Button
-                    className="bg-primary hover:bg-primary/90 sm:w-fit"
-                    disabled={!currentPassword || !password || !passwordConfirmation || isUpdatingPassword}
-                    onClick={() => void handlePasswordUpdate()}
-                  >
-                    {isUpdatingPassword ? "Alterando..." : "Alterar senha"}
-                  </Button>
-                </div>
                 <TurnstileCaptcha
                   ref={captchaRef}
                   onTokenChange={setCaptchaToken}
                   onError={(message) => toast.error(message)}
                 />
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <Button
+                    className="bg-primary hover:bg-primary/90 sm:w-fit"
+                    disabled={!currentPassword || !password || !passwordConfirmation || !captchaToken || isUpdatingPassword}
+                    onClick={() => void handlePasswordUpdate()}
+                  >
+                    {isUpdatingPassword ? "Alterando..." : "Alterar senha"}
+                  </Button>
+                </div>
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <Button
                     variant="outline"
