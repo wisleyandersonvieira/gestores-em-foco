@@ -8,7 +8,9 @@
       "Read(//home/codespace/.supabase/**)",
       "Bash(grep -E '\\\\.\\(html|css|js|jsx|tsx|ts|vue|svelte\\)$')",
       "Bash(grep -E '\\\\.\\(tsx|ts|css\\)$')",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(git stash *)",
+      "Bash(npx vite *)"
     ]
   }
 }

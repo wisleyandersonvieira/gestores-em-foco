@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      brazilian_cities: {
+        Row: {
+          city_name: string
+          created_at: string
+          id: string
+          state_name: string
+        }
+        Insert: {
+          city_name: string
+          created_at?: string
+          id?: string
+          state_name: string
+        }
+        Update: {
+          city_name?: string
+          created_at?: string
+          id?: string
+          state_name?: string
+        }
+        Relationships: []
+      }
       admin_users: {
         Row: {
           created_at: string
@@ -1629,6 +1650,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          city: string | null
           company_name: string | null
           created_at: string
           email: string | null
@@ -1636,13 +1658,16 @@ export type Database = {
           full_name: string | null
           id: string
           is_active: boolean
+          phone: string | null
           role: Database["public"]["Enums"]["app_role"]
           sector_id: string | null
           segment: string | null
+          state: string | null
           subsector_id: string | null
           updated_at: string
         }
         Insert: {
+          city?: string | null
           company_name?: string | null
           created_at?: string
           email?: string | null
@@ -1650,13 +1675,16 @@ export type Database = {
           full_name?: string | null
           id: string
           is_active?: boolean
+          phone?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           sector_id?: string | null
           segment?: string | null
+          state?: string | null
           subsector_id?: string | null
           updated_at?: string
         }
         Update: {
+          city?: string | null
           company_name?: string | null
           created_at?: string
           email?: string | null
@@ -1664,9 +1692,11 @@ export type Database = {
           full_name?: string | null
           id?: string
           is_active?: boolean
+          phone?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           sector_id?: string | null
           segment?: string | null
+          state?: string | null
           subsector_id?: string | null
           updated_at?: string
         }
@@ -2124,6 +2154,7 @@ export type Database = {
         Row: {
           avatar_path: string | null
           avatar_url: string | null
+          city: string | null
           company_name: string | null
           created_at: string
           full_name: string | null
@@ -2131,6 +2162,7 @@ export type Database = {
           phone: string | null
           role: string | null
           sector_id: string | null
+          state: string | null
           subsector_id: string | null
           updated_at: string
           user_id: string
@@ -2138,6 +2170,7 @@ export type Database = {
         Insert: {
           avatar_path?: string | null
           avatar_url?: string | null
+          city?: string | null
           company_name?: string | null
           created_at?: string
           full_name?: string | null
@@ -2145,6 +2178,7 @@ export type Database = {
           phone?: string | null
           role?: string | null
           sector_id?: string | null
+          state?: string | null
           subsector_id?: string | null
           updated_at?: string
           user_id: string
@@ -2152,6 +2186,7 @@ export type Database = {
         Update: {
           avatar_path?: string | null
           avatar_url?: string | null
+          city?: string | null
           company_name?: string | null
           created_at?: string
           full_name?: string | null
@@ -2159,6 +2194,7 @@ export type Database = {
           phone?: string | null
           role?: string | null
           sector_id?: string | null
+          state?: string | null
           subsector_id?: string | null
           updated_at?: string
           user_id?: string

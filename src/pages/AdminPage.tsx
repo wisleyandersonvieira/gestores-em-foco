@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Activity, Box, CalendarDays, Eye, EyeOff, Headphones, LayoutDashboard, Plus, Settings, Users } from "lucide-react";
+import { Activity, Box, CalendarDays, Check, ChevronsUpDown, Download, Eye, EyeOff, Headphones, LayoutDashboard, Plus, Settings, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { DiagnosticFlowBuilder } from "@/components/admin/diagnostic-flow-builder";
@@ -37,12 +37,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
+import { getDistinctStates, getCitiesByState } from "@/lib/brazilian-cities";
 import type { TemplateEditorState, TemplateSummary } from "@/types/diagnostic-builder";
 
 export default function AdminPage() {
@@ -530,15 +535,345 @@ function DreAdminPanel({ data }: { data: any }) {
 }
 
 function UsersPanel({ data, search, onSearch }: { data: any; search: string; onSearch: (value: string) => void }) {
-  const users = (data?.users ?? []).filter((user: any) => {
+  const allUsers: any[] = data?.users ?? [];
+
+  // Filter states
+  const [filterState, setFilterState] = useState("");
+  const [filterCity, setFilterCity] = useState("");
+  const [filterSector, setFilterSector] = useState("");
+  const [filterSubsector, setFilterSubsector] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterProduct, setFilterProduct] = useState("all");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
+
+  // State/city selects
+  const [availableStates, setAvailableStates] = useState<string[]>([]);
+  const [availableCities, setAvailableCities] = useState<string[]>([]);
+  const [stateOpen, setStateOpen] = useState(false);
+  const [cityOpen, setCityOpen] = useState(false);
+
+  useEffect(() => {
+    getDistinctStates().then(setAvailableStates).catch(() => setAvailableStates([]));
+  }, []);
+
+  async function handleFilterStateChange(stateName: string) {
+    setFilterState(stateName);
+    setFilterCity("");
+    setAvailableCities([]);
+    if (!stateName) return;
+    try {
+      const cities = await getCitiesByState(stateName);
+      setAvailableCities(cities);
+    } catch {
+      setAvailableCities([]);
+    }
+  }
+
+  // Unique sector/subsector names from the already-enriched user list
+  const allSectorNames = useMemo(() => {
+    const s = new Set<string>();
+    for (const u of allUsers) for (const n of u.sector_names ?? []) if (n) s.add(n);
+    return [...s].sort();
+  }, [allUsers]);
+
+  const allSubsectorNames = useMemo(() => {
+    const s = new Set<string>();
+    for (const u of allUsers) for (const n of u.subsector_names ?? []) if (n) s.add(n);
+    return [...s].sort();
+  }, [allUsers]);
+
+  // All products from subscriptions
+  const allProducts = useMemo(() => {
+    const s = new Set<string>();
+    for (const u of allUsers) for (const sub of u.subscriptions ?? []) if (sub.product_slug) s.add(sub.product_slug);
+    return [...s].sort();
+  }, [allUsers]);
+
+  const filteredUsers = useMemo(() => {
     const term = search.toLowerCase();
-    return !term || [user.full_name, user.email, user.company_name, user.global_profile?.company_name].some((value) => String(value ?? "").toLowerCase().includes(term));
-  });
+    return allUsers.filter((user: any) => {
+      // Text search
+      if (term && ![user.full_name, user.email, user.company_name, user.global_profile?.company_name, user.resolved_phone].some((v) => String(v ?? "").toLowerCase().includes(term))) return false;
+      // State
+      if (filterState) {
+        const uState = user.resolved_state ?? "";
+        if (!uState.toLowerCase().includes(filterState.toLowerCase())) return false;
+      }
+      // City
+      if (filterCity) {
+        const uCity = user.resolved_city ?? "";
+        if (!uCity.toLowerCase().includes(filterCity.toLowerCase())) return false;
+      }
+      // Sector
+      if (filterSector) {
+        const names: string[] = user.sector_names ?? [];
+        if (!names.includes(filterSector)) return false;
+      }
+      // Subsector
+      if (filterSubsector) {
+        const names: string[] = user.subsector_names ?? [];
+        if (!names.includes(filterSubsector)) return false;
+      }
+      // Status
+      if (filterStatus === "active" && !user.is_active) return false;
+      if (filterStatus === "inactive" && user.is_active) return false;
+      // Product
+      if (filterProduct !== "all") {
+        const hasProduct = (user.subscriptions ?? []).some((sub: any) => sub.product_slug === filterProduct && ["active", "trialing"].includes(sub.status));
+        if (!hasProduct) return false;
+      }
+      // Date range
+      if (filterDateFrom && user.created_at < filterDateFrom) return false;
+      if (filterDateTo && user.created_at > `${filterDateTo}T23:59:59`) return false;
+      return true;
+    });
+  }, [allUsers, search, filterState, filterCity, filterSector, filterSubsector, filterStatus, filterProduct, filterDateFrom, filterDateTo]);
+
+  function exportCSV() {
+    const headers = ["Nome", "Email", "Telefone", "Empresa", "Estado", "Cidade", "Setores", "Subsetores", "Funcionarios", "Produtos ativos", "Status", "Cadastro"];
+    const rows = filteredUsers.map((user: any) => [
+      user.full_name ?? user.global_profile?.full_name ?? "",
+      user.email ?? "",
+      user.resolved_phone ?? "",
+      user.company_name ?? user.global_profile?.company_name ?? "",
+      user.resolved_state ?? "",
+      user.resolved_city ?? "",
+      (user.sector_names ?? []).join("; "),
+      (user.subsector_names ?? []).join("; "),
+      user.employees_count ?? "",
+      (user.subscriptions ?? []).filter((s: any) => ["active", "trialing"].includes(s.status)).map((s: any) => s.product_slug).join("; "),
+      user.is_active ? "Ativo" : "Inativo",
+      formatDateTime(user.created_at),
+    ]);
+    const csv = [headers, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `usuarios_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function clearFilters() {
+    onSearch("");
+    setFilterState("");
+    setFilterCity("");
+    setAvailableCities([]);
+    setFilterSector("");
+    setFilterSubsector("");
+    setFilterStatus("all");
+    setFilterProduct("all");
+    setFilterDateFrom("");
+    setFilterDateTo("");
+  }
+
+  const hasFilters = search || filterState || filterCity || filterSector || filterSubsector || filterStatus !== "all" || filterProduct !== "all" || filterDateFrom || filterDateTo;
+
   return (
     <div className="space-y-6">
-      <div><h1 className="font-display text-3xl font-semibold">Usuarios</h1><p className="text-sm text-muted-foreground">Lista administrativa de usuarios cadastrados na plataforma.</p></div>
-      <Input value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Buscar por nome, email ou empresa" />
-      <Card className="bg-white/90"><CardContent className="p-0"><Table><TableHeader><TableRow><TableHead>Nome</TableHead><TableHead>Email</TableHead><TableHead>Empresa</TableHead><TableHead>Cadastro</TableHead><TableHead>Produtos ativos</TableHead><TableHead>Status</TableHead></TableRow></TableHeader><TableBody>{users.length ? users.map((user: any) => <TableRow key={user.id}><TableCell>{user.full_name ?? user.global_profile?.full_name ?? "-"}</TableCell><TableCell>{user.email ?? "-"}</TableCell><TableCell>{user.company_name ?? user.global_profile?.company_name ?? "-"}</TableCell><TableCell>{formatDateTime(user.created_at)}</TableCell><TableCell>{user.subscriptions?.filter((item: any) => ["active", "trialing"].includes(item.status)).length ?? 0}</TableCell><TableCell><Badge variant="outline">{user.is_active ? "Ativo" : "Inativo"}</Badge></TableCell></TableRow>) : <TableRow><TableCell colSpan={6} className="text-muted-foreground">Nenhum usuario encontrado.</TableCell></TableRow>}</TableBody></Table></CardContent></Card>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="font-display text-3xl font-semibold">Usuarios</h1>
+          <p className="text-sm text-muted-foreground">Lista administrativa de usuarios cadastrados na plataforma.</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={exportCSV} className="shrink-0 gap-2">
+          <Download className="h-4 w-4" />
+          Exportar relatório
+        </Button>
+      </div>
+
+      {/* Filtros */}
+      <Card className="bg-white/90">
+        <CardContent className="pt-4">
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <Input
+              value={search}
+              onChange={(e) => onSearch(e.target.value)}
+              placeholder="Buscar nome, email, empresa, telefone"
+              className="lg:col-span-1 xl:col-span-2"
+            />
+
+            {/* Estado */}
+            <Popover open={stateOpen} onOpenChange={setStateOpen}>
+              <PopoverTrigger asChild>
+                <Button type="button" variant="outline" role="combobox" className="w-full justify-between">
+                  <span className={cn("truncate", !filterState && "text-muted-foreground")}>
+                    {filterState || "Estado"}
+                  </span>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Buscar estado..." />
+                  <CommandList>
+                    <CommandEmpty>Nenhum estado.</CommandEmpty>
+                    <CommandGroup>
+                      {filterState && (
+                        <CommandItem value="__clear__" onSelect={() => { void handleFilterStateChange(""); setStateOpen(false); }}>
+                          <span className="text-muted-foreground">Limpar</span>
+                        </CommandItem>
+                      )}
+                      {availableStates.map((s) => (
+                        <CommandItem key={s} value={s} onSelect={() => { void handleFilterStateChange(s); setStateOpen(false); }}>
+                          <Check className={cn("mr-2 h-4 w-4", filterState === s ? "opacity-100" : "opacity-0")} />
+                          {s}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+
+            {/* Cidade */}
+            <Popover open={cityOpen} onOpenChange={setCityOpen}>
+              <PopoverTrigger asChild>
+                <Button type="button" variant="outline" role="combobox" disabled={!filterState} className="w-full justify-between">
+                  <span className={cn("truncate", !filterCity && "text-muted-foreground")}>
+                    {filterCity || (filterState ? "Cidade" : "Selecione o estado")}
+                  </span>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Buscar cidade..." />
+                  <CommandList>
+                    <CommandEmpty>Nenhuma cidade.</CommandEmpty>
+                    <CommandGroup>
+                      {filterCity && (
+                        <CommandItem value="__clear__" onSelect={() => { setFilterCity(""); setCityOpen(false); }}>
+                          <span className="text-muted-foreground">Limpar</span>
+                        </CommandItem>
+                      )}
+                      {availableCities.map((c) => (
+                        <CommandItem key={c} value={c} onSelect={() => { setFilterCity(c); setCityOpen(false); }}>
+                          <Check className={cn("mr-2 h-4 w-4", filterCity === c ? "opacity-100" : "opacity-0")} />
+                          {c}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+
+            {/* Setor */}
+            <Select value={filterSector} onValueChange={setFilterSector}>
+              <SelectTrigger><SelectValue placeholder="Setor" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todos os setores</SelectItem>
+                {allSectorNames.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+
+            {/* Subsetor */}
+            <Select value={filterSubsector} onValueChange={setFilterSubsector}>
+              <SelectTrigger><SelectValue placeholder="Subsetor" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todos os subsetores</SelectItem>
+                {allSubsectorNames.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+
+            {/* Status */}
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os status</SelectItem>
+                <SelectItem value="active">Ativo</SelectItem>
+                <SelectItem value="inactive">Inativo</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Produto */}
+            <Select value={filterProduct} onValueChange={setFilterProduct}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os produtos</SelectItem>
+                {allProducts.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+              </SelectContent>
+            </Select>
+
+            {/* Data de cadastro */}
+            <div className="flex gap-2">
+              <Input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} title="Data inicial" className="w-full" />
+              <Input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} title="Data final" className="w-full" />
+            </div>
+
+            {hasFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
+                Limpar filtros
+              </Button>
+            )}
+          </div>
+
+          <p className="mt-3 text-sm text-muted-foreground">{filteredUsers.length} usuário(s) encontrado(s)</p>
+        </CardContent>
+      </Card>
+
+      {/* Tabela */}
+      <Card className="bg-white/90 overflow-hidden">
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Telefone</TableHead>
+                  <TableHead>Empresa</TableHead>
+                  <TableHead>Estado / Cidade</TableHead>
+                  <TableHead>Setores</TableHead>
+                  <TableHead>Subsetores</TableHead>
+                  <TableHead>Funcionarios</TableHead>
+                  <TableHead>Cadastro</TableHead>
+                  <TableHead>Produtos ativos</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredUsers.length ? filteredUsers.map((user: any) => (
+                  <TableRow key={user.id}>
+                    <TableCell className="font-medium">{user.full_name ?? user.global_profile?.full_name ?? "-"}</TableCell>
+                    <TableCell>{user.email ?? "-"}</TableCell>
+                    <TableCell className="whitespace-nowrap">{user.resolved_phone ?? <span className="text-muted-foreground text-xs">Não informado</span>}</TableCell>
+                    <TableCell>{user.company_name ?? user.global_profile?.company_name ?? "-"}</TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {user.resolved_state || user.resolved_city
+                        ? [user.resolved_city, user.resolved_state].filter(Boolean).join(" / ")
+                        : <span className="text-muted-foreground text-xs">Não informado</span>}
+                    </TableCell>
+                    <TableCell>
+                      {(user.sector_names ?? []).length
+                        ? (user.sector_names as string[]).map((n) => <Badge key={n} variant="outline" className="mr-1 mb-1 text-xs">{n}</Badge>)
+                        : <span className="text-muted-foreground text-xs">-</span>}
+                    </TableCell>
+                    <TableCell>
+                      {(user.subsector_names ?? []).length
+                        ? (user.subsector_names as string[]).map((n) => <Badge key={n} variant="outline" className="mr-1 mb-1 text-xs">{n}</Badge>)
+                        : <span className="text-muted-foreground text-xs">-</span>}
+                    </TableCell>
+                    <TableCell>{user.employees_count ?? <span className="text-muted-foreground text-xs">-</span>}</TableCell>
+                    <TableCell className="whitespace-nowrap">{formatDateTime(user.created_at)}</TableCell>
+                    <TableCell>{user.subscriptions?.filter((item: any) => ["active", "trialing"].includes(item.status)).length ?? 0}</TableCell>
+                    <TableCell><Badge variant="outline">{user.is_active ? "Ativo" : "Inativo"}</Badge></TableCell>
+                  </TableRow>
+                )) : (
+                  <TableRow>
+                    <TableCell colSpan={11} className="text-muted-foreground text-center py-8">
+                      Nenhum usuario encontrado.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

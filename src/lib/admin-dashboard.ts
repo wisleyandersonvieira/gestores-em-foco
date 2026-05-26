@@ -15,7 +15,7 @@ export function getPeriodStart(period: AdminPeriod) {
 
 export async function getAdminData(period: AdminPeriod) {
   const since = getPeriodStart(period);
-  const [profiles, globalProfiles, products, subscriptions, accessLogs, supportRequests, dreMetrics, diagnosticMetrics] = await Promise.all([
+  const [profiles, globalProfiles, products, subscriptions, accessLogs, supportRequests, dreMetrics, diagnosticMetrics, sectors, subsectors, userSectors, userSubsectors] = await Promise.all([
     safeSelect("profiles", "*"),
     safeSelect("user_profiles", "*"),
     safeSelect("products", "*"),
@@ -24,20 +24,51 @@ export async function getAdminData(period: AdminPeriod) {
     safeSelect("support_requests", "*", (query) => query.order("created_at", { ascending: false }).limit(250)),
     getDreMetrics(),
     getDiagnosticMetrics(),
+    safeSelect("business_sectors", "id, name"),
+    safeSelect("business_subsectors", "id, name, sector_id"),
+    safeSelect("user_sectors", "user_id, sector_id"),
+    safeSelect("user_subsectors", "user_id, subsector_id"),
   ]);
+
+  const sectorsById = new Map((sectors as AnyRecord[]).map((s) => [s.id, s.name as string]));
+  const subsectorsById = new Map((subsectors as AnyRecord[]).map((s) => [s.id, s.name as string]));
+
+  const userSectorsByUserId = new Map<string, string[]>();
+  for (const row of userSectors as AnyRecord[]) {
+    const existing = userSectorsByUserId.get(row.user_id) ?? [];
+    const name = sectorsById.get(row.sector_id);
+    if (name) existing.push(name);
+    userSectorsByUserId.set(row.user_id, existing);
+  }
+
+  const userSubsectorsByUserId = new Map<string, string[]>();
+  for (const row of userSubsectors as AnyRecord[]) {
+    const existing = userSubsectorsByUserId.get(row.user_id) ?? [];
+    const name = subsectorsById.get(row.subsector_id);
+    if (name) existing.push(name);
+    userSubsectorsByUserId.set(row.user_id, existing);
+  }
 
   const userProfilesById = new Map((globalProfiles as AnyRecord[]).map((profile) => [profile.user_id, profile]));
   const profilesById = new Map((profiles as AnyRecord[]).map((profile) => [profile.id, profile]));
-  const users = (profiles as AnyRecord[]).map((profile) => ({
-    ...profile,
-    global_profile: userProfilesById.get(profile.id) ?? null,
-    subscriptions: (subscriptions as AnyRecord[]).filter((item) => item.user_id === profile.id),
-  }));
+  const users = (profiles as AnyRecord[]).map((profile) => {
+    const globalProfile = userProfilesById.get(profile.id) ?? null;
+    return {
+      ...profile,
+      global_profile: globalProfile,
+      subscriptions: (subscriptions as AnyRecord[]).filter((item) => item.user_id === profile.id),
+      sector_names: userSectorsByUserId.get(profile.id) ?? (profile.sector_id ? [sectorsById.get(profile.sector_id) ?? ""] : []),
+      subsector_names: userSubsectorsByUserId.get(profile.id) ?? (profile.subsector_id ? [subsectorsById.get(profile.subsector_id) ?? ""] : []),
+      resolved_phone: globalProfile?.phone ?? profile.phone ?? null,
+      resolved_state: globalProfile?.state ?? profile.state ?? null,
+      resolved_city: globalProfile?.city ?? profile.city ?? null,
+    };
+  });
   const supportWithUsers = (supportRequests as AnyRecord[]).map((request) => ({
     ...request,
     profile: profilesById.get(request.user_id) ?? null,
     global_profile: userProfilesById.get(request.user_id) ?? null,
-  }));
+  })) as AnyRecord[];
   const productStats = (products as AnyRecord[]).map((product) => {
     const productSubscriptions = (subscriptions as AnyRecord[]).filter((item) => item.product_slug === product.slug);
     return {
@@ -53,7 +84,7 @@ export async function getAdminData(period: AdminPeriod) {
     ...log,
     profile: log.user_id ? profilesById.get(log.user_id) ?? null : null,
     global_profile: log.user_id ? userProfilesById.get(log.user_id) ?? null : null,
-  }));
+  })) as AnyRecord[];
   const panelAccessLogs = accessLogsWithUsers.filter((item) => getAccessEventType(item) === "user_panel_access");
   const productAccessLogs = accessLogsWithUsers.filter((item) => getAccessEventType(item) === "product_access" && item.product_slug);
   const productAccessCounts = countBy(productAccessLogs, "product_slug");

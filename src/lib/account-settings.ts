@@ -224,6 +224,8 @@ function createDefaultProfile(userId: string): UserProfile {
     avatar_url: null,
     sector_id: null,
     subsector_id: null,
+    state: null,
+    city: null,
     created_at: now,
     updated_at: now,
   };
