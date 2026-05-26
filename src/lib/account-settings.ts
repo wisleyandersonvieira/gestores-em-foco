@@ -192,7 +192,7 @@ export async function sendPasswordResetEmail(email: string, captchaToken: string
   }
 }
 
-export async function updateUserPassword(newPassword: string, confirmation = newPassword, currentPassword?: string) {
+export async function updateUserPassword(newPassword: string, confirmation = newPassword, currentPassword?: string, captchaToken?: string | null) {
   const validationError = validatePassword(newPassword, confirmation);
   if (validationError) throw new Error(validationError);
 
@@ -203,9 +203,10 @@ export async function updateUserPassword(newPassword: string, confirmation = new
     const { error: reAuthError } = await supabase.auth.signInWithPassword({
       email: sessionUser.email,
       password: currentPassword,
+      options: captchaToken ? { captchaToken } : undefined,
     });
 
-    if (reAuthError) throw new Error("Senha atual incorreta. Verifique e tente novamente.");
+    if (reAuthError) throw new Error(getAuthErrorMessage(reAuthError, "Senha atual incorreta. Verifique e tente novamente."));
   }
 
   const { error } = await supabase.auth.updateUser({ password: newPassword });

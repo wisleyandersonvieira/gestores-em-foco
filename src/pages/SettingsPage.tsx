@@ -259,10 +259,15 @@ function SettingsContent({ user }: { user: User }) {
       return;
     }
 
+    if (!captchaToken) {
+      toast.error(CAPTCHA_ERROR_MESSAGE);
+      return;
+    }
+
     passwordUpdateLockRef.current = true;
     setIsUpdatingPassword(true);
     try {
-      await updateUserPassword(password, passwordConfirmation, currentPassword);
+      await updateUserPassword(password, passwordConfirmation, currentPassword, captchaToken);
       setCurrentPassword("");
       setPassword("");
       setPasswordConfirmation("");
@@ -273,6 +278,7 @@ function SettingsContent({ user }: { user: User }) {
     } finally {
       passwordUpdateLockRef.current = false;
       setIsUpdatingPassword(false);
+      captchaRef.current?.reset();
     }
   }
 
