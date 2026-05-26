@@ -192,24 +192,19 @@ export async function sendPasswordResetEmail(email: string, captchaToken: string
   }
 }
 
-export async function updateUserPassword(newPassword: string, confirmation = newPassword, currentPassword?: string, captchaToken?: string | null) {
+export async function updateUserPassword(newPassword: string, confirmation = newPassword, currentPassword?: string, _captchaToken?: string | null) {
   const validationError = validatePassword(newPassword, confirmation);
   if (validationError) throw new Error(validationError);
 
-  if (currentPassword) {
-    const { data: { user: sessionUser }, error: sessionError } = await supabase.auth.getUser();
-    if (sessionError || !sessionUser?.email) throw new Error("Não foi possível identificar sua sessão. Faça login novamente.");
-
-    const { error: reAuthError } = await supabase.auth.signInWithPassword({
-      email: sessionUser.email,
-      password: currentPassword,
-      options: captchaToken ? { captchaToken } : undefined,
-    });
-
-    if (reAuthError) throw new Error(getAuthErrorMessage(reAuthError, "Senha atual incorreta. Verifique e tente novamente."));
+  if (!currentPassword) {
+    throw new Error("Informe sua senha atual para alterar a senha.");
   }
 
-  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  const { error } = await supabase.auth.updateUser({
+    password: newPassword,
+    // Supabase "Secure Password Change" requires the current password to be sent in the same request.
+    current_password: currentPassword,
+  } as Parameters<typeof supabase.auth.updateUser>[0]);
   if (error) {
     if (import.meta.env.DEV) console.error("Password update failed", error);
     throw new Error(getAuthErrorMessage(error, "Não foi possível alterar a senha. Tente novamente."));
