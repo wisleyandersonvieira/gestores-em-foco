@@ -7,6 +7,7 @@ import logo from "@/assets/logo-gestores-em-foco.png";
 const navigation = [
   { href: "/", label: "Início" },
   { href: "/#produtos", label: "Produtos" },
+  { href: "/#comunidade", label: "Comunidade" },
   { href: "/#quem-somos", label: "Sobre" },
   { href: "/#contato", label: "Contato" },
 ];
@@ -16,7 +17,7 @@ export function SiteHeader() {
     <header className="sticky top-0 z-50 border-b border-white/60 bg-background/80 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-4">
         <Link to="/" className="flex items-center gap-3" aria-label="Gestores em Foco">
-          <img src={logo} alt="Gestores em Foco - Mentoria Empresarial" className="h-12 w-auto" />
+          <img src={logo} alt="Gestores em Foco — Educação e Comunidade para Gestores" className="h-12 w-auto" />
         </Link>
 
         <nav className="hidden items-center gap-6 text-sm font-medium text-muted-foreground lg:flex">

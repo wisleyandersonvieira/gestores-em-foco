@@ -4,15 +4,17 @@ import {
   ArrowRight,
   Award,
   BookOpen,
-  BriefcaseBusiness,
+  Briefcase,
+  Cpu,
+  Factory,
   GraduationCap,
+  Heart,
   LayoutDashboard,
-  MessagesSquare,
-  Presentation,
-  Rocket,
   ShieldCheck,
+  ShoppingCart,
   Sparkles,
   Target,
+  Users,
 } from "lucide-react";
 
 import { SiteFooter } from "@/components/marketing/site-footer";
@@ -29,26 +31,24 @@ const aboutPillars = [
 ];
 
 const products = [
-  { icon: GraduationCap, name: "Cursos Presenciais", text: "Formações intensivas para gestores que valorizam troca direta, prática aplicada e desenvolvimento em grupo." },
   { icon: BookOpen, name: "Cursos Online", text: "Conteúdos digitais para desenvolver liderança, estratégia e rotina de gestão no seu próprio ritmo.", href: "/cursos", cta: "Ver cursos", slug: PRODUCT_SLUGS.courses },
-  { icon: Presentation, name: "Palestras", text: "Encontros de alto impacto para eventos, empresas e comunidades empresariais." },
   { icon: LayoutDashboard, name: "Soluções", text: "Ferramentas digitais para diagnosticar, organizar e acompanhar a gestão da sua empresa.", href: "/solucoes", cta: "Ver soluções", solutionShelf: true },
-  { icon: Rocket, name: "Imersões", text: "Experiências profundas para acelerar decisões e transformar a gestão da empresa." },
-  { icon: MessagesSquare, name: "Mentorias", text: "Acompanhamento individual ou em grupo para evoluir como gestor e dono de empresa." },
-  { icon: BriefcaseBusiness, name: "Consultorias", text: "Projetos consultivos para ajustar processos, estratégia e indicadores de gestão." },
+];
+
+const communitySectors = [
+  { icon: Factory, label: "Indústria" },
+  { icon: ShoppingCart, label: "Comércio" },
+  { icon: Briefcase, label: "Serviços" },
+  { icon: Heart, label: "Saúde" },
+  { icon: GraduationCap, label: "Educação" },
+  { icon: Cpu, label: "Tecnologia" },
 ];
 
 const steps = [
   "Crie sua conta gratuita",
-  "Escolha o produto ideal para você",
+  "Escolha seu curso, solução ou comunidade",
   "Acesse o conteúdo e transforme sua gestão",
   "Acompanhe sua evolução",
-];
-
-const testimonials = [
-  { quote: "A mentoria nos ajudou a organizar prioridades e melhorar a tomada de decisão da diretoria.", author: "Mariana Costa", role: "Diretora Executiva" },
-  { quote: "O diagnóstico mostrou com clareza onde nossa gestão precisava de processo e acompanhamento.", author: "Rafael Nunes", role: "Sócio fundador" },
-  { quote: "Os encontros trouxeram linguagem prática para liderar melhor e cobrar execução sem perder alinhamento.", author: "Bianca Rocha", role: "Gerente de Operações" },
 ];
 
 export function MentoringLandingPage() {
@@ -83,7 +83,7 @@ export function MentoringLandingPage() {
                 Transforme a gestão da sua empresa
               </h1>
               <p className="mt-6 max-w-2xl text-lg leading-8 text-primary-foreground/80">
-                Mentoria empresarial, cursos, soluções digitais, palestras e imersões para gestores e donos de empresas que querem resultados reais.
+                Cursos práticos, soluções digitais e uma comunidade exclusiva para gestores e donos de empresas que querem resultados reais.
               </p>
               <div className="mt-8 flex flex-col gap-4 sm:flex-row">
                 <Button asChild size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90">
@@ -100,11 +100,15 @@ export function MentoringLandingPage() {
             <div className="grid gap-4">
               <Card className="border-white/15 bg-white/10 text-white backdrop-blur">
                 <CardContent className="grid gap-4 p-6 sm:grid-cols-3">
-                  {["Mentorias", "Cursos", "Soluções"].map((label) => (
-                    <div key={label} className="rounded-lg border border-white/15 bg-white/10 p-4">
+                  {[
+                    { label: "Comunidade", sub: "para trocar experiências" },
+                    { label: "Cursos", sub: "para evoluir a gestão" },
+                    { label: "Soluções", sub: "para evoluir a gestão" },
+                  ].map((item) => (
+                    <div key={item.label} className="rounded-lg border border-white/15 bg-white/10 p-4">
                       <Sparkles className="mb-4 h-5 w-5 text-accent" />
-                      <p className="font-semibold">{label}</p>
-                      <p className="mt-1 text-sm text-white/70">para evoluir a gestão</p>
+                      <p className="font-semibold">{item.label}</p>
+                      <p className="mt-1 text-sm text-white/70">{item.sub}</p>
                     </div>
                   ))}
                 </CardContent>
@@ -133,7 +137,7 @@ export function MentoringLandingPage() {
               <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary">Quem somos</p>
               <h2 className="font-display mt-3 text-3xl font-semibold md:text-4xl">Especialistas no desenvolvimento de gestores.</h2>
               <p className="mt-5 text-base leading-8 text-muted-foreground">
-                A Gestores em Foco desenvolve gestores e donos de empresas por meio de mentorias, cursos, soluções digitais, palestras, imersões e consultorias. Nossa metodologia combina diagnóstico, orientação prática e acompanhamento para melhorar decisões, processos e resultados.
+                A Gestores em Foco desenvolve gestores e donos de empresas por meio de cursos, soluções digitais e uma comunidade exclusiva por setor. Nossa metodologia combina diagnóstico, educação e soluções que visam melhorar decisões, processos e resultados.
               </p>
             </div>
             <div className="grid gap-5 md:grid-cols-3">
@@ -154,12 +158,43 @@ export function MentoringLandingPage() {
           <div className="mx-auto max-w-7xl px-6">
             <div className="mb-10 max-w-2xl">
               <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary">Nossos produtos</p>
-              <h2 className="font-display mt-3 text-3xl font-semibold md:text-4xl">Educação empresarial para cada momento da sua gestão.</h2>
+              <h2 className="font-display mt-3 text-3xl font-semibold md:text-4xl">Cursos, ferramentas e experiências para cada momento da sua gestão.</h2>
             </div>
-            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-5 md:grid-cols-2">
               {visibleProducts.map((product) => (
                 <ProductCard key={product.name} product={product} />
               ))}
+            </div>
+          </div>
+        </section>
+
+        <section id="comunidade" className="bg-primary py-20 text-primary-foreground">
+          <div className="mx-auto max-w-7xl px-6">
+            <div className="mb-10 max-w-2xl">
+              <div className="mb-3 flex items-center gap-3">
+                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-accent">Comunidade</p>
+                <Badge className="border-accent/40 bg-accent/20 text-accent text-xs font-bold tracking-wider">100% GRATUITO</Badge>
+              </div>
+              <h2 className="font-display text-3xl font-semibold md:text-4xl">Conecte-se com gestores do seu setor</h2>
+              <p className="mt-5 text-base leading-8 text-primary-foreground/75">
+                Participe gratuitamente de comunidades exclusivas organizadas por setor de atuação. Troque experiências, tire dúvidas e compartilhe boas práticas com profissionais que enfrentam os mesmos desafios que você.
+              </p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+              {communitySectors.map((sector) => (
+                <div key={sector.label} className="flex flex-col items-center gap-3 rounded-xl border border-white/15 bg-white/10 p-6 text-center backdrop-blur transition hover:bg-white/15">
+                  <sector.icon className="h-8 w-8 text-accent" />
+                  <p className="font-semibold">{sector.label}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-10 flex justify-center">
+              <Button asChild size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90">
+                <Link to="/entrar">
+                  <Users className="h-4 w-4" />
+                  Participe da Comunidade
+                </Link>
+              </Button>
             </div>
           </div>
         </section>
@@ -183,34 +218,12 @@ export function MentoringLandingPage() {
           </div>
         </section>
 
-        <section id="depoimentos" className="bg-secondary/70 py-20">
-          <div className="mx-auto max-w-7xl px-6">
-            <div className="mb-10 max-w-2xl">
-              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary">Depoimentos</p>
-              <h2 className="font-display mt-3 text-3xl font-semibold md:text-4xl">Histórias de gestores em evolução.</h2>
-            </div>
-            <div className="grid gap-6 lg:grid-cols-3">
-              {testimonials.map((item) => (
-                <Card key={item.author} className="border-primary/10 bg-white">
-                  <CardContent className="p-8">
-                    <p className="text-lg leading-8 text-muted-foreground">"{item.quote}"</p>
-                    <div className="mt-8">
-                      <p className="font-semibold text-foreground">{item.author}</p>
-                      <p className="text-sm text-muted-foreground">{item.role}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </section>
-
         <section className="mx-auto max-w-7xl px-6 py-20">
           <Card className="overflow-hidden border-none bg-primary text-primary-foreground">
             <CardContent className="flex flex-col gap-8 p-8 md:flex-row md:items-center md:justify-between md:p-10">
               <div>
                 <p className="text-sm uppercase tracking-[0.24em] text-primary-foreground/70">Próximo passo</p>
-                <h2 className="font-display mt-3 text-3xl font-semibold">Entre na plataforma e acompanhe sua evolução empresarial.</h2>
+                <h2 className="font-display mt-3 text-3xl font-semibold">Entre na plataforma, acesse sua comunidade e acompanhe sua evolução.</h2>
               </div>
               <Button asChild size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90">
                 <Link to="/entrar">Acessar Minha Conta</Link>
