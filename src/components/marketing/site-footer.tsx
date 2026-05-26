@@ -8,7 +8,7 @@ export function SiteFooter() {
         <div>
           <p className="font-display text-lg font-semibold uppercase tracking-wide">Gestores em Foco</p>
           <p className="mt-2 max-w-xl text-sm text-primary-foreground/80">
-            Mentoria Empresarial para Gestores e Donos de Empresas.
+            Educação e Comunidade para Gestores e Donos de Empresas.
           </p>
         </div>
         <div className="grid gap-3 text-sm text-primary-foreground/80">

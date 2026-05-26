@@ -1,4 +1,5 @@
 import { lazy, Suspense } from "react";
+import { CookieBanner } from "@/components/marketing/cookie-banner";
 import { Navigate, Routes, Route } from "react-router-dom";
 
 const HomePage = lazy(() => import("@/pages/HomePage"));
@@ -32,6 +33,7 @@ const DreEntryViewPage = lazy(() => import("@/pages/dre/DreEntryViewPage"));
 const DreModelsPage = lazy(() => import("@/pages/dre/DreModelsPage"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const PlaceholderLegalPage = lazy(() => import("@/pages/PlaceholderLegalPage"));
+const PrivacyPolicyPage = lazy(() => import("@/pages/PrivacyPolicyPage"));
 const SolucoesPage = lazy(() => import("@/pages/SolucoesPage"));
 const CommunityPage = lazy(() => import("@/pages/CommunityPage"));
 
@@ -49,6 +51,7 @@ function RouteFallback() {
 export default function App() {
   return (
     <Suspense fallback={<RouteFallback />}>
+      <CookieBanner />
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/entrar" element={<LoginPage />} />
@@ -98,7 +101,7 @@ export default function App() {
         <Route path="/admin/configuracoes" element={<AdminPage />} />
         <Route path="/diagnostico/:token" element={<DiagnosticPage />} />
         <Route path="/termos-de-uso" element={<PlaceholderLegalPage title="Termos de Uso" />} />
-        <Route path="/politica-de-privacidade" element={<PlaceholderLegalPage title="Política de Privacidade" />} />
+        <Route path="/politica-de-privacidade" element={<PrivacyPolicyPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
