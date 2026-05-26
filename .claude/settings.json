@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(npx vitest *)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(supabase db *)",
+      "Bash(npx supabase *)",
+      "Read(//home/codespace/.supabase/**)"
     ]
   }
 }

@@ -4,6 +4,7 @@ import { CalendarDays, MessageSquare, Plus, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { ClientLayout } from "@/components/platform/client-layout";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -180,8 +181,20 @@ function CommunityContent() {
         <DialogContent className="max-w-3xl">
           <DialogHeader><DialogTitle>{selectedTopic?.title}</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <div className="rounded-lg border bg-muted/30 p-4"><p className="whitespace-pre-wrap text-sm">{selectedTopic?.content}</p><p className="mt-3 text-xs text-muted-foreground">{selectedTopic?.author_name} - {formatDate(selectedTopic?.created_at)}</p></div>
-            <div className="space-y-3">{comments.length ? comments.map((item) => <div key={item.id} className="rounded-lg border p-3"><p className="whitespace-pre-wrap text-sm">{item.content}</p><p className="mt-2 text-xs text-muted-foreground">{item.author_name} - {formatDate(item.created_at)}</p></div>) : <p className="text-sm text-muted-foreground">Nenhum comentário ainda.</p>}</div>
+            <div className="rounded-lg border bg-muted/30 p-4">
+              <p className="whitespace-pre-wrap text-sm">{selectedTopic?.content}</p>
+              <AuthorChip name={selectedTopic?.author_name} avatarUrl={selectedTopic?.author_avatar_url} date={selectedTopic?.created_at} className="mt-3" />
+            </div>
+            <div className="space-y-3">
+              {comments.length
+                ? comments.map((item) => (
+                    <div key={item.id} className="rounded-lg border p-3">
+                      <p className="whitespace-pre-wrap text-sm">{item.content}</p>
+                      <AuthorChip name={item.author_name} avatarUrl={item.author_avatar_url} date={item.created_at} className="mt-2" />
+                    </div>
+                  ))
+                : <p className="text-sm text-muted-foreground">Nenhum comentário ainda.</p>}
+            </div>
             <Textarea maxLength={2000} value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Responder..." />
           </div>
           <DialogFooter><Button disabled={busy} onClick={() => void handleComment()}>{busy ? "Enviando..." : "Responder"}</Button></DialogFooter>
@@ -204,7 +217,43 @@ function CommunityFilter({ value, options, onChange }: { value: string; options:
 }
 
 function TopicRow({ topic, onOpen }: { topic: any; onOpen: () => void }) {
-  return <button type="button" onClick={onOpen} className="w-full rounded-lg border p-4 text-left transition hover:border-primary/40"><div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><p className="font-semibold">{topic.title}</p><p className="mt-1 text-sm text-muted-foreground">{topic.community_name} - {topic.author_name ?? "Usuário"}</p></div><div className="flex gap-2">{topic.is_pinned ? <Badge>Fixado</Badge> : null}<Badge variant="secondary">{topic.comments_count ?? 0} comentários</Badge></div></div></button>;
+  return (
+    <button type="button" onClick={onOpen} className="w-full rounded-lg border p-4 text-left transition hover:border-primary/40">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold">{topic.title}</p>
+          <div className="mt-1 flex items-center gap-2">
+            <AuthorAvatar name={topic.author_name} avatarUrl={topic.author_avatar_url} size="sm" />
+            <span className="text-sm text-muted-foreground">{topic.author_name ?? "Usuário"}{topic.community_name ? ` · ${topic.community_name}` : ""}</span>
+          </div>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          {topic.is_pinned ? <Badge>Fixado</Badge> : null}
+          <Badge variant="secondary"><MessageSquare className="mr-1 h-3 w-3" />{topic.comments_count ?? 0}</Badge>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function AuthorAvatar({ name, avatarUrl, size = "md" }: { name?: string | null; avatarUrl?: string | null; size?: "sm" | "md" }) {
+  const initials = (name ?? "U").split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+  const sizeClass = size === "sm" ? "h-5 w-5 text-[10px]" : "h-8 w-8 text-xs";
+  return (
+    <Avatar className={sizeClass}>
+      <AvatarImage src={avatarUrl ?? undefined} alt={name ?? "Usuário"} />
+      <AvatarFallback>{initials}</AvatarFallback>
+    </Avatar>
+  );
+}
+
+function AuthorChip({ name, avatarUrl, date, className }: { name?: string | null; avatarUrl?: string | null; date?: string | null; className?: string }) {
+  return (
+    <div className={`flex items-center gap-2 ${className ?? ""}`}>
+      <AuthorAvatar name={name} avatarUrl={avatarUrl} size="sm" />
+      <span className="text-xs text-muted-foreground">{name ?? "Usuário"}{date ? ` · ${formatDate(date)}` : ""}</span>
+    </div>
+  );
 }
 
 function EventCard({ event }: { event: any }) {
