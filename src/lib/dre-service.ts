@@ -186,7 +186,7 @@ export async function listDreSubcategories(userId: string) {
     const subcategories = (await fetchAllPaginated<DreSubcategoryWithCategory>((from, to) =>
       supabase
         .from("dre_subcategories")
-        .select("*, category:dre_categories(id,name,type,status,is_revenue)")
+        .select("*, category:dre_categories!dre_subcategories_category_id_fkey(id,name,type,status,is_revenue)")
         .eq("user_id", userId)
         .order("display_order", { ascending: true })
         .order("name", { ascending: true })
