@@ -84,16 +84,6 @@
   body {
     @apply min-h-screen bg-background text-foreground antialiased;
     font-family: var(--font-sans);
-    background-image:
-      radial-gradient(circle at top, hsl(219 71% 28% / 0.08), transparent 28%),
-      linear-gradient(180deg, hsl(210 33% 99%), hsl(210 33% 97%));
-  }
-
-  [data-theme="dark"] body,
-  .dark body {
-    background-image:
-      radial-gradient(circle at top, hsl(217 91% 60% / 0.12), transparent 30%),
-      linear-gradient(180deg, hsl(222 47% 11%), hsl(222 84% 5%));
   }
 }
 

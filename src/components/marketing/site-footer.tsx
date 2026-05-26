@@ -1,35 +1,84 @@
 import { Link } from "react-router-dom";
 import { Facebook, Instagram, Linkedin } from "lucide-react";
+import logo from "@/assets/logo-gestores-em-foco.png";
+
+const footerLinks = [
+  { href: "/#produtos", label: "Produtos" },
+  { href: "/#quem-somos", label: "Quem somos" },
+  { href: "/#comunidade", label: "Comunidade" },
+  { href: "/#como-funciona", label: "Como funciona" },
+];
+
+const accessLinks = [
+  { to: "/entrar", label: "Acessar conta" },
+  { to: "/termos-de-uso", label: "Termos de Uso" },
+  { to: "/politica-de-privacidade", label: "Política de Privacidade" },
+];
 
 export function SiteFooter() {
   return (
-    <footer id="contato" className="border-t border-border/70 bg-primary text-primary-foreground">
-      <div className="mx-auto grid max-w-7xl gap-8 px-6 py-10 lg:grid-cols-[1.2fr_0.8fr_0.8fr]">
-        <div>
-          <p className="font-display text-lg font-semibold uppercase tracking-wide">Gestores em Foco</p>
-          <p className="mt-2 max-w-xl text-sm text-primary-foreground/80">
+    <footer id="contato" className="bg-[#0F1B33] text-white/70">
+      <div className="mx-auto grid max-w-7xl gap-10 px-6 py-12 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="lg:col-span-1">
+          <img
+            src={logo}
+            alt="Gestores em Foco"
+            className="h-9 w-auto brightness-0 invert"
+            loading="lazy"
+          />
+          <p className="mt-4 text-sm leading-6 text-white/55">
             Educação e Comunidade para Gestores e Donos de Empresas.
           </p>
         </div>
-        <div className="grid gap-3 text-sm text-primary-foreground/80">
-          <a href="/#produtos" className="transition hover:text-white">Produtos</a>
-          <a href="/#quem-somos" className="transition hover:text-white">Quem somos</a>
-          <Link to="/entrar" className="transition hover:text-white">Acessar conta</Link>
-          <Link to="/termos-de-uso" className="transition hover:text-white">Termos de Uso</Link>
-          <Link to="/politica-de-privacidade" className="transition hover:text-white">Política de Privacidade</Link>
-        </div>
+
         <div>
-          <p className="text-sm font-semibold">Redes sociais</p>
-          <div className="mt-4 flex gap-3">
+          <p className="mb-4 text-[13px] font-semibold uppercase tracking-[0.08em] text-white">Links úteis</p>
+          <div className="grid gap-3 text-sm">
+            {footerLinks.map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                className="text-white/55 transition-colors duration-200 hover:text-white"
+              >
+                {item.label}
+              </a>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-4 text-[13px] font-semibold uppercase tracking-[0.08em] text-white">Acesso</p>
+          <div className="grid gap-3 text-sm">
+            {accessLinks.map((item) => (
+              <Link
+                key={item.to}
+                to={item.to}
+                className="text-white/55 transition-colors duration-200 hover:text-white"
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-4 text-[13px] font-semibold uppercase tracking-[0.08em] text-white">Redes sociais</p>
+          <div className="flex gap-3">
             {[Instagram, Linkedin, Facebook].map((Icon, index) => (
-              <a key={index} href="#" className="flex h-10 w-10 items-center justify-center rounded-full border border-primary-foreground/20 transition hover:bg-white/10">
+              <a
+                key={index}
+                href="#"
+                aria-label="Rede social"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-white/55 transition-all duration-200 hover:border-white/40 hover:text-white"
+              >
                 <Icon className="h-4 w-4" />
               </a>
             ))}
           </div>
         </div>
       </div>
-      <div className="border-t border-primary-foreground/10 px-6 py-5 text-center text-xs text-primary-foreground/70">
+
+      <div className="border-t border-white/[0.08] px-6 py-5 text-center text-xs text-white/40">
         © 2026 Gestores em Foco. Todos os direitos reservados.
       </div>
     </footer>
