@@ -24,8 +24,8 @@ export function SiteHeader() {
 
   return (
     <header
-      className={`sticky top-0 z-50 bg-[#0F1B33] border-b border-white/[0.08] transition-shadow duration-200 ${
-        scrolled ? "shadow-[0_1px_8px_rgba(0,0,0,0.3)]" : ""
+      className={`sticky top-0 z-50 bg-white border-b border-[#E2E8F0] transition-shadow duration-200 ${
+        scrolled ? "shadow-[0_1px_6px_rgba(0,0,0,0.08)]" : ""
       }`}
     >
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-[18px]">
@@ -38,7 +38,7 @@ export function SiteHeader() {
             <a
               key={item.href}
               href={item.href}
-              className="text-white/80 transition-colors duration-200 hover:text-white"
+              className="text-[#4A5568] transition-colors duration-200 hover:text-[#1B2A4A]"
             >
               {item.label}
             </a>
@@ -60,19 +60,19 @@ export function SiteHeader() {
             <Button
               variant="ghost"
               size="icon"
-              className="text-white/80 hover:bg-white/10 hover:text-white sm:hidden"
+              className="text-[#4A5568] hover:bg-[#F7F8FA] hover:text-[#1B2A4A] sm:hidden"
             >
               <Menu className="h-5 w-5" />
               <span className="sr-only">Abrir menu</span>
             </Button>
           </SheetTrigger>
-          <SheetContent side="right" className="w-72 bg-[#0F1B33] border-l border-white/[0.08]">
+          <SheetContent side="right" className="w-72 bg-white border-l border-[#E2E8F0]">
             <div className="mt-8 grid gap-5">
               {navigation.map((item) => (
                 <a
                   key={item.href}
                   href={item.href}
-                  className="text-base font-medium text-white/80 transition-colors duration-200 hover:text-white"
+                  className="text-base font-medium text-[#4A5568] transition-colors duration-200 hover:text-[#1B2A4A]"
                 >
                   {item.label}
                 </a>
