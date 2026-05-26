@@ -96,6 +96,8 @@ function SettingsContent({ user }: { user: User }) {
   const [notifications, setNotifications] = useState<UserNotificationPreferences | null>(null);
   const [subscriptions, setSubscriptions] = useState<UserProductAccess[]>([]);
   const [privacyRequests, setPrivacyRequests] = useState<PrivacyRequest[]>([]);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
@@ -260,7 +262,8 @@ function SettingsContent({ user }: { user: User }) {
     passwordUpdateLockRef.current = true;
     setIsUpdatingPassword(true);
     try {
-      await updateUserPassword(password, passwordConfirmation);
+      await updateUserPassword(password, passwordConfirmation, currentPassword);
+      setCurrentPassword("");
       setPassword("");
       setPasswordConfirmation("");
       toast.success("Senha alterada com sucesso.");
@@ -502,6 +505,14 @@ function SettingsContent({ user }: { user: User }) {
             <CardContent className="grid gap-6 lg:grid-cols-2">
               <div className="space-y-4">
                 <PasswordField
+                  label="Senha atual"
+                  value={currentPassword}
+                  placeholder="Senha atual"
+                  visible={showCurrentPassword}
+                  onToggleVisible={() => setShowCurrentPassword((current) => !current)}
+                  onChange={setCurrentPassword}
+                />
+                <PasswordField
                   label="Nova senha"
                   value={password}
                   placeholder="Nova senha"
@@ -521,7 +532,7 @@ function SettingsContent({ user }: { user: User }) {
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <Button
                     className="bg-primary hover:bg-primary/90 sm:w-fit"
-                    disabled={!password || !passwordConfirmation || isUpdatingPassword}
+                    disabled={!currentPassword || !password || !passwordConfirmation || isUpdatingPassword}
                     onClick={() => void handlePasswordUpdate()}
                   >
                     {isUpdatingPassword ? "Alterando..." : "Alterar senha"}

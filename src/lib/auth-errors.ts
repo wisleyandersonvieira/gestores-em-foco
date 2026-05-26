@@ -44,6 +44,12 @@ export function getAuthErrorMessage(error: unknown, fallback: string) {
   if (code === "email_address_not_authorized") {
     return "Este email não está autorizado a se cadastrar.";
   }
+  if (code === "reauthentication_needed" || message.includes("current password required") || message.includes("reauthentication")) {
+    return "Para alterar sua senha, informe a senha atual no campo correspondente.";
+  }
+  if (code === "same_password" || message.includes("should be different from the old password") || message.includes("same password")) {
+    return "A nova senha deve ser diferente da senha atual.";
+  }
   if (code === "validation_failed" || message.includes("validation")) {
     return e.message || fallback;
   }

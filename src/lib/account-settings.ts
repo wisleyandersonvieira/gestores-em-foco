@@ -192,9 +192,21 @@ export async function sendPasswordResetEmail(email: string, captchaToken: string
   }
 }
 
-export async function updateUserPassword(newPassword: string, confirmation = newPassword) {
+export async function updateUserPassword(newPassword: string, confirmation = newPassword, currentPassword?: string) {
   const validationError = validatePassword(newPassword, confirmation);
   if (validationError) throw new Error(validationError);
+
+  if (currentPassword) {
+    const { data: { user: sessionUser }, error: sessionError } = await supabase.auth.getUser();
+    if (sessionError || !sessionUser?.email) throw new Error("Não foi possível identificar sua sessão. Faça login novamente.");
+
+    const { error: reAuthError } = await supabase.auth.signInWithPassword({
+      email: sessionUser.email,
+      password: currentPassword,
+    });
+
+    if (reAuthError) throw new Error("Senha atual incorreta. Verifique e tente novamente.");
+  }
 
   const { error } = await supabase.auth.updateUser({ password: newPassword });
   if (error) {
