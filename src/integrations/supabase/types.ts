@@ -14,27 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      brazilian_cities: {
-        Row: {
-          city_name: string
-          created_at: string
-          id: string
-          state_name: string
-        }
-        Insert: {
-          city_name: string
-          created_at?: string
-          id?: string
-          state_name: string
-        }
-        Update: {
-          city_name?: string
-          created_at?: string
-          id?: string
-          state_name?: string
-        }
-        Relationships: []
-      }
       admin_users: {
         Row: {
           created_at: string
@@ -110,6 +89,27 @@ export type Database = {
           stripe_customer_id?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      brazilian_cities: {
+        Row: {
+          city_name: string
+          created_at: string | null
+          id: string
+          state_name: string
+        }
+        Insert: {
+          city_name: string
+          created_at?: string | null
+          id?: string
+          state_name: string
+        }
+        Update: {
+          city_name?: string
+          created_at?: string | null
+          id?: string
+          state_name?: string
         }
         Relationships: []
       }

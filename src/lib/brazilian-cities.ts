@@ -1,22 +1,26 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export async function getDistinctStates(): Promise<string[]> {
-  const { data, error } = await supabase
-    .from("brazilian_cities")
-    .select("state_name")
-    .order("state_name");
-
-  if (error) throw new Error("Não foi possível carregar os estados.");
-
   const seen = new Set<string>();
-  const unique: string[] = [];
-  for (const row of data ?? []) {
-    if (!seen.has(row.state_name)) {
-      seen.add(row.state_name);
-      unique.push(row.state_name);
-    }
+  const pageSize = 1000;
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("brazilian_cities")
+      .select("state_name")
+      .order("state_name")
+      .range(from, from + pageSize - 1);
+
+    if (error) throw new Error("Não foi possível carregar os estados.");
+    if (!data || data.length === 0) break;
+
+    for (const row of data) seen.add(row.state_name);
+    if (data.length < pageSize) break;
+    from += pageSize;
   }
-  return unique;
+
+  return Array.from(seen).sort((a, b) => a.localeCompare(b, "pt-BR"));
 }
 
 export async function getCitiesByState(stateName: string): Promise<string[]> {
