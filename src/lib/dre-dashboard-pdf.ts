@@ -78,7 +78,7 @@ function indLevelColor(level: AlertLevel | null): [number, number, number] {
 function shortPeriod(period: string): string {
   // period is like "Janeiro/2026" — convert to "Jan/26"
   const shortMonths: Record<string, string> = {
-    Janeiro: "Jan", Fevereiro: "Fev", Marco: "Mar", Abril: "Abr",
+    Janeiro: "Jan", Fevereiro: "Fev", Março: "Mar", Abril: "Abr",
     Maio: "Mai", Junho: "Jun", Julho: "Jul", Agosto: "Ago",
     Setembro: "Set", Outubro: "Out", Novembro: "Nov", Dezembro: "Dez",
   };

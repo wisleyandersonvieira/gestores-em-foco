@@ -6,7 +6,7 @@ export const DRE_PRODUCT_NAME = "Gestor de DRE";
 export const monthNames = [
   "Janeiro",
   "Fevereiro",
-  "Marco",
+  "Março",
   "Abril",
   "Maio",
   "Junho",
