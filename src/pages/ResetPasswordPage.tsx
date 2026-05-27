@@ -49,80 +49,29 @@ export default function ResetPasswordPage() {
   const [isSaving, setIsSaving]         = useState(false);
   const submitLockRef                   = useRef(false);
 
-  // ── Session / token detection ────────────────────────────────────────────────
-  // Strategy:
-  //  1. If no recovery token is in the URL at all → show error immediately.
-  //  2. If the session is already available (implicit/hash flow) → allow reset.
-  //  3. If the code is in the URL but session isn't ready yet (PKCE flow) →
-  //     wait for the PASSWORD_RECOVERY / SIGNED_IN auth event (Supabase
-  //     auto-exchanges the code on client init). A safety timeout of 6 s
-  //     prevents infinite loading if the exchange silently fails.
+  // Guarda os parâmetros para consumi-los apenas no submit (evita que
+  // scanners de email pré-visualizem o link e queimem o OTP).
+  const recoveryParamsRef = useRef(getRecoveryParams());
 
   useEffect(() => {
-    let mounted = true;
-    const params = getRecoveryParams();
+    const params = recoveryParamsRef.current;
 
     if (params.error) {
       setSessionState("invalid");
-      return () => { mounted = false; };
+      return;
     }
 
     const hasAnyToken = !!(params.tokenHash || params.code || params.accessToken || params.type === "recovery");
     if (!hasAnyToken) {
-      setSessionState("invalid");
-      return () => { mounted = false; };
-    }
-
-    const timeout = window.setTimeout(() => {
-      if (mounted && sessionState === "checking") setSessionState("invalid");
-    }, 8000);
-
-    // Preferred flow: token_hash + verifyOtp (resistente a prefetch de scanners)
-    if (params.tokenHash && params.type === "recovery") {
-      void supabase.auth.verifyOtp({ type: "recovery", token_hash: params.tokenHash }).then(({ data, error }) => {
-        if (!mounted) return;
-        window.clearTimeout(timeout);
-        if (error || !data.session) {
-          setSessionState("invalid");
-          return;
-        }
-        cleanRecoveryTokenFromUrl();
-        setSessionState("valid");
+      void supabase.auth.getSession().then(({ data }) => {
+        setSessionState(data.session ? "valid" : "invalid");
       });
-      return () => { mounted = false; window.clearTimeout(timeout); };
+      return;
     }
 
-    // Fallback (implicit/PKCE legado)
-    void supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      if (data.session) {
-        setSessionState("valid");
-        window.clearTimeout(timeout);
-        cleanRecoveryTokenFromUrl();
-      }
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!mounted) return;
-      const isRecoveryEvent =
-        event === "PASSWORD_RECOVERY" ||
-        (event === "SIGNED_IN" && hasAnyToken);
-      if (isRecoveryEvent) {
-        window.clearTimeout(timeout);
-        cleanRecoveryTokenFromUrl();
-        setSessionState(session ? "valid" : "invalid");
-      }
-    });
-
-    return () => {
-      mounted = false;
-      window.clearTimeout(timeout);
-      subscription.unsubscribe();
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Não consumir o token aqui: apenas habilitar o formulário.
+    setSessionState("valid");
   }, []);
-
-  // ── Form submit ──────────────────────────────────────────────────────────────
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -136,6 +85,35 @@ export default function ResetPasswordPage() {
 
     submitLockRef.current = true;
     setIsSaving(true);
+
+    const params = recoveryParamsRef.current;
+
+    // 1) Estabelecer sessão usando o token recebido por email — somente
+    //    agora (no clique do usuário), para não ser consumido por scanners.
+    try {
+      if (params.tokenHash) {
+        const { error } = await supabase.auth.verifyOtp({
+          type: "recovery",
+          token_hash: params.tokenHash,
+        });
+        if (error) throw error;
+      } else if (params.code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(params.code);
+        if (error) throw error;
+      }
+      // accessToken no hash: supabase-js já restaurou a sessão.
+    } catch (error) {
+      toast.error(
+        getAuthErrorMessage(
+          error,
+          "Link inválido ou expirado. Solicite um novo link de redefinição.",
+        ),
+      );
+      setSessionState("invalid");
+      submitLockRef.current = false;
+      setIsSaving(false);
+      return;
+    }
 
     const { error } = await supabase.auth.updateUser({ password });
 
@@ -151,6 +129,7 @@ export default function ResetPasswordPage() {
       return;
     }
 
+    cleanRecoveryTokenFromUrl();
     toast.success("Senha redefinida com sucesso.");
     await supabase.auth.signOut({ scope: "local" });
     navigate("/entrar", { replace: true });
