@@ -10,7 +10,8 @@
       "Bash(grep -E '\\\\.\\(tsx|ts|css\\)$')",
       "Bash(npm run *)",
       "Bash(git stash *)",
-      "Bash(npx vite *)"
+      "Bash(npx vite *)",
+      "Bash(supabase --version)"
     ]
   }
 }
