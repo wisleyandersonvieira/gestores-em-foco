@@ -16,16 +16,16 @@ import { PASSWORD_RULES, validatePassword } from "@/lib/password-security";
 // • PKCE flow  → ?code=XXXX  (default in Supabase v2 / modern clients)
 // • Implicit   → #access_token=XXXX&type=recovery
 
-function hasRecoveryTokenInUrl(): boolean {
+function getRecoveryParams() {
   const search = new URLSearchParams(window.location.search);
   const hash   = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-
-  return (
-    search.get("type") === "recovery" ||
-    hash.get("type")   === "recovery" ||
-    search.has("code") ||
-    hash.has("access_token")
-  );
+  return {
+    tokenHash: search.get("token_hash") ?? hash.get("token_hash"),
+    type: search.get("type") ?? hash.get("type"),
+    code: search.get("code"),
+    accessToken: hash.get("access_token"),
+    error: search.get("error") ?? hash.get("error"),
+  };
 }
 
 function cleanRecoveryTokenFromUrl() {
