@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
 import { buildDreAnalysisFromModel, type DreAnalysisResult } from "@/lib/dre-analysis";
+import { exportDashboardDrePdf } from "@/lib/dre-dashboard-pdf";
 import { calculateEffectiveTotalsFromEntryItems, currentCompetence, formatCompetence, formatPercentage } from "@/lib/dre-calculations";
 import { generateAdvancedDreAnalysis, type AdvancedAlert, type AdvancedDreAnalysis, type AlertLevel } from "@/lib/dre-advanced-analysis";
 import { getDreEntriesWithItems, getDreModelWithLines, listDreEntries } from "@/lib/dre-service";
@@ -169,7 +170,29 @@ function DreDashboardContent({ userId }: { userId: string }) {
         </div>
         <Button
           variant="outline"
-          onClick={() => exportDashboardPdf({ selectedCompetences, revenueValue, netProfitValue, netMarginValue, grossMargin: indicators?.gross_margin.value ?? null, alerts: topAlerts })}
+          onClick={() => {
+            if (!entriesWithItems.length) {
+              toast.error("Nao ha dados suficientes para gerar o PDF com os filtros selecionados.");
+              return;
+            }
+            exportDashboardDrePdf({
+              selectedCompetences,
+              modelName: model?.name ?? null,
+              revenueValue,
+              netProfitValue,
+              netMarginValue,
+              grossMarginValue: indicators?.gross_margin.value ?? null,
+              grossMarginUnavailable,
+              indicators: indicators ?? null,
+              operationalEfficiency,
+              hasSinglePeriod,
+              analyzedPeriodLabel: analyzedPeriod?.period ?? null,
+              analyzedPeriodMargin: analyzedPeriod?.margin ?? null,
+              chartData,
+              alerts: advancedAnalysis?.alerts ?? [],
+              advancedAnalysis,
+            });
+          }}
         >
           <Download className="h-4 w-4" />
           Exportar PDF
@@ -411,101 +434,3 @@ function MarginTooltip({ active, payload }: TooltipProps<number, string>) {
   );
 }
 
-function exportDashboardPdf(params: {
-  selectedCompetences: string[];
-  revenueValue: number;
-  netProfitValue: number;
-  netMarginValue: number;
-  grossMargin: number | null;
-  alerts: AdvancedAlert[];
-}) {
-  const reportWindow = window.open("", "_blank", "width=1100,height=800");
-
-  if (!reportWindow) {
-    toast.error("Nao foi possivel abrir a janela de exportacao. Verifique o bloqueador de pop-ups.");
-    return;
-  }
-
-  const competenceLabel = params.selectedCompetences.map(formatCompetence).join(", ");
-  const generatedAt = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date());
-
-  reportWindow.document.write(`
-    <!doctype html>
-    <html lang="pt-BR">
-      <head>
-        <meta charset="utf-8" />
-        <title>Dashboard DRE - ${escapeHtml(competenceLabel)}</title>
-        <style>
-          @page { size: A4; margin: 14mm; }
-          * { box-sizing: border-box; }
-          body { font-family: Inter, Arial, sans-serif; color: #172033; margin: 0; background: #f6f7f9; }
-          .page { background: #fff; padding: 28px; min-height: 100vh; }
-          .header { display: flex; justify-content: space-between; gap: 24px; border-bottom: 3px solid #0f2b46; padding-bottom: 18px; }
-          .eyebrow { color: #b45309; font-size: 11px; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase; margin: 0 0 8px; }
-          h1 { color: #0f2b46; font-size: 28px; margin: 0; }
-          .meta { color: #64748b; font-size: 12px; line-height: 1.5; text-align: right; }
-          .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 22px 0; }
-          .card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; background: #fbfdff; }
-          .card span { color: #64748b; display: block; font-size: 11px; margin-bottom: 8px; }
-          .card strong { color: #0f172a; font-size: 18px; }
-          h2 { color: #0f2b46; font-size: 18px; margin: 24px 0 10px; }
-          .alert { border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; margin: 8px 0; }
-          .footer { margin-top: 28px; color: #64748b; font-size: 11px; border-top: 1px solid #e2e8f0; padding-top: 12px; }
-          @media print { body { background: #fff; } .page { padding: 0; } }
-        </style>
-      </head>
-      <body>
-        <main class="page">
-          <section class="header">
-            <div>
-              <p class="eyebrow">Gestor de DRE</p>
-              <h1>Dashboard Financeiro</h1>
-            </div>
-            <div class="meta">
-              <strong>Competencias:</strong><br />
-              ${escapeHtml(competenceLabel)}<br />
-              Gerado em ${escapeHtml(generatedAt)}
-            </div>
-          </section>
-
-          <section class="cards">
-            ${reportCard("Faturamento", formatCurrency(params.revenueValue))}
-            ${reportCard("Lucro Liquido", formatCurrency(params.netProfitValue))}
-            ${reportCard("Margem de Lucro", formatPercentage(params.netMarginValue))}
-            ${reportCard("Margem Bruta", params.grossMargin === null ? "Ajuste o modelo de DRE" : formatPercentage(params.grossMargin))}
-          </section>
-
-          <h2>Alertas prioritarios</h2>
-          ${params.alerts.length === 0 ? "<p>Nenhum alerta identificado para os periodos selecionados.</p>" : params.alerts.map((alert) => `
-            <div class="alert">
-              <strong>${escapeHtml(alert.level)} - ${escapeHtml(alert.title)}</strong><br />
-              <span>${escapeHtml(alert.impact_description)}</span>
-            </div>
-          `).join("")}
-
-          <div class="footer">Relatorio gerado automaticamente pelo Gestor de DRE. Valores conforme filtros aplicados no dashboard.</div>
-        </main>
-        <script>
-          window.onload = () => {
-            window.focus();
-            window.print();
-          };
-        </script>
-      </body>
-    </html>
-  `);
-  reportWindow.document.close();
-}
-
-function reportCard(label: string, value: string) {
-  return `<div class="card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
