@@ -60,21 +60,39 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     let mounted = true;
-    const openedFromRecoveryLink = hasRecoveryTokenInUrl();
+    const params = getRecoveryParams();
 
-    if (!openedFromRecoveryLink) {
+    if (params.error) {
       setSessionState("invalid");
       return () => { mounted = false; };
     }
 
-    // Safety-net timeout — avoids indefinite spinner
-    const timeout = window.setTimeout(() => {
-      if (mounted && sessionState === "checking") {
-        setSessionState("invalid");
-      }
-    }, 6000);
+    const hasAnyToken = !!(params.tokenHash || params.code || params.accessToken || params.type === "recovery");
+    if (!hasAnyToken) {
+      setSessionState("invalid");
+      return () => { mounted = false; };
+    }
 
-    // Implicit flow: session may already exist in getSession
+    const timeout = window.setTimeout(() => {
+      if (mounted && sessionState === "checking") setSessionState("invalid");
+    }, 8000);
+
+    // Preferred flow: token_hash + verifyOtp (resistente a prefetch de scanners)
+    if (params.tokenHash && params.type === "recovery") {
+      void supabase.auth.verifyOtp({ type: "recovery", token_hash: params.tokenHash }).then(({ data, error }) => {
+        if (!mounted) return;
+        window.clearTimeout(timeout);
+        if (error || !data.session) {
+          setSessionState("invalid");
+          return;
+        }
+        cleanRecoveryTokenFromUrl();
+        setSessionState("valid");
+      });
+      return () => { mounted = false; window.clearTimeout(timeout); };
+    }
+
+    // Fallback (implicit/PKCE legado)
     void supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return;
       if (data.session) {
@@ -82,18 +100,13 @@ export default function ResetPasswordPage() {
         window.clearTimeout(timeout);
         cleanRecoveryTokenFromUrl();
       }
-      // PKCE: session not here yet — wait for onAuthStateChange below
     });
 
-    // Both implicit and PKCE fire one of these events when ready
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
-
       const isRecoveryEvent =
         event === "PASSWORD_RECOVERY" ||
-        // Some browsers / Supabase versions fire SIGNED_IN instead
-        (event === "SIGNED_IN" && openedFromRecoveryLink);
-
+        (event === "SIGNED_IN" && hasAnyToken);
       if (isRecoveryEvent) {
         window.clearTimeout(timeout);
         cleanRecoveryTokenFromUrl();
