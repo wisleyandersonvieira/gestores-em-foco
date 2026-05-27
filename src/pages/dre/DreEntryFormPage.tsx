@@ -56,7 +56,7 @@ function DreEntryFormContent({ userId }: { userId: string }) {
       }
     }
 
-    void load().catch((error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel carregar o formulario."));
+    void load().catch((error) => toast.error(error instanceof Error ? error.message : "Não foi possível carregar o formulário."));
   }, [entryId, userId]);
 
   const totals = useMemo(() => calculateDreTotals(lines), [lines]);
@@ -81,7 +81,7 @@ function DreEntryFormContent({ userId }: { userId: string }) {
       toast.success(status === "draft" ? "DRE salvo como rascunho." : "DRE finalizado.");
       navigate(`/dre-facil/dres/${entry.id}`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Nao foi possivel salvar o DRE.");
+      toast.error(error instanceof Error ? error.message : "Não foi possível salvar o DRE.");
     } finally {
       setLoading(false);
     }
@@ -91,13 +91,13 @@ function DreEntryFormContent({ userId }: { userId: string }) {
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-3xl font-semibold">{entryId ? "Editar DRE" : "Cadastrar DRE"}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Preencha valores somente nas subcategorias. Categorias e resultado sao calculados automaticamente.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Preencha valores somente nas subcategorias. Categorias e resultado são calculados automaticamente.</p>
       </div>
 
       <Card className="border-primary/10 bg-white/90">
-        <CardHeader><CardTitle>1. Competencia e modelo</CardTitle></CardHeader>
+        <CardHeader><CardTitle>1. Competência e modelo</CardTitle></CardHeader>
         <CardContent className="grid gap-4 lg:grid-cols-[220px_1fr_auto]">
-          <Label>Competencia<CompetenceSelect value={competence} onChange={setCompetence} /></Label>
+          <Label>Competência<CompetenceSelect value={competence} onChange={setCompetence} /></Label>
           <Label>Modelo<Select value={modelId} onValueChange={setModelId} disabled={Boolean(entryId)}><SelectTrigger className="mt-2"><SelectValue placeholder="Selecione um modelo ativo" /></SelectTrigger><SelectContent>{models.map((model) => <SelectItem key={model.id} value={model.id}>{model.name}</SelectItem>)}</SelectContent></Select></Label>
           <Button className="self-end" onClick={() => void generateDre().catch((error) => toast.error(error.message))} disabled={Boolean(entryId)}>Gerar DRE</Button>
         </CardContent>
@@ -106,14 +106,14 @@ function DreEntryFormContent({ userId }: { userId: string }) {
       <Card className="border-primary/10 bg-white/90">
         <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
           <div>
-            <CardTitle>2. Lancamentos</CardTitle>
+            <CardTitle>2. Lançamentos</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">{entryModelName ? `${entryModelName} · ${formatCompetence(competence)}` : "Gere a estrutura para preencher os valores."}</p>
           </div>
-          <Badge variant={totals.result >= 0 ? "default" : "destructive"}>{totals.result >= 0 ? "Lucro" : "Prejuizo"} {formatCurrency(totals.result)}</Badge>
+          <Badge variant={totals.result >= 0 ? "default" : "destructive"}>{totals.result >= 0 ? "Lucro" : "Prejuízo"} {formatCurrency(totals.result)}</Badge>
         </CardHeader>
         <CardContent>
           {lines.length === 0 ? (
-            <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">Selecione competencia e modelo para gerar a planilha financeira.</div>
+            <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">Selecione a competência e o modelo para gerar a planilha financeira.</div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -131,7 +131,7 @@ function DreEntryFormContent({ userId }: { userId: string }) {
                         <TableCell>
                           <div className={line.lineType === "category" ? "font-semibold uppercase" : line.lineType === "sum" ? "font-semibold text-primary" : "pl-6 text-sm"}>
                             {line.lineType === "category" || line.lineType === "sum" ? line.categoryName : line.subcategoryName}
-                            {line.lineType === "category" ? <Badge className="ml-2" variant={line.categoryType === "credit" ? "default" : "secondary"}>{line.categoryType === "credit" ? "Credito" : "Debito"}</Badge> : null}
+                            {line.lineType === "category" ? <Badge className="ml-2" variant={line.categoryType === "credit" ? "default" : "secondary"}>{line.categoryType === "credit" ? "Crédito" : "Débito"}</Badge> : null}
                             {line.lineType === "category" && line.categoryIsRevenue ? <Badge className="ml-2" variant="outline">FATURAMENTO</Badge> : null}
                             {line.lineType === "sum" && line.isNetIncome ? <Badge className="ml-2" variant="secondary">LUCRO LÍQUIDO</Badge> : null}
                             {line.lineType === "subcategory" && line.subcategoryIsReductive ? <Badge className="ml-2" variant="secondary">REDUTORA</Badge> : null}
@@ -158,8 +158,8 @@ function DreEntryFormContent({ userId }: { userId: string }) {
       </Card>
 
       <div className="grid gap-4 md:grid-cols-4">
-        <Summary label="Total de creditos" value={formatCurrency(totals.totalCredit)} />
-        <Summary label="Total de debitos" value={formatCurrency(totals.totalDebit)} />
+        <Summary label="Total de créditos" value={formatCurrency(totals.totalCredit)} />
+        <Summary label="Total de débitos" value={formatCurrency(totals.totalDebit)} />
         <Summary label="Resultado" value={formatCurrency(totals.result)} tone={totals.result >= 0 ? "positive" : "negative"} />
         <Summary label="Margem" value={`${totals.marginPercentage.toFixed(2).replace(".", ",")}%`} />
       </div>

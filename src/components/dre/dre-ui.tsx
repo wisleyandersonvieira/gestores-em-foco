@@ -69,11 +69,11 @@ export function CurrencyInput({ value, onChange, disabled }: { value: number; on
 
 export function CompetenceMultiFilter({ selected, onChange }: { selected: string[]; onChange: (competences: string[]) => void }) {
   const options = competenceOptionsAroundCurrent();
-  const label = selected.length === 1 ? formatCompetence(selected[0]) : `${selected.length} competencias selecionadas`;
+  const label = selected.length === 1 ? formatCompetence(selected[0]) : `${selected.length} competências selecionadas`;
 
   return (
     <div className="grid gap-2">
-      <Label>Competencias</Label>
+      <Label>Competências</Label>
       <Popover>
         <PopoverTrigger asChild>
           <button className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-left text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
@@ -132,7 +132,7 @@ export function CompetenceSelect({
           type="button"
           className="mt-2 flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-left text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
         >
-          <span>{value ? formatCompetence(value) : "Selecione a competencia"}</span>
+          <span>{value ? formatCompetence(value) : "Selecione a competência"}</span>
           <span className="text-muted-foreground">▾</span>
         </button>
       </PopoverTrigger>

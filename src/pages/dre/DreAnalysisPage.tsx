@@ -60,7 +60,7 @@ function DreAnalysisContent({ userId }: { userId: string }) {
   useEffect(() => {
     void listDreModels(userId, "active")
       .then(setModels)
-      .catch((error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel carregar modelos."));
+      .catch((error) => toast.error(error instanceof Error ? error.message : "Não foi possível carregar modelos."));
   }, [userId]);
 
   useEffect(() => {
@@ -72,7 +72,7 @@ function DreAnalysisContent({ userId }: { userId: string }) {
 
     void listDreEntriesByModelAndYears({ userId, modelId, years, includeDrafts })
       .then(setAvailableEntries)
-      .catch((error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel carregar DREs."));
+      .catch((error) => toast.error(error instanceof Error ? error.message : "Não foi possível carregar DREs."));
   }, [includeDrafts, modelId, userId, years]);
 
   const allEntriesForModel = useMemo(() => availableEntries, [availableEntries]);
@@ -111,7 +111,7 @@ function DreAnalysisContent({ userId }: { userId: string }) {
       const model = await getDreModelWithLines(userId, modelId);
       setResult(buildDreAnalysisFromModel({ model, periods: selectedPeriods, entries: detailedEntries }));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Nao foi possivel gerar a analise.");
+      toast.error(error instanceof Error ? error.message : "Não foi possível gerar a análise.");
     } finally {
       setLoading(false);
     }
@@ -149,13 +149,13 @@ function DreAnalysisContent({ userId }: { userId: string }) {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-display text-3xl font-semibold">Analise de DRE</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Compare DREs por mes, trimestre ou semestre usando a estrutura historica salva nos lancamentos.</p>
+        <h1 className="font-display text-3xl font-semibold">Análise de DRE</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Compare DREs por mês, trimestre ou semestre usando a estrutura histórica salva nos lançamentos.</p>
       </div>
 
       <Card className="border-primary/10 bg-white/90">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <CardTitle>Filtros da analise</CardTitle>
+          <CardTitle>Filtros da análise</CardTitle>
           <button
             type="button"
             className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
@@ -175,7 +175,7 @@ function DreAnalysisContent({ userId }: { userId: string }) {
               </Select>
             </Label>
             <Label>
-              Tipo de analise
+              Tipo de análise
               <Select value={analysisType} onValueChange={(value) => { setAnalysisType(value as AnalysisType); setSelectedIds([]); setResult(null); }}>
                 <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -210,7 +210,7 @@ function DreAnalysisContent({ userId }: { userId: string }) {
               </label>
               <label className="flex cursor-pointer items-center gap-2 text-sm">
                 <Switch checked={showVerticalAnalysis} onCheckedChange={setShowVerticalAnalysis} />
-                <span>Analise vertical</span>
+                <span>Análise vertical</span>
               </label>
             </div>
           </div>
@@ -241,7 +241,7 @@ function DreAnalysisContent({ userId }: { userId: string }) {
                   <Download className="h-4 w-4" />{exportingFormat === "pdf" ? "Gerando PDF..." : "Exportar PDF (Analitica)"}
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={Boolean(exportingFormat)} onClick={() => void runExport("pdf-synthetic")}>
-                  <Download className="h-4 w-4" />{exportingFormat === "pdf-synthetic" ? "Gerando PDF..." : "Exportar PDF (Sintetica)"}
+                  <Download className="h-4 w-4" />{exportingFormat === "pdf-synthetic" ? "Gerando PDF..." : "Exportar PDF (Sintética)"}
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={Boolean(exportingFormat)} onClick={() => void runExport("excel")}>
                   <FileSpreadsheet className="h-4 w-4" />{exportingFormat === "excel" ? "Gerando Excel..." : "Exportar Excel"}
@@ -249,10 +249,10 @@ function DreAnalysisContent({ userId }: { userId: string }) {
               </DropdownMenuContent>
             </DropdownMenu>
             <Button variant="outline" disabled={!result} onClick={() => setShowAdvancedAnalysis(true)}>
-              <BarChart2 className="h-4 w-4" />Analise Detalhada
+              <BarChart2 className="h-4 w-4" />Análise Detalhada
             </Button>
             <Button disabled={!canGenerate || loading} onClick={() => void generateAnalysis()}>
-              {loading ? "Gerando..." : "Gerar Analise"}
+              {loading ? "Gerando..." : "Gerar Análise"}
             </Button>
           </div>
         </CardContent>
@@ -282,11 +282,11 @@ function DreAnalysisContent({ userId }: { userId: string }) {
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <IndicatorCard title="Faturamento" value={formatCurrency(result.summary.revenue)} />
-            <IndicatorCard title="Total de Debitos" value={formatCurrency(result.summary.totalDebit)} />
+            <IndicatorCard title="Total de Débitos" value={formatCurrency(result.summary.totalDebit)} />
             <IndicatorCard title="Resultado acumulado" value={formatCurrency(result.summary.result)} tone={result.summary.result >= 0 ? "positive" : "negative"} />
-            <IndicatorCard title="Margem media" value={formatPercentage(result.summary.averageMargin)} />
-            <IndicatorCard title="Melhor periodo" value={result.summary.bestPeriod} />
-            <IndicatorCard title="Pior periodo" value={result.summary.worstPeriod} />
+            <IndicatorCard title="Margem média" value={formatPercentage(result.summary.averageMargin)} />
+            <IndicatorCard title="Melhor período" value={result.summary.bestPeriod} />
+            <IndicatorCard title="Pior período" value={result.summary.worstPeriod} />
           </div>
 
           <ComparisonTable result={result} showVariation={showVariation} showVerticalAnalysis={showVerticalAnalysis} />
@@ -544,13 +544,13 @@ function groupPeriodsByYear(periods: SelectablePeriod[]) {
 function exportAnalysisPdf(result: AnalysisResult, showVariation: boolean, showVerticalAnalysis: boolean) {
   const reportWindow = window.open("", "_blank", "width=1100,height=800");
   if (!reportWindow) {
-    toast.error("Nao foi possivel abrir a janela de exportacao.");
+    toast.error("Não foi possível abrir a janela de exportação.");
     return;
   }
 
   const generatedAt = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date());
   reportWindow.document.write(`
-    <!doctype html><html lang="pt-BR"><head><meta charset="utf-8" /><title>Analise de DRE</title>
+    <!doctype html><html lang="pt-BR"><head><meta charset="utf-8" /><title>Análise de DRE</title>
     <style>
       @page { size: A4 landscape; margin: 12mm; }
       body { font-family: Inter, Arial, sans-serif; color: #172033; margin: 0; }
@@ -562,14 +562,14 @@ function exportAnalysisPdf(result: AnalysisResult, showVariation: boolean, showV
       td { border-bottom:1px solid #e2e8f0; padding:7px; text-align:right; } .cat, .total { font-weight:700; background:#f1f5f9; } .sub td:first-child { padding-left:22px; }
       .positive { color:#047857; } .negative { color:#b91c1c; } .meta { color:#64748b; font-size:11px; text-align:right; }
     </style></head><body>
-      <section class="header"><div><p class="eyebrow">Gestor de DRE</p><h1>Analise Comparativa de DRE</h1></div><div class="meta">Gerado em ${escapeHtml(generatedAt)}<br />Periodos: ${escapeHtml(result.periods.map((period) => period.label).join(", "))}</div></section>
+      <section class="header"><div><p class="eyebrow">Gestor de DRE</p><h1>Análise Comparativa de DRE</h1></div><div class="meta">Gerado em ${escapeHtml(generatedAt)}<br />Períodos: ${escapeHtml(result.periods.map((period) => period.label).join(", "))}</div></section>
       <section class="cards">
         ${reportCard("Faturamento", formatCurrency(result.summary.revenue))}
-        ${reportCard("Debitos", formatCurrency(result.summary.totalDebit))}
+        ${reportCard("Débitos", formatCurrency(result.summary.totalDebit))}
         ${reportCard("Resultado", formatCurrency(result.summary.result), result.summary.result >= 0 ? "positive" : "negative")}
-        ${reportCard("Margem media", formatPercentage(result.summary.averageMargin))}
-        ${reportCard("Melhor periodo", result.summary.bestPeriod)}
-        ${reportCard("Pior periodo", result.summary.worstPeriod)}
+        ${reportCard("Margem média", formatPercentage(result.summary.averageMargin))}
+        ${reportCard("Melhor período", result.summary.bestPeriod)}
+        ${reportCard("Pior período", result.summary.worstPeriod)}
       </section>
       ${dreAnalysisTableHtml(result, showVariation, showVerticalAnalysis)}
       <script>window.onload = () => { window.focus(); window.print(); };</script>
@@ -582,13 +582,13 @@ function exportAnalysisPdfSynthetic(result: AnalysisResult, showVariation: boole
   const syntheticResult = { ...result, rows: result.rows.filter((row) => row.lineType !== "subcategory") };
   const reportWindow = window.open("", "_blank", "width=1100,height=800");
   if (!reportWindow) {
-    toast.error("Nao foi possivel abrir a janela de exportacao.");
+    toast.error("Não foi possível abrir a janela de exportação.");
     return;
   }
 
   const generatedAt = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date());
   reportWindow.document.write(`
-    <!doctype html><html lang="pt-BR"><head><meta charset="utf-8" /><title>Analise de DRE (Sintetica)</title>
+    <!doctype html><html lang="pt-BR"><head><meta charset="utf-8" /><title>Análise de DRE (Sintética)</title>
     <style>
       @page { size: A4 landscape; margin: 12mm; }
       body { font-family: Inter, Arial, sans-serif; color: #172033; margin: 0; }
@@ -600,14 +600,14 @@ function exportAnalysisPdfSynthetic(result: AnalysisResult, showVariation: boole
       td { border-bottom:1px solid #e2e8f0; padding:7px; text-align:right; } .cat, .total { font-weight:700; background:#f1f5f9; }
       .positive { color:#047857; } .negative { color:#b91c1c; } .meta { color:#64748b; font-size:11px; text-align:right; }
     </style></head><body>
-      <section class="header"><div><p class="eyebrow">Gestor de DRE</p><h1>Analise Comparativa de DRE (Sintetica)</h1></div><div class="meta">Gerado em ${escapeHtml(generatedAt)}<br />Periodos: ${escapeHtml(result.periods.map((period) => period.label).join(", "))}</div></section>
+      <section class="header"><div><p class="eyebrow">Gestor de DRE</p><h1>Análise Comparativa de DRE (Sintética)</h1></div><div class="meta">Gerado em ${escapeHtml(generatedAt)}<br />Períodos: ${escapeHtml(result.periods.map((period) => period.label).join(", "))}</div></section>
       <section class="cards">
         ${reportCard("Faturamento", formatCurrency(result.summary.revenue))}
-        ${reportCard("Debitos", formatCurrency(result.summary.totalDebit))}
+        ${reportCard("Débitos", formatCurrency(result.summary.totalDebit))}
         ${reportCard("Resultado", formatCurrency(result.summary.result), result.summary.result >= 0 ? "positive" : "negative")}
-        ${reportCard("Margem media", formatPercentage(result.summary.averageMargin))}
-        ${reportCard("Melhor periodo", result.summary.bestPeriod)}
-        ${reportCard("Pior periodo", result.summary.worstPeriod)}
+        ${reportCard("Margem média", formatPercentage(result.summary.averageMargin))}
+        ${reportCard("Melhor período", result.summary.bestPeriod)}
+        ${reportCard("Pior período", result.summary.worstPeriod)}
       </section>
       ${dreAnalysisTableHtml(syntheticResult, showVariation, showVerticalAnalysis)}
       <script>window.onload = () => { window.focus(); window.print(); };</script>

@@ -27,7 +27,7 @@ function DreEntryViewContent({ userId }: { userId: string }) {
     if (!entryId) return;
     void getDreEntry(userId, entryId)
       .then(setEntry)
-      .catch((error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel carregar o DRE."));
+      .catch((error) => toast.error(error instanceof Error ? error.message : "Não foi possível carregar o DRE."));
   }, [entryId, userId]);
 
   const lines = useMemo<DreDraftLine[]>(() => {
@@ -45,7 +45,7 @@ function DreEntryViewContent({ userId }: { userId: string }) {
       exportDreToPdf({ entry, lines });
       toast.success("PDF exportado com sucesso.");
     } catch {
-      toast.error("Nao foi possivel exportar o PDF. Tente novamente em instantes.");
+      toast.error("Não foi possível exportar o PDF. Tente novamente em instantes.");
     } finally {
       setExportingPdf(false);
     }
@@ -59,7 +59,7 @@ function DreEntryViewContent({ userId }: { userId: string }) {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="font-display text-3xl font-semibold">Visualizacao do DRE</h1>
+          <h1 className="font-display text-3xl font-semibold">Visualização do DRE</h1>
           <p className="mt-1 text-sm text-muted-foreground">{entry.model?.name ?? "Modelo"} · {formatCompetence(entry.competence)}</p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -76,7 +76,7 @@ function DreEntryViewContent({ userId }: { userId: string }) {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle className="font-display text-2xl">{entry.model?.name ?? "DRE"}</CardTitle>
-              <p className="mt-1 text-sm text-muted-foreground">Competencia {formatCompetence(entry.competence)}</p>
+              <p className="mt-1 text-sm text-muted-foreground">Competência {formatCompetence(entry.competence)}</p>
             </div>
             <Badge variant={entry.status === "finalized" ? "default" : "secondary"}>{entry.status === "finalized" ? "Finalizado" : "Rascunho"}</Badge>
           </div>
@@ -102,8 +102,8 @@ function DreEntryViewContent({ userId }: { userId: string }) {
       </Card>
 
       <div className="grid gap-4 md:grid-cols-4">
-        <Metric label="Total de creditos" value={formatCurrency(entry.total_credit)} />
-        <Metric label="Total de debitos" value={formatCurrency(entry.total_debit)} />
+        <Metric label="Total de créditos" value={formatCurrency(entry.total_credit)} />
+        <Metric label="Total de débitos" value={formatCurrency(entry.total_debit)} />
         <Metric label="Resultado final" value={formatCurrency(entry.result)} tone={entry.result >= 0 ? "positive" : "negative"} />
         <Metric label="Margem" value={formatPercentage(entry.margin_percentage)} />
       </div>

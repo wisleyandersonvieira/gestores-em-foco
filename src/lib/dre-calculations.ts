@@ -30,7 +30,7 @@ export function formatCompetence(competence: string) {
 }
 
 export function formatCurrency(value: number) {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value || 0);
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value || 0);
 }
 
 export function formatPercentage(value: number) {

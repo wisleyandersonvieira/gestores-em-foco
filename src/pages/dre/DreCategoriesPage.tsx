@@ -42,7 +42,7 @@ function DreCategoriesContent({ userId }: { userId: string }) {
   }
 
   useEffect(() => {
-    void reload().catch((error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel carregar categorias."));
+    void reload().catch((error) => toast.error(error instanceof Error ? error.message : "Não foi possível carregar categorias."));
   }, [userId]);
 
   const filteredCategories = useMemo(() => {
@@ -106,8 +106,8 @@ function DreCategoriesContent({ userId }: { userId: string }) {
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os tipos</SelectItem>
-              <SelectItem value="credit">Credito</SelectItem>
-              <SelectItem value="debit">Debito</SelectItem>
+              <SelectItem value="credit">Crédito</SelectItem>
+              <SelectItem value="debit">Débito</SelectItem>
             </SelectContent>
           </Select>
           <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as DreRecordStatus | "all")}>
@@ -135,7 +135,7 @@ function DreCategoriesContent({ userId }: { userId: string }) {
                   <div>
                     <p className="font-semibold">{category.name}</p>
                     <div className="mt-2 flex gap-2">
-                      <Badge variant={category.type === "credit" ? "default" : "secondary"}>{category.type === "credit" ? "Credito" : "Debito"}</Badge>
+                      <Badge variant={category.type === "credit" ? "default" : "secondary"}>{category.type === "credit" ? "Crédito" : "Débito"}</Badge>
                       {category.is_revenue ? <Badge variant="outline">FATURAMENTO</Badge> : null}
                       <Badge variant="outline">{category.status === "active" ? "Ativa" : "Inativa"}</Badge>
                     </div>
@@ -228,7 +228,7 @@ function CategoryDialog({ form, setForm, onSubmit }: { form: CategoryForm | null
           <div className="grid gap-4">
             <Label>Nome<Input className="mt-2" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Label>
             <div className="grid gap-4 sm:grid-cols-3">
-              <Label>Tipo<Select value={form.type} onValueChange={(value) => setForm({ ...form, type: value as DreCategoryType, is_revenue: value === "credit" ? form.is_revenue : false })}><SelectTrigger className="mt-2"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="credit">Credito</SelectItem><SelectItem value="debit">Debito</SelectItem></SelectContent></Select></Label>
+              <Label>Tipo<Select value={form.type} onValueChange={(value) => setForm({ ...form, type: value as DreCategoryType, is_revenue: value === "credit" ? form.is_revenue : false })}><SelectTrigger className="mt-2"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="credit">Crédito</SelectItem><SelectItem value="debit">Débito</SelectItem></SelectContent></Select></Label>
               <Label>Status<Select value={form.status} onValueChange={(value) => setForm({ ...form, status: value as DreRecordStatus })}><SelectTrigger className="mt-2"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Ativa</SelectItem><SelectItem value="inactive">Inativa</SelectItem></SelectContent></Select></Label>
               <Label>Ordem<Input className="mt-2" type="number" value={form.display_order} onChange={(event) => setForm({ ...form, display_order: Number(event.target.value) })} /></Label>
             </div>

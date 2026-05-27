@@ -51,7 +51,7 @@ function DreDashboardContent({ userId }: { userId: string }) {
     setIsLoadingEntries(true);
     void listDreEntries(userId)
       .then(setEntries)
-      .catch((error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel carregar dashboard."))
+      .catch((error) => toast.error(error instanceof Error ? error.message : "Não foi possível carregar dashboard."))
       .finally(() => setIsLoadingEntries(false));
   }, [userId]);
 
@@ -88,7 +88,7 @@ function DreDashboardContent({ userId }: { userId: string }) {
 
     void getDreModelWithLines(userId, primaryModelId)
       .then(setModel)
-      .catch((error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel carregar o modelo do dashboard."));
+      .catch((error) => toast.error(error instanceof Error ? error.message : "Não foi possível carregar o modelo do dashboard."));
   }, [primaryModelId, userId]);
 
   const fallbackTotals = useMemo(() => {
@@ -158,7 +158,7 @@ function DreDashboardContent({ userId }: { userId: string }) {
   }, [advancedAnalysis]);
 
   const modelNotice = selectedEntries.length > selectedEntriesForModel.length
-    ? "O dashboard considera o modelo mais recente entre as competencias selecionadas para manter consistencia com a analise detalhada."
+    ? "O dashboard considera o modelo mais recente entre as competências selecionadas para manter consistência com a análise detalhada."
     : null;
 
   return (

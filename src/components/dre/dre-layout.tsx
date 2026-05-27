@@ -88,7 +88,7 @@ function DreAccessGate({ user, children, allowBlockedAccess }: { user: User; chi
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary">Gestor de DRE</p>
-            <p className="text-sm text-muted-foreground">Controle mensal de categorias, modelos, lancamentos e indicadores.</p>
+            <p className="text-sm text-muted-foreground">Controle mensal de categorias, modelos, lançamentos e indicadores.</p>
           </div>
           <Badge className="bg-emerald-600">Acesso ativo</Badge>
         </div>

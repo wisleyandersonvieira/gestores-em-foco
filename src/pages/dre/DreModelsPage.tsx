@@ -46,7 +46,7 @@ function DreModelsContent({ userId }: { userId: string }) {
   }
 
   useEffect(() => {
-    void reload().catch((error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel carregar modelos."));
+    void reload().catch((error) => toast.error(error instanceof Error ? error.message : "Não foi possível carregar modelos."));
   }, [userId]);
 
   async function editModel(model: DreModel) {
@@ -169,7 +169,7 @@ function DreModelsContent({ userId }: { userId: string }) {
                         />
                         <div>
                           <p className="font-semibold">{category.name}</p>
-                          <p className="text-xs text-muted-foreground">{category.type === "credit" ? "Credito" : "Debito"} · Ordem atual {category.display_order}</p>
+                          <p className="text-xs text-muted-foreground">{category.type === "credit" ? "Crédito" : "Débito"} · Ordem atual {category.display_order}</p>
                         </div>
                       </label>
                       {selectedCategory ? (
