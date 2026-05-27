@@ -540,8 +540,8 @@ function UsersPanel({ data, search, onSearch }: { data: any; search: string; onS
   // Filter states
   const [filterState, setFilterState] = useState("");
   const [filterCity, setFilterCity] = useState("");
-  const [filterSector, setFilterSector] = useState("");
-  const [filterSubsector, setFilterSubsector] = useState("");
+  const [filterSector, setFilterSector] = useState("all");
+  const [filterSubsector, setFilterSubsector] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterProduct, setFilterProduct] = useState("all");
   const [filterDateFrom, setFilterDateFrom] = useState("");
@@ -606,12 +606,12 @@ function UsersPanel({ data, search, onSearch }: { data: any; search: string; onS
         if (!uCity.toLowerCase().includes(filterCity.toLowerCase())) return false;
       }
       // Sector
-      if (filterSector) {
+      if (filterSector !== "all") {
         const names: string[] = user.sector_names ?? [];
         if (!names.includes(filterSector)) return false;
       }
       // Subsector
-      if (filterSubsector) {
+      if (filterSubsector !== "all") {
         const names: string[] = user.subsector_names ?? [];
         if (!names.includes(filterSubsector)) return false;
       }
@@ -661,15 +661,15 @@ function UsersPanel({ data, search, onSearch }: { data: any; search: string; onS
     setFilterState("");
     setFilterCity("");
     setAvailableCities([]);
-    setFilterSector("");
-    setFilterSubsector("");
+    setFilterSector("all");
+    setFilterSubsector("all");
     setFilterStatus("all");
     setFilterProduct("all");
     setFilterDateFrom("");
     setFilterDateTo("");
   }
 
-  const hasFilters = search || filterState || filterCity || filterSector || filterSubsector || filterStatus !== "all" || filterProduct !== "all" || filterDateFrom || filterDateTo;
+  const hasFilters = search || filterState || filterCity || filterSector !== "all" || filterSubsector !== "all" || filterStatus !== "all" || filterProduct !== "all" || filterDateFrom || filterDateTo;
 
   return (
     <div className="space-y-6">
@@ -765,7 +765,7 @@ function UsersPanel({ data, search, onSearch }: { data: any; search: string; onS
             <Select value={filterSector} onValueChange={setFilterSector}>
               <SelectTrigger><SelectValue placeholder="Setor" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos os setores</SelectItem>
+                <SelectItem value="all">Todos os setores</SelectItem>
                 {allSectorNames.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -774,7 +774,7 @@ function UsersPanel({ data, search, onSearch }: { data: any; search: string; onS
             <Select value={filterSubsector} onValueChange={setFilterSubsector}>
               <SelectTrigger><SelectValue placeholder="Subsetor" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos os subsetores</SelectItem>
+                <SelectItem value="all">Todos os subsetores</SelectItem>
                 {allSubsectorNames.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
