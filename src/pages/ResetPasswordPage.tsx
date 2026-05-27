@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Eye, EyeOff } from "lucide-react";
+import { Check, Eye, EyeOff, X } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -9,54 +9,111 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { getAuthErrorMessage } from "@/lib/auth-errors";
-import { validatePassword } from "@/lib/password-security";
+import { PASSWORD_RULES, validatePassword } from "@/lib/password-security";
 
-function hasRecoveryTokenInUrl() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+// ── Token detection ────────────────────────────────────────────────────────────
+// Supabase sends recovery links in two possible formats depending on the project settings:
+// • PKCE flow  → ?code=XXXX  (default in Supabase v2 / modern clients)
+// • Implicit   → #access_token=XXXX&type=recovery
 
-  return urlParams.get("type") === "recovery" || hashParams.get("type") === "recovery" || urlParams.has("code");
+function hasRecoveryTokenInUrl(): boolean {
+  const search = new URLSearchParams(window.location.search);
+  const hash   = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+
+  return (
+    search.get("type") === "recovery" ||
+    hash.get("type")   === "recovery" ||
+    search.has("code") ||
+    hash.has("access_token")
+  );
 }
+
+function cleanRecoveryTokenFromUrl() {
+  if (typeof window !== "undefined" && window.history.replaceState) {
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+}
+
+// ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function ResetPasswordPage() {
   const navigate = useNavigate();
-  const [password, setPassword] = useState("");
-  const [passwordConfirmation, setPasswordConfirmation] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showPasswordConfirmation, setShowPasswordConfirmation] = useState(false);
-  const [hasRecoverySession, setHasRecoverySession] = useState(false);
-  const [isCheckingSession, setIsCheckingSession] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const submitLockRef = useRef(false);
+
+  const [password, setPassword]                             = useState("");
+  const [passwordConfirmation, setPasswordConfirmation]     = useState("");
+  const [showPassword, setShowPassword]                     = useState(false);
+  const [showConfirmation, setShowConfirmation]             = useState(false);
+
+  // Session state machine: "checking" | "valid" | "invalid"
+  const [sessionState, setSessionState] = useState<"checking" | "valid" | "invalid">("checking");
+  const [isSaving, setIsSaving]         = useState(false);
+  const submitLockRef                   = useRef(false);
+
+  // ── Session / token detection ────────────────────────────────────────────────
+  // Strategy:
+  //  1. If no recovery token is in the URL at all → show error immediately.
+  //  2. If the session is already available (implicit/hash flow) → allow reset.
+  //  3. If the code is in the URL but session isn't ready yet (PKCE flow) →
+  //     wait for the PASSWORD_RECOVERY / SIGNED_IN auth event (Supabase
+  //     auto-exchanges the code on client init). A safety timeout of 6 s
+  //     prevents infinite loading if the exchange silently fails.
 
   useEffect(() => {
-    let active = true;
+    let mounted = true;
     const openedFromRecoveryLink = hasRecoveryTokenInUrl();
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (!active) return;
-      setHasRecoverySession(Boolean(data.session) && openedFromRecoveryLink);
-      setIsCheckingSession(false);
+    if (!openedFromRecoveryLink) {
+      setSessionState("invalid");
+      return () => { mounted = false; };
+    }
+
+    // Safety-net timeout — avoids indefinite spinner
+    const timeout = window.setTimeout(() => {
+      if (mounted && sessionState === "checking") {
+        setSessionState("invalid");
+      }
+    }, 6000);
+
+    // Implicit flow: session may already exist in getSession
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+      if (data.session) {
+        setSessionState("valid");
+        window.clearTimeout(timeout);
+        cleanRecoveryTokenFromUrl();
+      }
+      // PKCE: session not here yet — wait for onAuthStateChange below
     });
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY") {
-        setHasRecoverySession(Boolean(session));
-        setIsCheckingSession(false);
+    // Both implicit and PKCE fire one of these events when ready
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return;
+
+      const isRecoveryEvent =
+        event === "PASSWORD_RECOVERY" ||
+        // Some browsers / Supabase versions fire SIGNED_IN instead
+        (event === "SIGNED_IN" && openedFromRecoveryLink);
+
+      if (isRecoveryEvent) {
+        window.clearTimeout(timeout);
+        cleanRecoveryTokenFromUrl();
+        setSessionState(session ? "valid" : "invalid");
       }
     });
 
     return () => {
-      active = false;
+      mounted = false;
+      window.clearTimeout(timeout);
       subscription.unsubscribe();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ── Form submit ──────────────────────────────────────────────────────────────
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (submitLockRef.current) return;
+    if (submitLockRef.current || sessionState !== "valid") return;
 
     const validationError = validatePassword(password, passwordConfirmation);
     if (validationError) {
@@ -66,10 +123,16 @@ export default function ResetPasswordPage() {
 
     submitLockRef.current = true;
     setIsSaving(true);
+
     const { error } = await supabase.auth.updateUser({ password });
 
     if (error) {
-      toast.error(getAuthErrorMessage(error, "Nao foi possivel redefinir sua senha. Solicite um novo link e tente novamente."));
+      toast.error(
+        getAuthErrorMessage(
+          error,
+          "Não foi possível redefinir sua senha. Solicite um novo link e tente novamente.",
+        ),
+      );
       submitLockRef.current = false;
       setIsSaving(false);
       return;
@@ -79,6 +142,8 @@ export default function ResetPasswordPage() {
     await supabase.auth.signOut({ scope: "local" });
     navigate("/entrar", { replace: true });
   }
+
+  // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
     <main className="mx-auto flex min-h-screen max-w-7xl flex-col items-center justify-center gap-10 px-6 py-16 lg:flex-row lg:justify-between">
@@ -98,10 +163,16 @@ export default function ResetPasswordPage() {
           <CardDescription>Digite uma nova senha para acessar sua conta.</CardDescription>
         </CardHeader>
         <CardContent>
-          {!isCheckingSession && !hasRecoverySession ? (
+          {sessionState === "checking" && (
+            <div className="py-6 text-center text-sm text-muted-foreground">
+              Validando link de redefinição...
+            </div>
+          )}
+
+          {sessionState === "invalid" && (
             <div className="space-y-4">
               <div className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                Link invalido ou expirado. Solicite um novo link de redefinicao.
+                Este link expirou ou é inválido. Solicite uma nova redefinição de senha.
               </div>
               <Button asChild variant="outline" className="w-full">
                 <Link to="/esqueci-minha-senha">Solicitar novo link</Link>
@@ -110,28 +181,48 @@ export default function ResetPasswordPage() {
                 <Link to="/entrar">Voltar para login</Link>
               </Button>
             </div>
-          ) : (
+          )}
+
+          {sessionState === "valid" && (
             <form onSubmit={handleSubmit} className="space-y-5">
               <PasswordInput
+                id="new-password"
                 label="Nova senha"
                 value={password}
                 placeholder="Nova senha"
                 visible={showPassword}
-                onToggleVisible={() => setShowPassword((current) => !current)}
+                onToggleVisible={() => setShowPassword((v) => !v)}
                 onChange={setPassword}
               />
+
+              {/* Real-time requirements checklist */}
+              {password.length > 0 && (
+                <PasswordRequirements password={password} />
+              )}
+
               <PasswordInput
+                id="confirm-password"
                 label="Confirmar nova senha"
                 value={passwordConfirmation}
                 placeholder="Confirmar nova senha"
-                visible={showPasswordConfirmation}
-                onToggleVisible={() => setShowPasswordConfirmation((current) => !current)}
+                visible={showConfirmation}
+                onToggleVisible={() => setShowConfirmation((v) => !v)}
                 onChange={setPasswordConfirmation}
               />
-              <p className="text-sm text-muted-foreground">A senha deve ter no minimo 8 caracteres, incluindo letras e numeros.</p>
-              <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isSaving || isCheckingSession}>
+
+              {/* Confirmation mismatch hint */}
+              {passwordConfirmation.length > 0 && password !== passwordConfirmation && (
+                <p className="text-xs text-destructive">As senhas informadas não coincidem.</p>
+              )}
+
+              <Button
+                type="submit"
+                className="w-full bg-primary hover:bg-primary/90"
+                disabled={isSaving}
+              >
                 {isSaving ? "Salvando..." : "Salvar nova senha"}
               </Button>
+
               <p className="text-center text-sm text-muted-foreground">
                 <Link to="/entrar" className="font-medium text-primary hover:underline">
                   Voltar para login
@@ -145,7 +236,10 @@ export default function ResetPasswordPage() {
   );
 }
 
+// ── Sub-components ─────────────────────────────────────────────────────────────
+
 function PasswordInput({
+  id,
   label,
   value,
   placeholder,
@@ -153,6 +247,7 @@ function PasswordInput({
   onToggleVisible,
   onChange,
 }: {
+  id: string;
   label: string;
   value: string;
   placeholder: string;
@@ -161,17 +256,18 @@ function PasswordInput({
   onChange: (value: string) => void;
 }) {
   return (
-    <Label className="block">
+    <Label className="block" htmlFor={id}>
       {label}
       <div className="relative mt-2">
         <Input
+          id={id}
           className="pr-11"
           type={visible ? "text" : "password"}
           value={value}
           placeholder={placeholder}
           autoComplete="new-password"
           required
-          onChange={(event) => onChange(event.target.value)}
+          onChange={(e) => onChange(e.target.value)}
         />
         <Button
           type="button"
@@ -179,11 +275,30 @@ function PasswordInput({
           size="icon"
           className="absolute right-0 top-0 h-10 w-10 text-muted-foreground hover:text-foreground"
           onClick={onToggleVisible}
+          tabIndex={-1}
         >
           {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           <span className="sr-only">{visible ? "Ocultar senha" : "Mostrar senha"}</span>
         </Button>
       </div>
     </Label>
+  );
+}
+
+function PasswordRequirements({ password }: { password: string }) {
+  return (
+    <ul className="grid gap-1 rounded-lg border bg-muted/30 px-3 py-2.5 sm:grid-cols-2">
+      {PASSWORD_RULES.map((rule) => {
+        const met = rule.test(password);
+        return (
+          <li key={rule.label} className={`flex items-center gap-1.5 text-xs ${met ? "text-emerald-600" : "text-muted-foreground"}`}>
+            {met
+              ? <Check className="h-3.5 w-3.5 shrink-0" />
+              : <X className="h-3.5 w-3.5 shrink-0" />}
+            {rule.label}
+          </li>
+        );
+      })}
+    </ul>
   );
 }

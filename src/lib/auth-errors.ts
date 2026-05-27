@@ -30,7 +30,7 @@ export function getAuthErrorMessage(error: unknown, fallback: string) {
   const message = (e.message ?? "").toLowerCase();
 
   if (code === "weak_password" || message.includes("password should be") || message.includes("weak password")) {
-    return "Senha muito fraca. Use ao menos 8 caracteres, com letras e números.";
+    return "Senha inválida. Use no mínimo 8 caracteres com letra maiúscula, minúscula, número e caractere especial.";
   }
   if (code === "user_already_exists" || message.includes("already registered") || message.includes("user already")) {
     return "Este email já possui uma conta. Faça login ou recupere sua senha.";
