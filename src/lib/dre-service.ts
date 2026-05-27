@@ -506,6 +506,51 @@ export async function saveDreEntry(params: {
   return entry;
 }
 
+export type DreEntriesPageFilter = {
+  startCompetence?: string;
+  endCompetence?: string;
+  modelId?: string;
+  status?: DreEntryStatus | "all";
+  resultFilter?: "all" | "positive" | "negative" | "zero";
+};
+
+export async function listDreEntriesPaginated(
+  userId: string,
+  page: number,
+  pageSize: number,
+  filter: DreEntriesPageFilter = {},
+): Promise<{ entries: DreEntryWithModel[]; totalCount: number }> {
+  try {
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+
+    let query = supabase
+      .from("dre_entries")
+      .select("*, model:dre_models!dre_entries_model_id_fkey(id,name)", { count: "exact" })
+      .eq("user_id", userId)
+      .order("competence", { ascending: false })
+      .order("created_at", { ascending: false })
+      .range(from, to);
+
+    if (filter.startCompetence) query = query.gte("competence", filter.startCompetence);
+    if (filter.endCompetence) query = query.lte("competence", filter.endCompetence);
+    if (filter.modelId && filter.modelId !== "all") query = query.eq("model_id", filter.modelId);
+    if (filter.status && filter.status !== "all") query = query.eq("status", filter.status);
+    if (filter.resultFilter === "positive") query = query.gt("result", 0);
+    if (filter.resultFilter === "negative") query = query.lt("result", 0);
+    if (filter.resultFilter === "zero") query = query.eq("result", 0);
+
+    const { data, error, count } = await query;
+    if (error) throw error;
+
+    const entries = (data ?? []) as DreEntryWithModel[];
+    const recalculated = await recalculateEntrySummaries(userId, entries);
+    return { entries: recalculated, totalCount: count ?? 0 };
+  } catch {
+    throw new Error("Nao foi possivel carregar DREs cadastrados.");
+  }
+}
+
 export async function listDreEntries(userId: string) {
   try {
     const entries = (await fetchAllPaginated((from, to) =>
