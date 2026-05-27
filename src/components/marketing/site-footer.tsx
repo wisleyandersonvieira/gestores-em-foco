@@ -1,5 +1,4 @@
 import { Link } from "react-router-dom";
-import { Facebook, Instagram, Linkedin } from "lucide-react";
 import logo from "@/assets/logo-gestores-em-foco.png";
 
 const footerLinks = [
@@ -18,7 +17,7 @@ const accessLinks = [
 export function SiteFooter() {
   return (
     <footer id="contato" className="bg-[#0F1B33] text-white/70">
-      <div className="mx-auto grid max-w-7xl gap-10 px-6 py-12 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mx-auto grid max-w-7xl gap-10 px-6 py-12 sm:grid-cols-2 lg:grid-cols-3">
         <div className="lg:col-span-1">
           <img
             src={logo}
@@ -61,21 +60,7 @@ export function SiteFooter() {
           </div>
         </div>
 
-        <div>
-          <p className="mb-4 text-[13px] font-semibold uppercase tracking-[0.08em] text-white">Redes sociais</p>
-          <div className="flex gap-3">
-            {[Instagram, Linkedin, Facebook].map((Icon, index) => (
-              <a
-                key={index}
-                href="#"
-                aria-label="Rede social"
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-white/55 transition-all duration-200 hover:border-white/40 hover:text-white"
-              >
-                <Icon className="h-4 w-4" />
-              </a>
-            ))}
-          </div>
-        </div>
+
       </div>
 
       <div className="border-t border-white/[0.08] px-6 py-5 text-center text-xs text-white/40">
