@@ -217,8 +217,8 @@ async function selectByUser(table: string, userId: string) {
 
 
 
-async function selectMaybeSingle(table: Parameters<typeof supabase.from>[0], userId: string) {
-  const { data, error } = await supabase.from(table).select("*").eq("user_id", userId).maybeSingle();
+async function selectMaybeSingle(table: string, userId: string) {
+  const { data, error } = await (supabase.from(table as any) as any).select("*").eq("user_id", userId).maybeSingle();
   if (error) {
     if (import.meta.env.DEV) console.error(`Data export failed for ${table}`, error);
     return null;
@@ -226,6 +226,7 @@ async function selectMaybeSingle(table: Parameters<typeof supabase.from>[0], use
 
   return data;
 }
+
 
 type AnyRecord = Record<string, any>;
 type ExcelSheet = { name: string; rows: AnyRecord[] };
