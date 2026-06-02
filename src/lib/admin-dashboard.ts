@@ -16,18 +16,18 @@ export function getPeriodStart(period: AdminPeriod) {
 export async function getAdminData(period: AdminPeriod) {
   const since = getPeriodStart(period);
   const [profiles, globalProfiles, products, subscriptions, accessLogs, supportRequests, dreMetrics, diagnosticMetrics, sectors, subsectors, userSectors, userSubsectors] = await Promise.all([
-    safeSelect("profiles", "*"),
-    safeSelect("user_profiles", "*"),
-    safeSelect("products", "*"),
-    safeSelect("user_product_subscriptions", "*, product:products(*)"),
-    safeSelect("site_access_logs", "*", (query) => query.gte("created_at", since).in("event_type", ["user_panel_access", "product_access"]).order("created_at", { ascending: false }).limit(5000)),
+    paginatedSelect("profiles", "*"),
+    paginatedSelect("user_profiles", "*"),
+    paginatedSelect("products", "*"),
+    paginatedSelect("user_product_subscriptions", "*, product:products(*)"),
+    paginatedSelect("site_access_logs", "*", (q) => q.gte("created_at", since).in("event_type", ["user_panel_access", "product_access"]).order("created_at", { ascending: false }), 5000),
     safeSelect("support_requests", "*", (query) => query.order("created_at", { ascending: false }).limit(250)),
     getDreMetrics(),
     getDiagnosticMetrics(),
-    safeSelect("business_sectors", "id, name"),
-    safeSelect("business_subsectors", "id, name, sector_id"),
-    safeSelect("user_sectors", "user_id, sector_id"),
-    safeSelect("user_subsectors", "user_id, subsector_id"),
+    paginatedSelect("business_sectors", "id, name"),
+    paginatedSelect("business_subsectors", "id, name, sector_id"),
+    paginatedSelect("user_sectors", "user_id, sector_id"),
+    paginatedSelect("user_subsectors", "user_id, subsector_id"),
   ]);
 
   const sectorsById = new Map((sectors as AnyRecord[]).map((s) => [s.id, s.name as string]));
@@ -118,35 +118,36 @@ export async function updateSupportRequest(requestId: string, payload: { status?
 }
 
 async function getDreMetrics() {
-  const [categories, subcategories, models, entries, items] = await Promise.all([
-    safeSelect("dre_categories", "*"),
-    safeSelect("dre_subcategories", "*"),
-    safeSelect("dre_models", "*"),
-    safeSelect("dre_entries", "*"),
-    safeSelect("dre_entry_items", "*"),
+  const [categories, subcategories, models, entries, items, lastEntry] = await Promise.all([
+    countRows("dre_categories"),
+    countRows("dre_subcategories"),
+    countRows("dre_models"),
+    countRows("dre_entries"),
+    countRows("dre_entry_items"),
+    fetchLastCreatedAt("dre_entries"),
   ]);
-  const lastEntry = (entries as AnyRecord[]).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0] ?? null;
   return {
-    categories: (categories as AnyRecord[]).length,
-    subcategories: (subcategories as AnyRecord[]).length,
-    models: (models as AnyRecord[]).length,
-    entries: (entries as AnyRecord[]).length,
-    items: (items as AnyRecord[]).length,
-    lastActivity: lastEntry?.created_at ?? null,
+    categories,
+    subcategories,
+    models,
+    entries,
+    items,
+    lastActivity: lastEntry,
   };
 }
 
 async function getDiagnosticMetrics() {
-  const [templates, links, sessions] = await Promise.all([
-    safeSelect("diagnostic_templates", "*"),
-    safeSelect("diagnostic_links", "*"),
-    safeSelect("diagnostic_sessions", "*"),
+  const [templates, publishedTemplates, links, sessions] = await Promise.all([
+    countRows("diagnostic_templates"),
+    countRows("diagnostic_templates", (q) => q.eq("status", "published")),
+    countRows("diagnostic_links"),
+    countRows("diagnostic_sessions"),
   ]);
   return {
-    templates: (templates as AnyRecord[]).length,
-    publishedTemplates: (templates as AnyRecord[]).filter((item) => item.status === "published").length,
-    links: (links as AnyRecord[]).length,
-    sessions: (sessions as AnyRecord[]).length,
+    templates,
+    publishedTemplates,
+    links,
+    sessions,
   };
 }
 
@@ -159,6 +160,53 @@ async function safeSelect(table: any, columns = "*", transform?: (query: any) =>
     return [];
   }
   return data ?? [];
+}
+
+async function paginatedSelect(table: any, columns = "*", transform?: (query: any) => any, maxRows = Infinity) {
+  const pageSize = 1000;
+  let from = 0;
+  const all: any[] = [];
+  while (all.length < maxRows) {
+    const end = Math.min(from + pageSize, maxRows) - 1;
+    let query: any = supabase.from(table).select(columns);
+    if (transform) query = transform(query);
+    query = query.range(from, end);
+    const { data, error } = await query;
+    if (error) {
+      if (import.meta.env.DEV) console.error(`Admin paginated query failed for ${table}`, error);
+      return all;
+    }
+    if (!data || data.length === 0) break;
+    all.push(...data);
+    if (data.length < end - from + 1) break;
+    from = all.length;
+  }
+  return all;
+}
+
+async function countRows(table: any, transform?: (query: any) => any) {
+  let query: any = supabase.from(table).select("*", { count: "exact", head: true });
+  if (transform) query = transform(query);
+  const { count, error } = await query;
+  if (error) {
+    if (import.meta.env.DEV) console.error(`Admin count failed for ${table}`, error);
+    return 0;
+  }
+  return count ?? 0;
+}
+
+async function fetchLastCreatedAt(table: any) {
+  const { data, error } = await supabase
+    .from(table)
+    .select("created_at")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    if (import.meta.env.DEV) console.error(`Admin last-row query failed for ${table}`, error);
+    return null;
+  }
+  return (data as any)?.created_at ?? null;
 }
 
 function countBy(rows: AnyRecord[], key: string) {
@@ -175,3 +223,4 @@ function getAccessEventType(row: AnyRecord) {
 }
 
 type AnyRecord = Record<string, any>;
+

@@ -194,18 +194,31 @@ async function getActivePrivacyRequest(userId: string, requestType: PrivacyReque
   return data;
 }
 
-async function selectByUser(table: Parameters<typeof supabase.from>[0], userId: string) {
-  const { data, error } = await supabase.from(table).select("*").eq("user_id", userId);
-  if (error) {
-    if (import.meta.env.DEV) console.error(`Data export failed for ${table}`, error);
-    return [];
+async function selectByUser(table: string, userId: string) {
+  const pageSize = 1000;
+  let from = 0;
+  const all: any[] = [];
+  while (true) {
+    const { data, error } = await (supabase.from(table as any) as any)
+      .select("*")
+      .eq("user_id", userId)
+      .range(from, from + pageSize - 1);
+    if (error) {
+      if (import.meta.env.DEV) console.error(`Data export failed for ${table}`, error);
+      return [];
+    }
+    if (!data || data.length === 0) break;
+    all.push(...data);
+    if (data.length < pageSize) break;
+    from += pageSize;
   }
-
-  return data ?? [];
+  return all;
 }
 
-async function selectMaybeSingle(table: Parameters<typeof supabase.from>[0], userId: string) {
-  const { data, error } = await supabase.from(table).select("*").eq("user_id", userId).maybeSingle();
+
+
+async function selectMaybeSingle(table: string, userId: string) {
+  const { data, error } = await (supabase.from(table as any) as any).select("*").eq("user_id", userId).maybeSingle();
   if (error) {
     if (import.meta.env.DEV) console.error(`Data export failed for ${table}`, error);
     return null;
@@ -213,6 +226,7 @@ async function selectMaybeSingle(table: Parameters<typeof supabase.from>[0], use
 
   return data;
 }
+
 
 type AnyRecord = Record<string, any>;
 type ExcelSheet = { name: string; rows: AnyRecord[] };
