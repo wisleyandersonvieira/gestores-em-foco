@@ -194,13 +194,12 @@ async function getActivePrivacyRequest(userId: string, requestType: PrivacyReque
   return data;
 }
 
-async function selectByUser(table: Parameters<typeof supabase.from>[0], userId: string) {
+async function selectByUser(table: string, userId: string) {
   const pageSize = 1000;
   let from = 0;
   const all: any[] = [];
   while (true) {
-    const { data, error } = await supabase
-      .from(table)
+    const { data, error } = await (supabase.from(table as any) as any)
       .select("*")
       .eq("user_id", userId)
       .range(from, from + pageSize - 1);
@@ -215,6 +214,7 @@ async function selectByUser(table: Parameters<typeof supabase.from>[0], userId: 
   }
   return all;
 }
+
 
 
 async function selectMaybeSingle(table: Parameters<typeof supabase.from>[0], userId: string) {
