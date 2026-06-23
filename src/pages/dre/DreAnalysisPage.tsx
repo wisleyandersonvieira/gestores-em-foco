@@ -1,9 +1,11 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import { BarChart2, ChevronDown, Download, FileSpreadsheet, Minus, Plus, RotateCcw } from "lucide-react";
+import { BarChart2, ChevronDown, Download, FileSpreadsheet, RotateCcw, Share2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { DreLayout } from "@/components/dre/dre-layout";
-import { IndicatorCard, formatCurrency } from "@/components/dre/dre-ui";
+import { ComparisonTable, DreAnalysisSummaryCards } from "@/components/dre/DreAnalysisDisplay";
+import { DreShareModal } from "@/components/dre/DreShareModal";
+import { formatCurrency } from "@/components/dre/dre-ui";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,18 +14,13 @@ import { Label } from "@/components/ui/label";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatCompetence, formatPercentage, variationPercentage } from "@/lib/dre-calculations";
+import { formatCompetence, formatPercentage } from "@/lib/dre-calculations";
 import {
   buildDreAnalysisFromModel,
   buildSelectableDreAnalysisPeriods,
   dreAnalysisTableHtml,
-  formatDreAnalysisRowLabel,
-  isGoodDreAnalysisVariation,
-  type DreAnalysisPeriod,
   type DreAnalysisPeriodInput,
   type DreAnalysisResult,
-  type DreAnalysisRow,
   type DreAnalysisType,
 } from "@/lib/dre-analysis";
 import { escapeExcelFormula } from "@/lib/export-security";
@@ -57,6 +54,7 @@ function DreAnalysisContent({ userId }: { userId: string }) {
   const [loading, setLoading] = useState(false);
   const [showAdvancedAnalysis, setShowAdvancedAnalysis] = useState(false);
   const [exportingFormat, setExportingFormat] = useState<"pdf" | "pdf-synthetic" | "pdf-managerial" | "excel" | null>(null);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   useEffect(() => {
     void listDreModels(userId, "active")
@@ -265,6 +263,9 @@ function DreAnalysisContent({ userId }: { userId: string }) {
             <Button variant="outline" disabled={!result} onClick={() => setShowAdvancedAnalysis(true)}>
               <BarChart2 className="h-4 w-4" />Análise Detalhada
             </Button>
+            <Button variant="outline" disabled={!canGenerate} onClick={() => setShowShareModal(true)}>
+              <Share2 className="h-4 w-4" />Compartilhar análise
+            </Button>
             <Button disabled={!canGenerate || loading} onClick={() => void generateAnalysis()}>
               {loading ? "Gerando..." : "Gerar Análise"}
             </Button>
@@ -282,6 +283,19 @@ function DreAnalysisContent({ userId }: { userId: string }) {
         </Suspense>
       ) : null}
 
+      <DreShareModal
+        open={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        modelId={modelId}
+        modelName={models.find((m) => m.id === modelId)?.name ?? ""}
+        analysisType={analysisType}
+        selectedYears={years}
+        selectedPeriodIds={selectedIds}
+        includeDrafts={includeDrafts}
+        showVariation={showVariation}
+        showVerticalAnalysis={showVerticalAnalysis}
+      />
+
       {result ? (
         <>
           {result.periods.some((period) => period.missingMonths.length > 0) ? (
@@ -294,14 +308,7 @@ function DreAnalysisContent({ userId }: { userId: string }) {
             </Card>
           ) : null}
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <IndicatorCard title="Faturamento" value={formatCurrency(result.summary.revenue)} />
-            <IndicatorCard title="Total de Débitos" value={formatCurrency(result.summary.totalDebit)} />
-            <IndicatorCard title="Resultado acumulado" value={formatCurrency(result.summary.result)} tone={result.summary.result >= 0 ? "positive" : "negative"} />
-            <IndicatorCard title="Margem média" value={formatPercentage(result.summary.averageMargin)} />
-            <IndicatorCard title="Melhor período" value={result.summary.bestPeriod} />
-            <IndicatorCard title="Pior período" value={result.summary.worstPeriod} />
-          </div>
+          <DreAnalysisSummaryCards result={result} />
 
           <ComparisonTable result={result} showVariation={showVariation} showVerticalAnalysis={showVerticalAnalysis} />
         </>
@@ -377,155 +384,6 @@ function PeriodSelector({
   );
 }
 
-function ComparisonTable({ result, showVariation, showVerticalAnalysis }: { result: AnalysisResult; showVariation: boolean; showVerticalAnalysis: boolean }) {
-  const categoryKeys = useMemo(
-    () => result.rows
-      .filter((row) => row.lineType === "category" && result.rows.some((candidate) => candidate.lineType === "subcategory" && candidate.parentKey === row.key))
-      .map((row) => row.key),
-    [result.rows],
-  );
-  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(() => new Set());
-  const allExpanded = categoryKeys.length > 0 && expandedKeys.size === categoryKeys.length;
-  const visibleRows = useMemo(
-    () => result.rows.filter((row) => row.lineType !== "subcategory" || Boolean(row.parentKey && expandedKeys.has(row.parentKey))),
-    [expandedKeys, result.rows],
-  );
-
-  useEffect(() => {
-    setExpandedKeys(new Set());
-  }, [result]);
-
-  function toggleCategory(categoryKey: string) {
-    setExpandedKeys((current) => {
-      const next = new Set(current);
-      if (next.has(categoryKey)) {
-        next.delete(categoryKey);
-      } else {
-        next.add(categoryKey);
-      }
-      return next;
-    });
-  }
-
-  function toggleAllCategories() {
-    setExpandedKeys(allExpanded ? new Set() : new Set(categoryKeys));
-  }
-
-  return (
-    <Card className="border-primary/10 bg-white/90">
-      <CardHeader><CardTitle>Tabela Comparativa</CardTitle></CardHeader>
-      <CardContent className="overflow-x-auto">
-        <Table className="min-w-[920px]">
-          <TableHeader className="sticky top-0 z-10 bg-white">
-            <TableRow>
-              <TableHead className="sticky left-0 z-20 min-w-72 bg-white">
-                <div className="flex items-center gap-2">
-                  <span>Categoria / Subcategoria</span>
-                  <button
-                    type="button"
-                    className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    onClick={toggleAllCategories}
-                    aria-label={allExpanded ? "Recolher todas as subcategorias" : "Expandir todas as subcategorias"}
-                    title={allExpanded ? "Recolher todas" : "Expandir todas"}
-                  >
-                    {allExpanded ? <Minus className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
-                  </button>
-                </div>
-              </TableHead>
-              {result.periods.map((period, index) => (
-                <ColumnHeaders key={period.id} period={period} index={index} showVariation={showVariation} />
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {visibleRows.map((row) => (
-              <TableRow key={row.key} className={row.lineType === "category" ? "bg-muted/70" : row.isNetIncome ? "bg-primary/10" : row.isSumLine ? "bg-primary/5" : ""}>
-                <TableCell className={`sticky left-0 z-10 bg-inherit ${row.level === 1 ? "pl-10 text-sm" : "font-semibold"} ${row.isNetIncome ? "text-primary" : ""}`}>
-                  <div className="flex items-center gap-2">
-                    {categoryKeys.includes(row.key) ? (
-                      <button
-                        type="button"
-                        className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
-                        onClick={() => toggleCategory(row.key)}
-                        aria-label={expandedKeys.has(row.key) ? `Recolher subcategorias de ${row.label}` : `Expandir subcategorias de ${row.label}`}
-                        title={expandedKeys.has(row.key) ? "Recolher subcategorias" : "Expandir subcategorias"}
-                      >
-                        {expandedKeys.has(row.key) ? <Minus className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
-                      </button>
-                    ) : row.lineType === "category" ? <span className="h-6 w-6 shrink-0" /> : null}
-                    <span>{formatDreAnalysisRowLabel(row)}</span>
-                  </div>
-                  {row.isNetIncome ? <Badge className="ml-2" variant="secondary">LUCRO LÍQUIDO</Badge> : null}
-                </TableCell>
-                {result.periods.map((period, index) => {
-                  const current = getRowValue(row, period);
-                  const previous = index > 0 ? getRowValue(row, result.periods[index - 1]) : 0;
-                  const variation = index > 0 ? current - previous : 0;
-                  return (
-                    <ValueCells
-                      key={`${period.id}-${row.key}`}
-                      row={row}
-                      value={current}
-                      variation={variation}
-                      previous={previous}
-                      showVariation={showVariation && index > 0}
-                      showVerticalAnalysis={showVerticalAnalysis}
-                      verticalPercentage={getRowVerticalPercentage(row, period)}
-                    />
-                  );
-                })}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
-  );
-}
-
-function ColumnHeaders({ period, index, showVariation }: { period: DreAnalysisPeriod; index: number; showVariation: boolean }) {
-  return (
-    <>
-      <TableHead className="min-w-36 text-right">{period.label}</TableHead>
-      {showVariation && index > 0 ? <TableHead className="min-w-44 text-right">Var. anterior</TableHead> : null}
-    </>
-  );
-}
-
-function ValueCells({
-  row,
-  value,
-  variation,
-  previous,
-  showVariation,
-  showVerticalAnalysis,
-  verticalPercentage,
-}: {
-  row: DreAnalysisRow;
-  value: number;
-  variation: number;
-  previous: number;
-  showVariation: boolean;
-  showVerticalAnalysis: boolean;
-  verticalPercentage: number;
-}) {
-  const formatted = row.categoryType === "margin" ? formatPercentage(value) : formatCurrency(value);
-  const variationClass = variation === 0 ? "text-muted-foreground" : isGoodDreAnalysisVariation(row.categoryType, variation) ? "text-emerald-700" : "text-red-700";
-  return (
-    <>
-      <TableCell className={`text-right font-medium tabular-nums ${row.categoryType === "result" ? value >= 0 ? "text-emerald-700" : "text-red-700" : ""}`}>
-        <span>{formatted}</span>
-        {showVerticalAnalysis && row.categoryType !== "margin" ? <span className="mt-1 block text-xs font-semibold text-muted-foreground">{formatPercentage(verticalPercentage)}</span> : null}
-      </TableCell>
-      {showVariation ? (
-        <TableCell className={`text-right text-sm font-semibold tabular-nums ${variationClass}`}>
-          {formatCurrency(variation)} / {formatPercentage(variationPercentage(previous, value))}
-        </TableCell>
-      ) : null}
-    </>
-  );
-}
-
 function buildAvailableYears(entries: DreEntryWithModel[], selectedYears: string[]) {
   const currentYear = String(new Date().getFullYear());
   const years = new Set([
@@ -538,14 +396,6 @@ function buildAvailableYears(entries: DreEntryWithModel[], selectedYears: string
   ]);
   entries.forEach((entry) => years.add(entry.competence.slice(0, 4)));
   return Array.from(years).sort();
-}
-
-function getRowValue(row: DreAnalysisRow, period: DreAnalysisPeriod) {
-  return row.values[period.id]?.amount ?? 0;
-}
-
-function getRowVerticalPercentage(row: DreAnalysisRow, period: DreAnalysisPeriod) {
-  return row.values[period.id]?.verticalPercentage ?? 0;
 }
 
 function groupPeriodsByYear(periods: SelectablePeriod[]) {

@@ -31,6 +31,7 @@ const DreEntriesPage = lazy(() => import("@/pages/dre/DreEntriesPage"));
 const DreEntryFormPage = lazy(() => import("@/pages/dre/DreEntryFormPage"));
 const DreEntryViewPage = lazy(() => import("@/pages/dre/DreEntryViewPage"));
 const DreModelsPage = lazy(() => import("@/pages/dre/DreModelsPage"));
+const DrePublicAnalysisPage = lazy(() => import("@/pages/dre/DrePublicAnalysisPage"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const PlaceholderLegalPage = lazy(() => import("@/pages/PlaceholderLegalPage"));
 const PrivacyPolicyPage = lazy(() => import("@/pages/PrivacyPolicyPage"));
@@ -99,6 +100,7 @@ export default function App() {
         <Route path="/admin/eventos" element={<AdminPage />} />
         <Route path="/admin/suporte" element={<AdminPage />} />
         <Route path="/admin/configuracoes" element={<AdminPage />} />
+        <Route path="/public/analise-dre/:token" element={<DrePublicAnalysisPage />} />
         <Route path="/diagnostico/:token" element={<DiagnosticPage />} />
         <Route path="/termos-de-uso" element={<PlaceholderLegalPage title="Termos de Uso" />} />
         <Route path="/politica-de-privacidade" element={<PrivacyPolicyPage />} />
