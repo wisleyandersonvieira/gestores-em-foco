@@ -28,6 +28,7 @@ import {
 } from "@/lib/dre-analysis";
 import { escapeExcelFormula } from "@/lib/export-security";
 import { getDreEntriesWithItems, getDreModelWithLines, listDreEntriesByModelAndYears, listDreModels } from "@/lib/dre-service";
+import { exportManagerialDrePdf } from "@/lib/dre-managerial-pdf";
 import type { DreEntryWithModel, DreModel } from "@/types/dre";
 
 type AnalysisType = DreAnalysisType;
@@ -55,7 +56,7 @@ function DreAnalysisContent({ userId }: { userId: string }) {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [showAdvancedAnalysis, setShowAdvancedAnalysis] = useState(false);
-  const [exportingFormat, setExportingFormat] = useState<"pdf" | "pdf-synthetic" | "excel" | null>(null);
+  const [exportingFormat, setExportingFormat] = useState<"pdf" | "pdf-synthetic" | "pdf-managerial" | "excel" | null>(null);
 
   useEffect(() => {
     void listDreModels(userId, "active")
@@ -129,18 +130,28 @@ function DreAnalysisContent({ userId }: { userId: string }) {
     setResult(null);
   }
 
-  async function runExport(format: "pdf" | "pdf-synthetic" | "excel") {
+  async function runExport(format: "pdf" | "pdf-synthetic" | "pdf-managerial" | "excel") {
     if (!result || exportingFormat) return;
     setExportingFormat(format);
     try {
-      await new Promise<void>((resolve) => {
+      await new Promise<void>((resolve, reject) => {
         window.requestAnimationFrame(() => {
-          if (format === "pdf") exportAnalysisPdf(result, showVariation, showVerticalAnalysis);
-          if (format === "pdf-synthetic") exportAnalysisPdfSynthetic(result, showVariation, showVerticalAnalysis);
-          if (format === "excel") exportAnalysisExcel(result, showVariation, showVerticalAnalysis);
-          resolve();
+          try {
+            const exported = format === "pdf-managerial"
+              ? exportManagerialDrePdf(result, models.find((m) => m.id === modelId)?.name ?? "Modelo de DRE")
+              : Promise.resolve().then(() => {
+                if (format === "pdf") exportAnalysisPdf(result, showVariation, showVerticalAnalysis);
+                if (format === "pdf-synthetic") exportAnalysisPdfSynthetic(result, showVariation, showVerticalAnalysis);
+                if (format === "excel") exportAnalysisExcel(result, showVariation, showVerticalAnalysis);
+              });
+            exported.then(resolve).catch(reject);
+          } catch (error) {
+            reject(error);
+          }
         });
       });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível exportar o relatório.");
     } finally {
       setExportingFormat(null);
     }
@@ -242,6 +253,9 @@ function DreAnalysisContent({ userId }: { userId: string }) {
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={Boolean(exportingFormat)} onClick={() => void runExport("pdf-synthetic")}>
                   <Download className="h-4 w-4" />{exportingFormat === "pdf-synthetic" ? "Gerando PDF..." : "Exportar PDF (Sintética)"}
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled={Boolean(exportingFormat)} onClick={() => void runExport("pdf-managerial")}>
+                  <Download className="h-4 w-4" />{exportingFormat === "pdf-managerial" ? "Gerando PDF..." : "Análise Gerencial de DRE"}
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={Boolean(exportingFormat)} onClick={() => void runExport("excel")}>
                   <FileSpreadsheet className="h-4 w-4" />{exportingFormat === "excel" ? "Gerando Excel..." : "Exportar Excel"}
