@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   AlertTriangle,
@@ -502,21 +502,43 @@ function AbcCurveSection({ data }: { data: AdvancedDreAnalysis }) {
 // ── Section 5: Charts ──────────────────────────────────────────────────────────
 
 function ChartInsight({ text }: { text: string }) {
-  return <p className="mt-2 text-xs text-muted-foreground italic">{text}</p>;
+  return <p data-chart-insight className="mt-2 text-xs text-muted-foreground italic">{text}</p>;
 }
 
-function ChartsSection({ data }: { data: AdvancedDreAnalysis }) {
+function ChartsSection({ data, modelName }: { data: AdvancedDreAnalysis; modelName: string }) {
   const { charts_data: cd, metadata } = data;
   const hasMultiplePeriods = metadata.periods_count >= 2;
   const has3Periods = metadata.periods_count >= 3;
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [exporting, setExporting] = useState(false);
+
+  const periodsLabel = cd.revenue_evolution.map((p) => p.period).join(", ");
+
+  async function handleExportCharts() {
+    if (!containerRef.current) return;
+    setExporting(true);
+    try {
+      const { exportDreChartsPdf } = await import("@/lib/dre-charts-pdf");
+      await exportDreChartsPdf({ container: containerRef.current, modelName, periodsLabel });
+    } finally {
+      setExporting(false);
+    }
+  }
 
   const waterfallBarColor = (entry: { isTotal: boolean; up: number }) =>
     entry.isTotal ? COLORS.primary : entry.up > 0 ? COLORS.revenue : COLORS.expense;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" ref={containerRef}>
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" onClick={() => void handleExportCharts()} disabled={exporting}>
+          {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+          Exportar gráficos (PDF)
+        </Button>
+      </div>
+
       {/* Revenue evolution */}
-      <Card className="border-primary/10 bg-white">
+      <Card data-chart-card data-chart-title="Evolução do Faturamento" className="border-primary/10 bg-white">
         <CardHeader className="pb-2"><CardTitle className="text-sm">Evolução do Faturamento</CardTitle></CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={220}>
@@ -533,7 +555,7 @@ function ChartsSection({ data }: { data: AdvancedDreAnalysis }) {
       </Card>
 
       {/* Margin evolution */}
-      <Card className="border-primary/10 bg-white">
+      <Card data-chart-card data-chart-title="Evolução das Margens (%)" className="border-primary/10 bg-white">
         <CardHeader className="pb-2"><CardTitle className="text-sm">Evolução das Margens (%)</CardTitle></CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={220}>
@@ -555,7 +577,7 @@ function ChartsSection({ data }: { data: AdvancedDreAnalysis }) {
 
       {/* Waterfall */}
       {cd.waterfall.length > 0 && (
-        <Card className="border-primary/10 bg-white">
+        <Card data-chart-card data-chart-title="Ponte de Resultado (Waterfall)" className="border-primary/10 bg-white">
           <CardHeader className="pb-2"><CardTitle className="text-sm">Ponte de Resultado (Waterfall)</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={260}>
@@ -578,7 +600,7 @@ function ChartsSection({ data }: { data: AdvancedDreAnalysis }) {
 
       {/* Revenue vs Expenses */}
       {hasMultiplePeriods && (
-        <Card className="border-primary/10 bg-white">
+        <Card data-chart-card data-chart-title="Receita vs. Despesas por Período" className="border-primary/10 bg-white">
           <CardHeader className="pb-2"><CardTitle className="text-sm">Receita vs. Despesas por Período</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
@@ -598,7 +620,7 @@ function ChartsSection({ data }: { data: AdvancedDreAnalysis }) {
 
       {/* Top 5 expenses */}
       {cd.top_expenses.length > 0 && (
-        <Card className="border-primary/10 bg-white">
+        <Card data-chart-card data-chart-title="Top 5 Categorias de Despesa (períodos selecionados)" className="border-primary/10 bg-white">
           <CardHeader className="pb-2"><CardTitle className="text-sm">Top 5 Categorias de Despesa (períodos selecionados)</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
@@ -618,7 +640,7 @@ function ChartsSection({ data }: { data: AdvancedDreAnalysis }) {
 
       {/* Expenses distribution (donut) */}
       {cd.expenses_distribution.length > 0 && (
-        <Card className="border-primary/10 bg-white">
+        <Card data-chart-card data-chart-title="Distribuição de Despesas (períodos selecionados)" className="border-primary/10 bg-white">
           <CardHeader className="pb-2"><CardTitle className="text-sm">Distribuição de Despesas (períodos selecionados)</CardTitle></CardHeader>
           <CardContent>
             <div className="flex flex-col sm:flex-row items-center gap-4">
@@ -645,7 +667,7 @@ function ChartsSection({ data }: { data: AdvancedDreAnalysis }) {
 
       {/* Net income evolution (3+ periods) */}
       {has3Periods && (
-        <Card className="border-primary/10 bg-white">
+        <Card data-chart-card data-chart-title="Evolução do Lucro Líquido" className="border-primary/10 bg-white">
           <CardHeader className="pb-2"><CardTitle className="text-sm">Evolução do Lucro Líquido</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={200}>
@@ -946,7 +968,7 @@ export function DreAdvancedAnalysisModal({ result, modelName, onClose }: DreAdva
                 <TabsContent value="indicators" className="mt-0">{activeTab === "indicators" ? <IndicatorsSection data={analysis} /> : null}</TabsContent>
                 <TabsContent value="variations" className="mt-0">{activeTab === "variations" ? <VariationsSection data={analysis} /> : null}</TabsContent>
                 <TabsContent value="abc" className="mt-0">{activeTab === "abc" ? <AbcCurveSection data={analysis} /> : null}</TabsContent>
-                <TabsContent value="charts" className="mt-0">{activeTab === "charts" ? <ChartsSection data={analysis} /> : null}</TabsContent>
+                <TabsContent value="charts" className="mt-0">{activeTab === "charts" ? <ChartsSection data={analysis} modelName={modelName} /> : null}</TabsContent>
                 <TabsContent value="margins" className="mt-0">{activeTab === "margins" ? <MarginsSection data={analysis} /> : null}</TabsContent>
                 <TabsContent value="alerts" className="mt-0">{activeTab === "alerts" ? <AlertsSection data={analysis} /> : null}</TabsContent>
                 <TabsContent value="recommendations" className="mt-0">{activeTab === "recommendations" ? <RecommendationsSection data={analysis} /> : null}</TabsContent>
