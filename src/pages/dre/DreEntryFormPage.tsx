@@ -39,7 +39,8 @@ function DreEntryFormContent({ userId }: { userId: string }) {
         setCompetence(entry.competence);
         setModelId(entry.model_id);
         setEntryModelName(entry.model?.name ?? "Modelo salvo");
-        setLines(entry.items.map((item) => ({
+
+        const savedLines: DreDraftLine[] = entry.items.map((item) => ({
           categoryId: item.category_id,
           subcategoryId: item.subcategory_id,
           categoryName: item.category_name_snapshot,
@@ -52,7 +53,35 @@ function DreEntryFormContent({ userId }: { userId: string }) {
           lineType: item.line_type,
           displayOrder: item.display_order,
           value: Number(item.value || 0),
-        })));
+        }));
+
+        // Para rascunhos, mescla com a estrutura atual do modelo para incluir
+        // novas categorias/subcategorias adicionadas após a criação do DRE.
+        if (entry.status === "draft") {
+          try {
+            const model = await getDreModelWithLines(userId, entry.model_id);
+            const currentLines = buildDraftLinesFromModel(model);
+            const valueBySub = new Map<string, number>();
+            savedLines.forEach((line) => {
+              if (line.lineType === "subcategory" && line.subcategoryId) {
+                valueBySub.set(line.subcategoryId, line.value);
+              }
+            });
+            const merged = currentLines.map((line) => {
+              if (line.lineType === "subcategory" && line.subcategoryId) {
+                const prev = valueBySub.get(line.subcategoryId);
+                if (prev !== undefined) return { ...line, value: prev };
+              }
+              return line;
+            });
+            setLines(merged);
+            return;
+          } catch {
+            // Em caso de falha, mantém os itens salvos como fallback.
+          }
+        }
+
+        setLines(savedLines);
       }
     }
 
