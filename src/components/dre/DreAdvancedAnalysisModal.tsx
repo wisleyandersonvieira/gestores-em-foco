@@ -502,19 +502,41 @@ function AbcCurveSection({ data }: { data: AdvancedDreAnalysis }) {
 // ── Section 5: Charts ──────────────────────────────────────────────────────────
 
 function ChartInsight({ text }: { text: string }) {
-  return <p className="mt-2 text-xs text-muted-foreground italic">{text}</p>;
+  return <p data-chart-insight className="mt-2 text-xs text-muted-foreground italic">{text}</p>;
 }
 
-function ChartsSection({ data }: { data: AdvancedDreAnalysis }) {
+function ChartsSection({ data, modelName }: { data: AdvancedDreAnalysis; modelName: string }) {
   const { charts_data: cd, metadata } = data;
   const hasMultiplePeriods = metadata.periods_count >= 2;
   const has3Periods = metadata.periods_count >= 3;
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [exporting, setExporting] = useState(false);
+
+  const periodsLabel = cd.revenue_evolution.map((p) => p.period).join(", ");
+
+  async function handleExportCharts() {
+    if (!containerRef.current) return;
+    setExporting(true);
+    try {
+      const { exportDreChartsPdf } = await import("@/lib/dre-charts-pdf");
+      await exportDreChartsPdf({ container: containerRef.current, modelName, periodsLabel });
+    } finally {
+      setExporting(false);
+    }
+  }
 
   const waterfallBarColor = (entry: { isTotal: boolean; up: number }) =>
     entry.isTotal ? COLORS.primary : entry.up > 0 ? COLORS.revenue : COLORS.expense;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" ref={containerRef}>
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" onClick={() => void handleExportCharts()} disabled={exporting}>
+          {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+          Exportar gráficos (PDF)
+        </Button>
+      </div>
+
       {/* Revenue evolution */}
       <Card className="border-primary/10 bg-white">
         <CardHeader className="pb-2"><CardTitle className="text-sm">Evolução do Faturamento</CardTitle></CardHeader>
