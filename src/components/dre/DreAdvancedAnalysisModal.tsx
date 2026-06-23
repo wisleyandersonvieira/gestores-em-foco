@@ -538,7 +538,7 @@ function ChartsSection({ data, modelName }: { data: AdvancedDreAnalysis; modelNa
       </div>
 
       {/* Revenue evolution */}
-      <Card className="border-primary/10 bg-white">
+      <Card data-chart-card data-chart-title="Evolução do Faturamento" className="border-primary/10 bg-white">
         <CardHeader className="pb-2"><CardTitle className="text-sm">Evolução do Faturamento</CardTitle></CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={220}>
@@ -555,7 +555,7 @@ function ChartsSection({ data, modelName }: { data: AdvancedDreAnalysis; modelNa
       </Card>
 
       {/* Margin evolution */}
-      <Card className="border-primary/10 bg-white">
+      <Card data-chart-card data-chart-title="Evolução das Margens (%)" className="border-primary/10 bg-white">
         <CardHeader className="pb-2"><CardTitle className="text-sm">Evolução das Margens (%)</CardTitle></CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={220}>
@@ -577,7 +577,7 @@ function ChartsSection({ data, modelName }: { data: AdvancedDreAnalysis; modelNa
 
       {/* Waterfall */}
       {cd.waterfall.length > 0 && (
-        <Card className="border-primary/10 bg-white">
+        <Card data-chart-card data-chart-title="Ponte de Resultado (Waterfall)" className="border-primary/10 bg-white">
           <CardHeader className="pb-2"><CardTitle className="text-sm">Ponte de Resultado (Waterfall)</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={260}>
@@ -600,7 +600,7 @@ function ChartsSection({ data, modelName }: { data: AdvancedDreAnalysis; modelNa
 
       {/* Revenue vs Expenses */}
       {hasMultiplePeriods && (
-        <Card className="border-primary/10 bg-white">
+        <Card data-chart-card data-chart-title="Receita vs. Despesas por Período" className="border-primary/10 bg-white">
           <CardHeader className="pb-2"><CardTitle className="text-sm">Receita vs. Despesas por Período</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
@@ -620,7 +620,7 @@ function ChartsSection({ data, modelName }: { data: AdvancedDreAnalysis; modelNa
 
       {/* Top 5 expenses */}
       {cd.top_expenses.length > 0 && (
-        <Card className="border-primary/10 bg-white">
+        <Card data-chart-card data-chart-title="Top 5 Categorias de Despesa (períodos selecionados)" className="border-primary/10 bg-white">
           <CardHeader className="pb-2"><CardTitle className="text-sm">Top 5 Categorias de Despesa (períodos selecionados)</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
@@ -640,7 +640,7 @@ function ChartsSection({ data, modelName }: { data: AdvancedDreAnalysis; modelNa
 
       {/* Expenses distribution (donut) */}
       {cd.expenses_distribution.length > 0 && (
-        <Card className="border-primary/10 bg-white">
+        <Card data-chart-card data-chart-title="Distribuição de Despesas (períodos selecionados)" className="border-primary/10 bg-white">
           <CardHeader className="pb-2"><CardTitle className="text-sm">Distribuição de Despesas (períodos selecionados)</CardTitle></CardHeader>
           <CardContent>
             <div className="flex flex-col sm:flex-row items-center gap-4">
@@ -667,7 +667,7 @@ function ChartsSection({ data, modelName }: { data: AdvancedDreAnalysis; modelNa
 
       {/* Net income evolution (3+ periods) */}
       {has3Periods && (
-        <Card className="border-primary/10 bg-white">
+        <Card data-chart-card data-chart-title="Evolução do Lucro Líquido" className="border-primary/10 bg-white">
           <CardHeader className="pb-2"><CardTitle className="text-sm">Evolução do Lucro Líquido</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={200}>
