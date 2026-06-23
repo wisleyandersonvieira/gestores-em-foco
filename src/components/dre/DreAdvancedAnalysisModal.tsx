@@ -968,7 +968,7 @@ export function DreAdvancedAnalysisModal({ result, modelName, onClose }: DreAdva
                 <TabsContent value="indicators" className="mt-0">{activeTab === "indicators" ? <IndicatorsSection data={analysis} /> : null}</TabsContent>
                 <TabsContent value="variations" className="mt-0">{activeTab === "variations" ? <VariationsSection data={analysis} /> : null}</TabsContent>
                 <TabsContent value="abc" className="mt-0">{activeTab === "abc" ? <AbcCurveSection data={analysis} /> : null}</TabsContent>
-                <TabsContent value="charts" className="mt-0">{activeTab === "charts" ? <ChartsSection data={analysis} /> : null}</TabsContent>
+                <TabsContent value="charts" className="mt-0">{activeTab === "charts" ? <ChartsSection data={analysis} modelName={modelName} /> : null}</TabsContent>
                 <TabsContent value="margins" className="mt-0">{activeTab === "margins" ? <MarginsSection data={analysis} /> : null}</TabsContent>
                 <TabsContent value="alerts" className="mt-0">{activeTab === "alerts" ? <AlertsSection data={analysis} /> : null}</TabsContent>
                 <TabsContent value="recommendations" className="mt-0">{activeTab === "recommendations" ? <RecommendationsSection data={analysis} /> : null}</TabsContent>
