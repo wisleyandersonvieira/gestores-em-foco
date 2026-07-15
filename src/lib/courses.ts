@@ -126,6 +126,9 @@ export type UserCourseEnrollment = {
   course?: Course | null;
 };
 
+export type EnrollmentAccessState = "active" | "expiring_soon" | "expired";
+export type EnrollmentWithAccessState = UserCourseEnrollment & { accessState: EnrollmentAccessState };
+
 export type UserLessonProgress = {
   id: string;
   user_id: string;
@@ -163,16 +166,35 @@ export async function getPublishedCourses() {
   return (data ?? []) as Course[];
 }
 
-export async function getUserCourses(userId: string) {
+const EXPIRING_SOON_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+export function getEnrollmentAccessState(
+  enrollment: Pick<UserCourseEnrollment, "status" | "expires_at" | "canceled_at">,
+  now = Date.now(),
+): EnrollmentAccessState {
+  const activeStatuses: EnrollmentStatus[] = ["active", "trialing"];
+  const expiresAt = enrollment.expires_at ? new Date(enrollment.expires_at).getTime() : null;
+
+  if (enrollment.canceled_at || !activeStatuses.includes(enrollment.status) || (expiresAt !== null && expiresAt <= now)) {
+    return "expired";
+  }
+
+  if (expiresAt !== null && expiresAt - now <= EXPIRING_SOON_WINDOW_MS) {
+    return "expiring_soon";
+  }
+
+  return "active";
+}
+
+export async function getUserCourses(userId: string): Promise<EnrollmentWithAccessState[]> {
   const { data, error } = await table("user_course_enrollments")
     .select("*, course:courses(*)")
     .eq("user_id", userId)
-    .in("status", ["active", "trialing"])
     .order("created_at", { ascending: false });
 
   if (error) throw new Error("Nao foi possivel carregar seus cursos.");
   const now = Date.now();
-  return ((data ?? []) as UserCourseEnrollment[]).filter((item) => !item.canceled_at && (!item.expires_at || new Date(item.expires_at).getTime() > now));
+  return ((data ?? []) as UserCourseEnrollment[]).map((item) => ({ ...item, accessState: getEnrollmentAccessState(item, now) }));
 }
 
 export async function getUserCourseProgressByCourse(userId: string, courseIds: string[]) {

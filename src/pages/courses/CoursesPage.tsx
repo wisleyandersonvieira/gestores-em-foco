@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import { getPublishedCourses, getUserCourseProgressByCourse, getUserCourses, type Course, type UserCourseEnrollment } from "@/lib/courses";
+import { getPublishedCourses, getUserCourseProgressByCourse, getUserCourses, type Course, type EnrollmentWithAccessState } from "@/lib/courses";
 
 export default function CoursesPage() {
   return <ClientLayout>{(user) => <CoursesContent user={user} />}</ClientLayout>;
@@ -17,7 +17,7 @@ export default function CoursesPage() {
 
 function CoursesContent({ user }: { user: User }) {
   const [courses, setCourses] = useState<Course[]>([]);
-  const [enrollments, setEnrollments] = useState<UserCourseEnrollment[]>([]);
+  const [enrollments, setEnrollments] = useState<EnrollmentWithAccessState[]>([]);
   const [progressByCourse, setProgressByCourse] = useState<Map<string, number>>(new Map());
   const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -84,7 +84,7 @@ function CourseSection({
   title: string;
   empty: string;
   courses: Course[];
-  enrollmentByCourse: Map<string, UserCourseEnrollment>;
+  enrollmentByCourse: Map<string, EnrollmentWithAccessState>;
   progressByCourse: Map<string, number>;
   owned?: boolean;
 }) {
@@ -108,42 +108,68 @@ function CourseSection({
   );
 }
 
-function CourseCard({ course, enrollment, progressPercent, owned }: { course: Course; enrollment?: UserCourseEnrollment; progressPercent: number; owned?: boolean }) {
+function CourseCard({ course, enrollment, progressPercent, owned }: { course: Course; enrollment?: EnrollmentWithAccessState; progressPercent: number; owned?: boolean }) {
+  const accessState = enrollment?.accessState;
+  const isExpired = accessState === "expired";
   return (
     <Card className="flex h-full overflow-hidden border-primary/10 bg-white/90 shadow-sm">
       <div className="flex w-full flex-col">
-        <div className="aspect-[16/9] bg-muted">
+        <div className="relative aspect-[16/9] bg-muted">
           {course.thumbnail_url || course.cover_url ? (
-            <img src={course.thumbnail_url ?? course.cover_url ?? ""} alt={course.title} className="h-full w-full object-cover" />
+            <img src={course.thumbnail_url ?? course.cover_url ?? ""} alt={course.title} className={`h-full w-full object-cover ${isExpired ? "opacity-60" : ""}`} />
           ) : (
             <div className="flex h-full items-center justify-center bg-sidebar text-sidebar-foreground"><BookOpen className="h-12 w-12 text-accent" /></div>
           )}
+          {isExpired ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+              <Badge variant="destructive">Acesso expirado</Badge>
+            </div>
+          ) : null}
         </div>
         <CardHeader>
           <div className="flex items-start justify-between gap-3">
             <Badge variant="outline">{course.category ?? "Curso"}</Badge>
-            <Badge className={enrollment ? "bg-emerald-600" : ""}>{enrollment ? "Contratado" : formatPrice(course)}</Badge>
+            {accessState === "expired" ? (
+              <Badge variant="destructive">Acesso expirado</Badge>
+            ) : accessState === "expiring_soon" ? (
+              <Badge className="bg-amber-500 text-white hover:bg-amber-500">Expira em {daysUntilExpiry(enrollment?.expires_at ?? null)} dias</Badge>
+            ) : (
+              <Badge className={enrollment ? "bg-emerald-600" : ""}>{enrollment ? "Contratado" : formatPrice(course)}</Badge>
+            )}
           </div>
           <CardTitle className="text-xl">{course.title}</CardTitle>
           <p className="line-clamp-2 text-sm text-muted-foreground">{course.short_description ?? course.description ?? "Curso disponivel na plataforma."}</p>
         </CardHeader>
         <CardContent className="mt-auto space-y-4">
-          {owned ? (
+          {owned && !isExpired ? (
             <div className="space-y-2">
               <div className="flex justify-between text-xs text-muted-foreground"><span>Progresso</span><span>{progressPercent}%</span></div>
               <Progress value={progressPercent} className="h-2" />
             </div>
           ) : null}
           <Button asChild className="w-full bg-primary hover:bg-primary/90">
-            <Link to={owned ? `/cursos/${course.slug}/aulas` : `/cursos/${course.slug}`}>
-              {owned ? "Continuar assistindo" : "Ver detalhes"}
-              <ArrowRight className="h-4 w-4" />
-            </Link>
+            {isExpired ? (
+              <Link to="/produtos">
+                Renovar acesso
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            ) : (
+              <Link to={owned ? `/cursos/${course.slug}/aulas` : `/cursos/${course.slug}`}>
+                {owned ? "Continuar assistindo" : "Ver detalhes"}
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            )}
           </Button>
         </CardContent>
       </div>
     </Card>
   );
+}
+
+function daysUntilExpiry(expiresAt: string | null) {
+  if (!expiresAt) return 1;
+  const diffMs = new Date(expiresAt).getTime() - Date.now();
+  return Math.max(1, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
 }
 
 function formatPrice(course: Course) {

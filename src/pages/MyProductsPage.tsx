@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getUserProducts, type UserProductAccess } from "@/lib/products";
-import { getUserCourses, type UserCourseEnrollment } from "@/lib/courses";
+import { getUserCourses, type EnrollmentWithAccessState } from "@/lib/courses";
 
 const productIcons: Record<string, ComponentType<{ className?: string }>> = {
   diagnosticos: BarChart3,
@@ -32,7 +32,7 @@ export default function MyProductsPage() {
 
 function MyProductsContent({ userId }: { userId: string }) {
   const [products, setProducts] = useState<UserProductAccess[]>([]);
-  const [courses, setCourses] = useState<UserCourseEnrollment[]>([]);
+  const [courses, setCourses] = useState<EnrollmentWithAccessState[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -43,6 +43,9 @@ function MyProductsContent({ userId }: { userId: string }) {
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Nao foi possivel carregar seus produtos."));
   }, [userId]);
+
+  const activeCoursesCount = courses.filter((enrollment) => enrollment.accessState !== "expired").length;
+  const allCoursesExpired = courses.length > 0 && activeCoursesCount === 0;
 
   return (
     <div className="space-y-8">
@@ -69,17 +72,33 @@ function MyProductsContent({ userId }: { userId: string }) {
               <CardHeader>
                 <div className="flex items-start justify-between gap-4">
                   <BookOpen className="h-9 w-9 text-primary" />
-                  <Badge className="bg-emerald-600">{courses.length} curso(s)</Badge>
+                  <Badge className="bg-emerald-600">{activeCoursesCount} curso(s)</Badge>
                 </div>
                 <CardTitle className="text-xl">Cursos</CardTitle>
-                <CardDescription>Seus treinamentos contratados, aulas e materiais de apoio.</CardDescription>
+                <CardDescription>
+                  {allCoursesExpired
+                    ? "Seu acesso expirou. Renove para continuar estudando."
+                    : "Seus treinamentos contratados, aulas e materiais de apoio."}
+                </CardDescription>
               </CardHeader>
               <CardContent className="mt-auto space-y-4">
                 <div className="grid gap-2 rounded-lg bg-muted p-4 text-sm">
                   {courses.slice(0, 3).map((enrollment) => (
-                    <div key={enrollment.id} className="flex justify-between gap-4">
-                      <span className="text-muted-foreground">{enrollment.course?.title ?? "Curso"}</span>
-                      <span>{enrollment.status === "trialing" ? "Teste" : "Ativo"}</span>
+                    <div key={enrollment.id} className="flex items-center justify-between gap-4">
+                      <span className="flex flex-wrap items-center gap-2 text-muted-foreground">
+                        {enrollment.course?.title ?? "Curso"}
+                        {enrollment.accessState === "expiring_soon" ? (
+                          <Badge className="bg-amber-500 text-white hover:bg-amber-500">Expira em {daysUntilExpiry(enrollment.expires_at)} dias</Badge>
+                        ) : null}
+                        {enrollment.accessState === "expired" ? (
+                          <Badge variant="destructive">Acesso expirado</Badge>
+                        ) : null}
+                      </span>
+                      {enrollment.accessState === "expired" ? (
+                        <Link to="/produtos" className="font-medium text-primary hover:underline">Renovar acesso</Link>
+                      ) : (
+                        <span>{enrollment.status === "trialing" ? "Teste" : "Ativo"}</span>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -129,4 +148,10 @@ function MyProductsContent({ userId }: { userId: string }) {
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("pt-BR").format(new Date(value));
+}
+
+function daysUntilExpiry(expiresAt: string | null) {
+  if (!expiresAt) return 1;
+  const diffMs = new Date(expiresAt).getTime() - Date.now();
+  return Math.max(1, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
 }
