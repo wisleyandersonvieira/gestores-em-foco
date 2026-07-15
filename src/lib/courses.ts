@@ -15,6 +15,10 @@ export type ParsedYouTubeUrl = {
   embedUrl: string;
   thumbnailUrl: string;
 };
+export type ParsedVimeoUrl = {
+  videoId: string;
+  hash: string | null;
+};
 
 export const COURSE_MATERIALS_BUCKET = "course-materials";
 export const COURSE_MATERIAL_MAX_BYTES = 20 * 1024 * 1024;
@@ -409,8 +413,13 @@ export function buildEmbedUrl(rawUrl: string, provider?: VideoProvider | null) {
   const youtube = parseYouTubeUrl(url);
   if (youtube) return { provider: "youtube" as const, embedUrl: youtube.embedUrl, thumbnailUrl: youtube.thumbnailUrl };
 
-  const vimeoId = parseVimeoUrl(url);
-  if (vimeoId) return { provider: "vimeo" as const, embedUrl: `https://player.vimeo.com/video/${vimeoId}` };
+  const vimeo = parseVimeoUrl(url);
+  if (vimeo) {
+    const embedUrl = vimeo.hash
+      ? `https://player.vimeo.com/video/${vimeo.videoId}?h=${vimeo.hash}&dnt=1`
+      : `https://player.vimeo.com/video/${vimeo.videoId}?dnt=1`;
+    return { provider: "vimeo" as const, embedUrl };
+  }
 
   if (provider === "external" && isSafeExternalUrl(url)) return { provider: "external" as const, embedUrl: url };
   throw new Error("Informe um link valido do YouTube, Vimeo ou uma URL externa HTTPS permitida.");
@@ -440,17 +449,46 @@ export function parseYouTubeUrl(rawUrl: string): ParsedYouTubeUrl | null {
   }
 }
 
-export function parseVimeoUrl(rawUrl: string) {
+const VIMEO_ID_PATTERN = /^\d{6,12}$/;
+const VIMEO_HASH_PATTERN = /^[a-f0-9]{8,12}$/;
+
+export function parseVimeoUrl(rawUrl: string): ParsedVimeoUrl | null {
+  if (containsUnsafeMarkup(rawUrl)) return null;
   try {
-    const url = new URL(rawUrl);
-    if (url.hostname.endsWith("vimeo.com")) {
-      const id = url.pathname.split("/").filter(Boolean).pop() ?? "";
-      return /^\d+$/.test(id) ? id : null;
+    const url = new URL(rawUrl.trim());
+    if (url.protocol !== "https:") return null;
+    const host = url.hostname.replace(/^www\./, "");
+    const segments = url.pathname.split("/").filter(Boolean);
+
+    let videoId: string | undefined;
+    let hash: string | null = null;
+
+    if (host === "player.vimeo.com") {
+      // https://player.vimeo.com/video/{id}[?h={hash}]
+      if (segments[0] === "video") {
+        videoId = segments[1];
+        hash = url.searchParams.get("h");
+      }
+    } else if (host === "vimeo.com") {
+      if (segments[0] === "manage" && segments[1] === "videos") {
+        // Painel do Vimeo: https://vimeo.com/manage/videos/{id}
+        videoId = segments[2];
+      } else {
+        // https://vimeo.com/{id} ou https://vimeo.com/{id}/{hash} (nao listado)
+        videoId = segments[0];
+        hash = segments[1] ?? url.searchParams.get("h");
+      }
+    } else {
+      return null;
     }
+
+    if (!videoId || !VIMEO_ID_PATTERN.test(videoId)) return null;
+    if (hash !== null && !VIMEO_HASH_PATTERN.test(hash)) return null;
+
+    return { videoId, hash: hash ?? null };
   } catch {
     return null;
   }
-  return null;
 }
 
 function cleanVideoId(value: string) {
@@ -573,6 +611,9 @@ export async function saveCourseLesson(input: Partial<CourseLesson> & { course_i
   }
   if (input.lesson_type === "video" && videoProvider === "youtube" && !parseYouTubeUrl(input.video_url ?? "")) {
     throw new Error("Informe um link valido do YouTube.");
+  }
+  if (input.lesson_type === "video" && videoProvider === "vimeo" && !parseVimeoUrl(input.video_url ?? "")) {
+    throw new Error("Informe um link valido do Vimeo (aceita links de videos nao listados).");
   }
 
   const payload = {

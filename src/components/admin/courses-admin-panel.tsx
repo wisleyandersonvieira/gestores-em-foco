@@ -377,7 +377,7 @@ function LessonDialog(props: { open: boolean; value: CourseLesson | "new" | null
   useEffect(() => {
     const moduleId = current?.module_id ?? props.initialModuleId ?? props.modules[0]?.id ?? "";
     const moduleLessons = props.lessons.filter((lesson) => lesson.module_id === moduleId);
-    setForm(current ? { ...current, duration_input: formatDurationInput(current.duration_seconds) } : { title: "", module_id: moduleId, lesson_type: "video", video_provider: "youtube", status: "active", is_preview: false, display_order: nextOrder(moduleLessons), duration_input: "" });
+    setForm(current ? { ...current, duration_input: formatDurationInput(current.duration_seconds) } : { title: "", module_id: moduleId, lesson_type: "video", video_provider: "vimeo", status: "active", is_preview: false, display_order: nextOrder(moduleLessons), duration_input: "" });
   }, [current, props.open, props.modules, props.lessons, props.initialModuleId]);
   return <SimpleEntityDialog
     title={current ? "Editar aula" : "Nova aula"}
@@ -392,9 +392,9 @@ function LessonDialog(props: { open: boolean; value: CourseLesson | "new" | null
     <Field label="Descricao da aula"><Textarea value={form.description ?? ""} onChange={(event) => setForm({ ...form, description: event.target.value })} /></Field>
     <div className="grid gap-4 sm:grid-cols-2">
       <Field label="Tipo da aula"><Select value={form.lesson_type ?? "video"} onValueChange={(lesson_type) => setForm({ ...form, lesson_type: lesson_type as CourseLesson["lesson_type"] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="video">Video</SelectItem><SelectItem value="text">Texto</SelectItem><SelectItem value="file">Arquivo</SelectItem><SelectItem value="external_link">Link externo</SelectItem></SelectContent></Select></Field>
-      <Field label="Provedor do video"><Select value={form.video_provider ?? "youtube"} onValueChange={(video_provider) => setForm({ ...form, video_provider: video_provider as CourseLesson["video_provider"] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="youtube">YouTube</SelectItem><SelectItem value="vimeo">Vimeo</SelectItem><SelectItem value="external">Externo</SelectItem></SelectContent></Select></Field>
+      <Field label="Provedor do video"><Select value={form.video_provider ?? "vimeo"} onValueChange={(video_provider) => setForm({ ...form, video_provider: video_provider as CourseLesson["video_provider"] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="youtube">YouTube</SelectItem><SelectItem value="vimeo">Vimeo</SelectItem><SelectItem value="external">Externo</SelectItem></SelectContent></Select></Field>
     </div>
-    <Field label="Link do video"><Input value={form.video_url ?? ""} onChange={(event) => setForm({ ...form, video_url: event.target.value })} placeholder="https://www.youtube.com/watch?v=VIDEO_ID" /></Field>
+    <Field label="Link do video"><Input value={form.video_url ?? ""} onChange={(event) => setForm({ ...form, video_url: event.target.value })} placeholder="https://vimeo.com/123456789/a1b2c3d4e5" /><span className="text-xs font-normal text-muted-foreground">Cole o link do Vimeo. Para videos nao listados, use o link completo com o codigo de privacidade (vimeo.com/ID/codigo).</span></Field>
     <div className="grid gap-4 sm:grid-cols-2">
       <Field label="Duracao da aula"><Input value={form.duration_input ?? ""} onChange={(event) => setForm({ ...form, duration_input: event.target.value })} placeholder="10, 10:30 ou 01:10:30" /></Field>
       <Field label="Thumbnail URL"><Input value={form.thumbnail_url ?? ""} onChange={(event) => setForm({ ...form, thumbnail_url: event.target.value })} placeholder="Opcional" /></Field>
