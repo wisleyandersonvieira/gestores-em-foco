@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { getAdminAccessError } from "@/lib/admin-access";
 import { getAuthErrorMessage } from "@/lib/auth-errors";
+import { sanitizeInternalRedirect } from "@/lib/navigation";
 import { TurnstileCaptcha, type TurnstileCaptchaHandle } from "@/components/auth/turnstile-captcha";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +16,9 @@ export default function LoginPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const created = searchParams.get("cadastro") === "sucesso";
-  const callbackUrl = searchParams.get("redirect") ?? searchParams.get("callbackUrl") ?? "/dashboard";
+  const callbackUrl = sanitizeInternalRedirect(
+    searchParams.get("redirect") ?? searchParams.get("callbackUrl"),
+  );
   const adminAccessError =
     searchParams.get("erro") === "admin_email" ? getAdminAccessError(searchParams.get("email")) : null;
   const [error, setError] = useState<string | null>(null);
