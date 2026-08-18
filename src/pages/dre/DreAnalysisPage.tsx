@@ -137,11 +137,13 @@ function DreAnalysisContent({ userId }: { userId: string }) {
           try {
             const exported = format === "pdf-managerial"
               ? exportManagerialDrePdf(result, models.find((m) => m.id === modelId)?.name ?? "Modelo de DRE")
-              : Promise.resolve().then(() => {
-                if (format === "pdf") exportAnalysisPdf(result, showVariation, showVerticalAnalysis);
-                if (format === "pdf-synthetic") exportAnalysisPdfSynthetic(result, showVariation, showVerticalAnalysis);
-                if (format === "excel") exportAnalysisExcel(result, showVariation, showVerticalAnalysis);
-              });
+              : format === "excel"
+                ? exportDreAnalysisExcel(result, showVariation, showVerticalAnalysis, models.find((m) => m.id === modelId)?.name ?? "Modelo de DRE")
+                : Promise.resolve().then(() => {
+                  if (format === "pdf") exportAnalysisPdf(result, showVariation, showVerticalAnalysis);
+                  if (format === "pdf-synthetic") exportAnalysisPdfSynthetic(result, showVariation, showVerticalAnalysis);
+                });
+
             exported.then(resolve).catch(reject);
           } catch (error) {
             reject(error);
