@@ -23,7 +23,6 @@ import {
   type DreAnalysisResult,
   type DreAnalysisType,
 } from "@/lib/dre-analysis";
-import { escapeExcelFormula } from "@/lib/export-security";
 import { getDreEntriesWithItems, getDreModelWithLines, listDreEntriesByModelAndYears, listDreModels } from "@/lib/dre-service";
 import { exportDreAnalysisExcel } from "@/lib/dre-excel";
 import { exportManagerialDrePdf } from "@/lib/dre-managerial-pdf";
