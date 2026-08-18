@@ -90,11 +90,12 @@ export function ComparisonTable({
       <CardHeader>
         <CardTitle>Tabela Comparativa</CardTitle>
       </CardHeader>
-      <CardContent className="overflow-x-auto">
+      <CardContent className="overflow-x-auto px-2 sm:px-6">
         <Table className="min-w-[920px]">
-          <TableHeader className="sticky top-0 z-10 bg-white">
+          <TableHeader className="sticky top-0 z-20 bg-white">
             <TableRow>
-              <TableHead className="sticky left-0 z-20 min-w-72 bg-white">
+              <TableHead className="sticky left-0 z-30 min-w-52 bg-white shadow-[1px_0_0_0_hsl(var(--border))] sm:min-w-72">
+
                 <div className="flex items-center gap-2">
                   <span>Categoria / Subcategoria</span>
                   <button
@@ -128,8 +129,15 @@ export function ComparisonTable({
                 }
               >
                 <TableCell
-                  className={`sticky left-0 z-10 bg-inherit ${row.level === 1 ? "pl-10 text-sm" : "font-semibold"} ${row.isNetIncome ? "text-primary" : ""}`}
+                  className={`sticky left-0 z-10 shadow-[1px_0_0_0_hsl(var(--border))] ${
+                    row.lineType === "category"
+                      ? "bg-[hsl(var(--muted))]"
+                      : row.isNetIncome
+                        ? "bg-[hsl(var(--muted))]"
+                        : "bg-white"
+                  } ${row.level === 1 ? "pl-6 text-sm sm:pl-10" : "font-semibold"} ${row.isNetIncome ? "text-primary" : ""}`}
                 >
+
                   <div className="flex items-center gap-2">
                     {categoryKeys.includes(row.key) ? (
                       <button
