@@ -25,6 +25,7 @@ import {
 } from "@/lib/dre-analysis";
 import { escapeExcelFormula } from "@/lib/export-security";
 import { getDreEntriesWithItems, getDreModelWithLines, listDreEntriesByModelAndYears, listDreModels } from "@/lib/dre-service";
+import { exportDreAnalysisExcel } from "@/lib/dre-excel";
 import { exportManagerialDrePdf } from "@/lib/dre-managerial-pdf";
 import type { DreEntryWithModel, DreModel } from "@/types/dre";
 
@@ -480,17 +481,6 @@ function exportAnalysisPdfSynthetic(result: AnalysisResult, showVariation: boole
     </body></html>
   `);
   reportWindow.document.close();
-}
-
-function exportAnalysisExcel(result: AnalysisResult, showVariation: boolean, showVerticalAnalysis: boolean) {
-  const html = `<!doctype html><html><head><meta charset="utf-8" /></head><body>${dreAnalysisTableHtml(result, showVariation, showVerticalAnalysis, { sanitizeText: escapeExcelFormula })}</body></html>`;
-  const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "analise-dre.xls";
-  link.click();
-  URL.revokeObjectURL(url);
 }
 
 function reportCard(label: string, value: string, tone = "") {
