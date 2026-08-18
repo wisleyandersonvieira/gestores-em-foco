@@ -133,7 +133,7 @@ export function ComparisonTable({
                     row.lineType === "category"
                       ? "bg-[hsl(var(--muted))]"
                       : row.isNetIncome
-                        ? "bg-[hsl(var(--primary)/0.1)] bg-white bg-blend-normal"
+                        ? "bg-[hsl(var(--muted))]"
                         : "bg-white"
                   } ${row.level === 1 ? "pl-6 text-sm sm:pl-10" : "font-semibold"} ${row.isNetIncome ? "text-primary" : ""}`}
                 >
