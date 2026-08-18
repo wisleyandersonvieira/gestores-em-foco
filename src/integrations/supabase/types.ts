@@ -1095,6 +1095,74 @@ export type Database = {
           },
         ]
       }
+      dre_analysis_share_links: {
+        Row: {
+          access_count: number
+          analysis_type: string
+          created_at: string
+          created_by: string
+          description: string | null
+          dre_model_id: string
+          expires_at: string
+          id: string
+          include_drafts: boolean
+          last_accessed_at: string | null
+          revoked_at: string | null
+          selected_period_ids: string[]
+          selected_years: string[]
+          show_variation: boolean
+          show_vertical_analysis: boolean
+          token: string
+          user_id: string
+        }
+        Insert: {
+          access_count?: number
+          analysis_type: string
+          created_at?: string
+          created_by: string
+          description?: string | null
+          dre_model_id: string
+          expires_at: string
+          id?: string
+          include_drafts?: boolean
+          last_accessed_at?: string | null
+          revoked_at?: string | null
+          selected_period_ids: string[]
+          selected_years: string[]
+          show_variation?: boolean
+          show_vertical_analysis?: boolean
+          token: string
+          user_id: string
+        }
+        Update: {
+          access_count?: number
+          analysis_type?: string
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          dre_model_id?: string
+          expires_at?: string
+          id?: string
+          include_drafts?: boolean
+          last_accessed_at?: string | null
+          revoked_at?: string | null
+          selected_period_ids?: string[]
+          selected_years?: string[]
+          show_variation?: boolean
+          show_vertical_analysis?: boolean
+          token?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dre_analysis_share_links_dre_model_id_fkey"
+            columns: ["dre_model_id"]
+            isOneToOne: false
+            referencedRelation: "dre_models"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dre_categories: {
         Row: {
           created_at: string
@@ -2402,6 +2470,21 @@ export type Database = {
           model_id: string
         }[]
       }
+      create_dre_share_link: {
+        Args: {
+          p_analysis_type: string
+          p_description?: string
+          p_dre_model_id: string
+          p_expires_at: string
+          p_include_drafts: boolean
+          p_selected_period_ids: string[]
+          p_selected_years: string[]
+          p_show_variation: boolean
+          p_show_vertical_analysis: boolean
+          p_token: string
+        }
+        Returns: Json
+      }
       default_dre_category_id: {
         Args: {
           p_display_order: number
@@ -2426,6 +2509,7 @@ export type Database = {
             }
             Returns: string
           }
+      fetch_dre_analysis_for_token: { Args: { p_token: string }; Returns: Json }
       find_dre_ownership_violations: {
         Args: never
         Returns: {
