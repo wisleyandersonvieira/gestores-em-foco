@@ -129,8 +129,15 @@ export function ComparisonTable({
                 }
               >
                 <TableCell
-                  className={`sticky left-0 z-10 bg-inherit ${row.level === 1 ? "pl-10 text-sm" : "font-semibold"} ${row.isNetIncome ? "text-primary" : ""}`}
+                  className={`sticky left-0 z-10 shadow-[1px_0_0_0_hsl(var(--border))] ${
+                    row.lineType === "category"
+                      ? "bg-[hsl(var(--muted))]"
+                      : row.isNetIncome
+                        ? "bg-[hsl(var(--primary)/0.1)] bg-white bg-blend-normal"
+                        : "bg-white"
+                  } ${row.level === 1 ? "pl-6 text-sm sm:pl-10" : "font-semibold"} ${row.isNetIncome ? "text-primary" : ""}`}
                 >
+
                   <div className="flex items-center gap-2">
                     {categoryKeys.includes(row.key) ? (
                       <button
