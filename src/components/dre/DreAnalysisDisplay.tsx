@@ -90,11 +90,12 @@ export function ComparisonTable({
       <CardHeader>
         <CardTitle>Tabela Comparativa</CardTitle>
       </CardHeader>
-      <CardContent className="overflow-x-auto">
+      <CardContent className="overflow-x-auto px-2 sm:px-6">
         <Table className="min-w-[920px]">
-          <TableHeader className="sticky top-0 z-10 bg-white">
+          <TableHeader className="sticky top-0 z-20 bg-white">
             <TableRow>
-              <TableHead className="sticky left-0 z-20 min-w-72 bg-white">
+              <TableHead className="sticky left-0 z-30 min-w-52 bg-white shadow-[1px_0_0_0_hsl(var(--border))] sm:min-w-72">
+
                 <div className="flex items-center gap-2">
                   <span>Categoria / Subcategoria</span>
                   <button
